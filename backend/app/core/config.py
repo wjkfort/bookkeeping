@@ -15,6 +15,13 @@ class Settings(BaseSettings):
         "postgresql://username:password@localhost:5432/bookkeeping"
     )
 
+    # Open Exchange Rates API
+    OPEN_EXCHANGE_RATES_API_KEY: str = os.getenv(
+        "OPEN_EXCHANGE_RATES_API_KEY",
+        ""
+    )
+    EXCHANGE_RATE_CACHE_HOURS: int = 24  # Cache rates for 24 hours
+
     # API
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Bookkeeping API"

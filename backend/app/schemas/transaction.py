@@ -5,6 +5,7 @@ from typing import Optional
 
 class TransactionCreate(BaseModel):
     amount: float = Field(..., gt=0)
+    currency: str = Field(default='USD', max_length=3)
     description: Optional[str] = None
     category_id: int
     date: Optional[str] = None  # Accept string date in ISO format
@@ -12,6 +13,7 @@ class TransactionCreate(BaseModel):
 
 class TransactionUpdate(BaseModel):
     amount: Optional[float] = Field(None, gt=0)
+    currency: Optional[str] = Field(None, max_length=3)
     description: Optional[str] = None
     category_id: Optional[int] = None
     date: Optional[str] = None  # Accept string date in ISO format
@@ -20,6 +22,7 @@ class TransactionUpdate(BaseModel):
 class TransactionResponse(BaseModel):
     id: int
     amount: float
+    currency: str
     description: Optional[str]
     date: date
     category_id: int

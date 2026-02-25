@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getCategories, createCategory, deleteCategory } from '../api';
 
 function Categories() {
+  const { t } = useTranslation();
   const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState({ name: '', type: 'expense' });
   const [loading, setLoading] = useState(true);
@@ -29,33 +31,33 @@ function Categories() {
       loadCategories();
     } catch (error) {
       console.error('Error creating category:', error);
-      alert('Error creating category');
+      alert(t('categories.errorCreating'));
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
+    if (window.confirm(t('categories.deleteConfirm'))) {
       try {
         await deleteCategory(id);
         loadCategories();
       } catch (error) {
         console.error('Error deleting category:', error);
-        alert('Error deleting category');
+        alert(t('categories.errorDeleting'));
       }
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('categories.loading')}</div>;
 
   return (
     <div>
-      <h1>Categories</h1>
+      <h1>{t('categories.title')}</h1>
 
       <div className="card">
-        <h2>Add New Category</h2>
+        <h2>{t('categories.addNew')}</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Name</label>
+            <label>{t('categories.name')}</label>
             <input
               type="text"
               value={formData.name}
@@ -65,31 +67,31 @@ function Categories() {
           </div>
 
           <div className="form-group">
-            <label>Type</label>
+            <label>{t('categories.type')}</label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             >
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
+              <option value="income">{t('categories.income')}</option>
+              <option value="expense">{t('categories.expense')}</option>
             </select>
           </div>
 
-          <button type="submit" className="btn btn-primary">Add Category</button>
+          <button type="submit" className="btn btn-primary">{t('categories.add')}</button>
         </form>
       </div>
 
       <div className="card">
-        <h2>All Categories</h2>
+        <h2>{t('categories.allCategories')}</h2>
         {categories.length === 0 ? (
-          <p>No categories yet</p>
+          <p>{t('categories.noCategories')}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Actions</th>
+                <th>{t('categories.name')}</th>
+                <th>{t('categories.type')}</th>
+                <th>{t('categories.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -98,7 +100,7 @@ function Categories() {
                   <td>{category.name}</td>
                   <td>
                     <span className={`badge badge-${category.type}`}>
-                      {category.type}
+                      {t(`categories.${category.type}`)}
                     </span>
                   </td>
                   <td>
@@ -106,7 +108,7 @@ function Categories() {
                       onClick={() => handleDelete(category.id)}
                       className="btn btn-danger"
                     >
-                      Delete
+                      {t('categories.deleteBtn')}
                     </button>
                   </td>
                 </tr>

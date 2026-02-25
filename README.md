@@ -1,6 +1,38 @@
 # Bookkeeping Application
 
-A full-stack bookkeeping application with FastAPI backend and React (Vite) frontend.
+A full-stack bookkeeping application with multi-language support and automatic currency conversion.
+
+## Features
+
+- **Multi-Language Support (i18n)**
+  - English (EN) and Chinese (中文) interface
+  - Language switcher in navigation bar
+  - Persistent language preference in localStorage
+
+- **Automatic Currency Conversion**
+  - USD ($) for English, CNY (¥) for Chinese
+  - Real-time exchange rates from Open Exchange Rates API
+  - Smart caching (24 hours) to minimize API usage
+  - Automatic conversion when switching languages
+  - Shows both converted and original amounts
+
+- **Transaction Management**
+  - Add, edit, and delete transactions
+  - Filter by date range and category
+  - Each transaction stores its original currency
+
+- **Category Management**
+  - Create income and expense categories
+  - Organize transactions by category
+
+- **Dashboard**
+  - Summary cards showing total income, expense, and balance
+  - Recent transactions list
+  - All amounts automatically converted to selected currency
+
+- **REST API**
+  - Full-featured API with automatic documentation
+  - Real-time updates across the application
 
 ## Project Structure
 
@@ -13,7 +45,8 @@ bookkeeping/
 │   │   │   ├── __init__.py
 │   │   │   ├── categories.py
 │   │   │   ├── transactions.py
-│   │   │   └── summary.py
+│   │   │   ├── summary.py
+│   │   │   └── exchange_rates.py  # Currency conversion API
 │   │   ├── core/              # Core functionality
 │   │   │   ├── __init__.py
 │   │   │   ├── config.py      # Configuration
@@ -21,13 +54,16 @@ bookkeeping/
 │   │   ├── models/            # SQLAlchemy models
 │   │   │   ├── __init__.py
 │   │   │   ├── category.py
-│   │   │   └── transaction.py
+│   │   │   ├── transaction.py
+│   │   │   └── exchange_rate.py   # Exchange rate cache model
 │   │   ├── schemas/           # Pydantic schemas
 │   │   │   ├── __init__.py
 │   │   │   ├── category.py
 │   │   │   ├── transaction.py
-│   │   │   └── summary.py
+│   │   │   ├── summary.py
+│   │   │   └── exchange_rate.py
 │   │   └── main.py            # FastAPI app entry
+│   ├── migrations/            # SQL migration scripts
 │   ├── .env.example
 │   ├── .gitignore
 │   ├── .python-version
@@ -41,10 +77,17 @@ bookkeeping/
     │   ├── components/        # React components
     │   │   ├── Dashboard.jsx
     │   │   ├── Transactions.jsx
-    │   │   └── Categories.jsx
+    │   │   ├── Categories.jsx
+    │   │   └── LanguageSwitcher.jsx  # Language toggle
+    │   ├── hooks/             # Custom React hooks
+    │   │   └── useCurrency.js # Currency conversion hook
+    │   ├── locales/           # i18n translation files
+    │   │   ├── en.json        # English translations
+    │   │   └── zh.json        # Chinese translations
     │   ├── App.jsx            # Main app component
     │   ├── App.css            # Styles
     │   ├── api.js             # API service layer
+    │   ├── i18n.js            # i18next configuration
     │   ├── index.css          # Global styles
     │   └── main.jsx           # Entry point
     ├── index.html
@@ -54,6 +97,14 @@ bookkeeping/
 ```
 
 ## Quick Start
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- Python 3.12+
+- PostgreSQL 15+
+- Open Exchange Rates API key (free tier: 1000 requests/month)
+  - Sign up at [https://openexchangerates.org/signup/free](https://openexchangerates.org/signup/free)
 
 ### Backend Setup
 
@@ -74,14 +125,21 @@ Or using pip:
 pip install -r requirements.txt
 ```
 
-3. Configure database:
+3. Configure database and API key:
    - Copy `.env.example` to `.env`
-   - Update `DATABASE_URL` with your PostgreSQL credentials:
+   - Update with your credentials:
    ```
    DATABASE_URL=postgresql://username:password@localhost:5432/bookkeeping
+   OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
    ```
 
-4. Run the backend:
+4. Run database migrations:
+```bash
+psql "$DATABASE_URL" -f migrations/add_currency_to_transactions.sql
+psql "$DATABASE_URL" -f migrations/create_exchange_rates_table.sql
+```
+
+5. Run the backend:
 
 Using uv:
 ```bash
@@ -117,6 +175,43 @@ npm run dev
 
 Frontend will open at `http://localhost:5173`
 
+## Usage
+
+### Language Switching
+
+Click the language buttons (EN / 中文) in the top-right corner of the navigation bar to switch between English and Chinese. Your preference is saved in browser localStorage.
+
+### Currency Conversion
+
+- **English Mode**: All amounts display in USD ($)
+- **Chinese Mode**: All amounts display in CNY (¥)
+
+When you switch languages:
+1. Exchange rates are fetched (or loaded from 24-hour cache)
+2. Dashboard summary automatically converts to target currency
+3. Transaction list shows converted amounts with original in parentheses
+4. New transactions save with the current language's currency
+
+**Example:**
+- Create transaction: $100 USD
+- Switch to Chinese: Shows ¥686.72 ($100.00)
+- Create transaction: ¥500 CNY
+- Switch to English: Both transactions converted and summed in USD
+
+### Managing Transactions
+
+1. Go to **Transactions** page
+2. Fill in the form: amount, description, category, date
+3. Click **Add** to create transaction (saves with current language's currency)
+4. Use filters to find specific transactions by date range or category
+5. Edit or delete existing transactions
+
+### Managing Categories
+
+1. Go to **Categories** page
+2. Create income or expense categories
+3. Use categories when creating transactions
+
 ## Features
 
 - **Dashboard**: View summary of income, expense, and balance with recent transactions
@@ -132,6 +227,7 @@ Frontend will open at `http://localhost:5173`
 - **SQLAlchemy** - SQL toolkit and ORM
 - **PostgreSQL** - Relational database
 - **Pydantic** - Data validation using Python type annotations
+- **httpx** - Async HTTP client for API requests
 - **uv** - Fast Python package installer and resolver
 
 ### Frontend
@@ -139,6 +235,7 @@ Frontend will open at `http://localhost:5173`
 - **Vite** - Next generation frontend tooling (fast HMR, optimized builds)
 - **React Router** - Client-side routing
 - **Axios** - Promise-based HTTP client
+- **i18next / react-i18next** - Internationalization framework
 - **CSS** - Custom styling
 
 ## API Endpoints
@@ -152,12 +249,16 @@ All endpoints are prefixed with `/api/v1`:
 
 ### Transactions
 - `GET /api/v1/transactions` - List transactions (with optional filters: category_id, start_date, end_date)
-- `POST /api/v1/transactions` - Create a transaction
+- `POST /api/v1/transactions` - Create a transaction (includes currency field)
 - `PUT /api/v1/transactions/{id}` - Update a transaction
 - `DELETE /api/v1/transactions/{id}` - Delete a transaction
 
 ### Summary
-- `GET /api/v1/summary` - Get income/expense summary (with optional filters: start_date, end_date)
+- `GET /api/v1/summary?target_currency=CNY` - Get income/expense summary converted to target currency (with optional filters: start_date, end_date)
+
+### Exchange Rates
+- `GET /api/v1/exchange-rates/rates?base=USD&force_refresh=false` - Get cached exchange rates (USD/CNY)
+- `GET /api/v1/exchange-rates/convert?amount=100&from_currency=USD&to_currency=CNY` - Convert amount between currencies
 
 ## Development
 
@@ -167,6 +268,24 @@ The project follows clean architecture principles:
 - **Type safety**: Pydantic schemas for request/response validation
 - **Automatic documentation**: FastAPI generates interactive API docs
 - **Fast development**: Vite provides instant HMR and fast builds
+- **Internationalization**: Easy to add new languages via JSON translation files
+
+### Adding New Languages
+
+1. Create translation file: `client/src/locales/{lang}.json`
+2. Add currency configuration:
+   ```json
+   {
+     "currency": {
+       "symbol": "€",
+       "code": "EUR"
+     },
+     "nav": { ... },
+     "dashboard": { ... }
+   }
+   ```
+3. Update `client/src/components/LanguageSwitcher.jsx` to include new language button
+4. Update Open Exchange Rates API call to include new currency in symbols parameter
 
 ## Production Build
 
@@ -185,12 +304,44 @@ npm run build
 
 The optimized build will be in the `client/dist` folder, ready to be served by any static file server.
 
+## Troubleshooting
+
+### Exchange rates not loading
+- Verify `OPEN_EXCHANGE_RATES_API_KEY` is set in `backend/.env`
+- Check backend logs for API errors
+- Test endpoint directly: `http://localhost:8000/api/v1/exchange-rates/rates`
+- Ensure you haven't exceeded the 1000 requests/month limit
+
+### Currency not converting
+- Ensure exchange rates are cached (visit rates endpoint first)
+- Check that transactions have `currency` field populated
+- Verify database migrations ran successfully
+- Check browser console for errors
+
+### Database connection errors
+- Confirm PostgreSQL is running: `pg_isready`
+- Check `DATABASE_URL` in `backend/.env`
+- Ensure database exists: `psql -l | grep bookkeeping`
+- Verify migrations were applied
+
+### Language not switching
+- Check browser console for errors
+- Verify translation files exist in `client/src/locales/`
+- Clear browser localStorage and try again
+
 ## Environment Variables
 
 ### Backend (.env)
 ```
 DATABASE_URL=postgresql://username:password@localhost:5432/bookkeeping
+OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
 ```
+
+## Additional Documentation
+
+- [Currency Conversion Setup Guide](./CURRENCY_SETUP.md) - Detailed guide for currency features
+- [Backend API Documentation](./backend/README.md) - Backend-specific details
+- [Frontend Documentation](./client/README.md) - Frontend-specific details
 
 ## License
 

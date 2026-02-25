@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Numeric, Text, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Numeric, Text, Date, DateTime, ForeignKey, String
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
@@ -9,6 +9,7 @@ class Transaction(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Numeric(10, 2), nullable=False)
+    currency = Column(String(3), nullable=False, default='USD')
     description = Column(Text)
     date = Column(Date, nullable=False, default=datetime.utcnow().date)
     category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)

@@ -1,0 +1,65 @@
+{
+  "nav": {
+    "title": "Bookkeeping App",
+    "dashboard": "Dashboard",
+    "transactions": "Transactions",
+    "categories": "Categories"
+  },
+  "currency": {
+    "symbol": "$",
+    "code": "USD"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalIncome": "Total Income",
+    "totalExpense": "Total Expense",
+    "balance": "Balance",
+    "recentTransactions": "Recent Transactions",
+    "noTransactions": "No transactions yet",
+    "loading": "Loading..."
+  },
+  "transactions": {
+    "title": "Transactions",
+    "addNew": "Add New Transaction",
+    "edit": "Edit Transaction",
+    "amount": "Amount",
+    "description": "Description",
+    "category": "Category",
+    "date": "Date",
+    "selectCategory": "Select a category",
+    "add": "Add",
+    "update": "Update",
+    "cancel": "Cancel",
+    "filterTitle": "Filter Transactions",
+    "allCategories": "All Categories",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "applyFilters": "Apply Filters",
+    "allTransactions": "All Transactions",
+    "actions": "Actions",
+    "editBtn": "Edit",
+    "deleteBtn": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this transaction?",
+    "errorSaving": "Error saving transaction",
+    "errorDeleting": "Error deleting transaction",
+    "noTransactions": "No transactions yet",
+    "loading": "Loading..."
+  },
+  "categories": {
+    "title": "Categories",
+    "addNew": "Add New Category",
+    "name": "Name",
+    "type": "Type",
+    "income": "Income",
+    "expense": "Expense",
+    "add": "Add Category",
+    "allCategories": "All Categories",
+    "actions": "Actions",
+    "deleteBtn": "Delete",
+    "deleteConfirm": "Are you sure you want to delete this category?",
+    "errorCreating": "Error creating category",
+    "errorDeleting": "Error deleting category",
+    "noCategories": "No categories yet",
+    "loading": "Loading..."
+  }
+}

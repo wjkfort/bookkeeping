@@ -23,4 +23,13 @@ export const deleteTransaction = (id) => api.delete(`/transactions/${id}`);
 // Summary
 export const getSummary = (params) => api.get('/summary', { params });
 
+// Exchange Rates
+export const getExchangeRates = (base = 'USD', forceRefresh = false) => 
+  api.get('/exchange-rates/rates', { params: { base, force_refresh: forceRefresh } });
+
+export const convertCurrency = (amount, fromCurrency, toCurrency) =>
+  api.get('/exchange-rates/convert', { 
+    params: { amount, from_currency: fromCurrency, to_currency: toCurrency } 
+  });
+
 export default api;

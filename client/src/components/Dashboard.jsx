@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../hooks/useCurrency';
 import { getSummary, getTransactions } from '../api';
 
 function Dashboard() {
+  const { t } = useTranslation();
+  const { formatCurrency, formatWithConversion, convertAmount, currencyCode } = useCurrency();
   const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0 });
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currencyCode]); // Reload when currency changes
 
   const loadData = async () => {
     try {
       const [summaryRes, transactionsRes] = await Promise.all([
-        getSummary(),
+        getSummary({ target_currency: currencyCode }),
         getTransactions()
       ]);
       setSummary(summaryRes.data);
@@ -25,41 +29,41 @@ function Dashboard() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('dashboard.loading')}</div>;
 
   return (
     <div>
-      <h1>Dashboard</h1>
+      <h1>{t('dashboard.title')}</h1>
       
       <div className="summary-grid">
         <div className="summary-card income">
-          <h3>Total Income</h3>
-          <div className="amount">${summary.income.toFixed(2)}</div>
+          <h3>{t('dashboard.totalIncome')}</h3>
+          <div className="amount">{formatCurrency(summary.income, currencyCode)}</div>
         </div>
         
         <div className="summary-card expense">
-          <h3>Total Expense</h3>
-          <div className="amount">${summary.expense.toFixed(2)}</div>
+          <h3>{t('dashboard.totalExpense')}</h3>
+          <div className="amount">{formatCurrency(summary.expense, currencyCode)}</div>
         </div>
         
         <div className="summary-card balance">
-          <h3>Balance</h3>
-          <div className="amount">${summary.balance.toFixed(2)}</div>
+          <h3>{t('dashboard.balance')}</h3>
+          <div className="amount">{formatCurrency(summary.balance, currencyCode)}</div>
         </div>
       </div>
 
       <div className="card">
-        <h2>Recent Transactions</h2>
+        <h2>{t('dashboard.recentTransactions')}</h2>
         {recentTransactions.length === 0 ? (
-          <p>No transactions yet</p>
+          <p>{t('dashboard.noTransactions')}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Amount</th>
+                <th>{t('transactions.date')}</th>
+                <th>{t('transactions.description')}</th>
+                <th>{t('transactions.category')}</th>
+                <th>{t('transactions.amount')}</th>
               </tr>
             </thead>
             <tbody>
@@ -68,7 +72,14 @@ function Dashboard() {
                   <td>{transaction.date}</td>
                   <td>{transaction.description}</td>
                   <td>{transaction.category_name}</td>
-                  <td>${transaction.amount.toFixed(2)}</td>
+                  <td>
+                    {formatWithConversion(transaction.amount, transaction.currency)}
+                    {transaction.currency !== currencyCode && (
+                      <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '0.5rem' }}>
+                        ({formatCurrency(transaction.amount, transaction.currency)})
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

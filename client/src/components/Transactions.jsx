@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useCurrency } from '../hooks/useCurrency';
 import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories } from '../api';
 
 function Transactions() {
+  const { t } = useTranslation();
+  const { currencyCode, formatCurrency, formatWithConversion } = useCurrency();
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [formData, setFormData] = useState({
@@ -53,6 +57,7 @@ function Transactions() {
     try {
       const data = {
         amount: parseFloat(formData.amount),
+        currency: currencyCode,
         category_id: parseInt(formData.category_id),
         date: formData.date
       };
@@ -80,7 +85,7 @@ function Transactions() {
     } catch (error) {
       console.error('Error saving transaction:', error);
       console.error('Error response:', error.response?.data);
-      alert('Error saving transaction: ' + (error.response?.data?.detail || error.message));
+      alert(t('transactions.errorSaving') + ': ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -95,13 +100,13 @@ function Transactions() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this transaction?')) {
+    if (window.confirm(t('transactions.deleteConfirm'))) {
       try {
         await deleteTransaction(id);
         loadTransactions();
       } catch (error) {
         console.error('Error deleting transaction:', error);
-        alert('Error deleting transaction');
+        alert(t('transactions.errorDeleting'));
       }
     }
   };
@@ -114,17 +119,17 @@ function Transactions() {
     loadTransactions();
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('transactions.loading')}</div>;
 
   return (
     <div>
-      <h1>Transactions</h1>
+      <h1>{t('transactions.title')}</h1>
 
       <div className="card">
-        <h2>{editingId ? 'Edit Transaction' : 'Add New Transaction'}</h2>
+        <h2>{editingId ? t('transactions.edit') : t('transactions.addNew')}</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Amount</label>
+            <label>{t('transactions.amount')}</label>
             <input
               type="number"
               step="0.01"
@@ -135,7 +140,7 @@ function Transactions() {
           </div>
 
           <div className="form-group">
-            <label>Description</label>
+            <label>{t('transactions.description')}</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -143,13 +148,13 @@ function Transactions() {
           </div>
 
           <div className="form-group">
-            <label>Category</label>
+            <label>{t('transactions.category')}</label>
             <select
               value={formData.category_id}
               onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
               required
             >
-              <option value="">Select a category</option>
+              <option value="">{t('transactions.selectCategory')}</option>
               {categories.map(category => (
                 <option key={category.id} value={category.id}>
                   {category.name} ({category.type})
@@ -159,7 +164,7 @@ function Transactions() {
           </div>
 
           <div className="form-group">
-            <label>Date</label>
+            <label>{t('transactions.date')}</label>
             <input
               type="date"
               value={formData.date}
@@ -169,7 +174,7 @@ function Transactions() {
           </div>
 
           <button type="submit" className="btn btn-primary">
-            {editingId ? 'Update' : 'Add'} Transaction
+            {editingId ? t('transactions.update') : t('transactions.add')}
           </button>
           {editingId && (
             <button
@@ -186,21 +191,21 @@ function Transactions() {
               className="btn"
               style={{ marginLeft: '1rem' }}
             >
-              Cancel
+              {t('transactions.cancel')}
             </button>
           )}
         </form>
       </div>
 
       <div className="card">
-        <h2>Filter Transactions</h2>
+        <h2>{t('transactions.filterTitle')}</h2>
         <div className="filters">
           <select
             name="category_id"
             value={filters.category_id}
             onChange={handleFilterChange}
           >
-            <option value="">All Categories</option>
+            <option value="">{t('transactions.allCategories')}</option>
             {categories.map(category => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -225,24 +230,24 @@ function Transactions() {
           />
 
           <button onClick={applyFilters} className="btn btn-primary">
-            Apply Filters
+            {t('transactions.applyFilters')}
           </button>
         </div>
       </div>
 
       <div className="card">
-        <h2>All Transactions</h2>
+        <h2>{t('transactions.allTransactions')}</h2>
         {transactions.length === 0 ? (
-          <p>No transactions yet</p>
+          <p>{t('transactions.noTransactions')}</p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Amount</th>
-                <th>Actions</th>
+                <th>{t('transactions.date')}</th>
+                <th>{t('transactions.description')}</th>
+                <th>{t('transactions.category')}</th>
+                <th>{t('transactions.amount')}</th>
+                <th>{t('transactions.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -251,20 +256,27 @@ function Transactions() {
                   <td>{transaction.date}</td>
                   <td>{transaction.description}</td>
                   <td>{transaction.category_name}</td>
-                  <td>${transaction.amount.toFixed(2)}</td>
+                  <td>
+                    {formatWithConversion(transaction.amount, transaction.currency)}
+                    {transaction.currency !== currencyCode && (
+                      <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '0.5rem' }}>
+                        ({formatCurrency(transaction.amount, transaction.currency)})
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <button
                       onClick={() => handleEdit(transaction)}
                       className="btn btn-primary"
                       style={{ marginRight: '0.5rem' }}
                     >
-                      Edit
+                      {t('transactions.editBtn')}
                     </button>
                     <button
                       onClick={() => handleDelete(transaction.id)}
                       className="btn btn-danger"
                     >
-                      Delete
+                      {t('transactions.deleteBtn')}
                     </button>
                   </td>
                 </tr>

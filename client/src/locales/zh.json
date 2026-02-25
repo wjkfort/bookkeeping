@@ -1,0 +1,65 @@
+{
+  "nav": {
+    "title": "记账应用",
+    "dashboard": "仪表盘",
+    "transactions": "交易记录",
+    "categories": "分类管理"
+  },
+  "currency": {
+    "symbol": "¥",
+    "code": "CNY"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "totalIncome": "总收入",
+    "totalExpense": "总支出",
+    "balance": "余额",
+    "recentTransactions": "最近交易",
+    "noTransactions": "暂无交易记录",
+    "loading": "加载中..."
+  },
+  "transactions": {
+    "title": "交易记录",
+    "addNew": "添加新交易",
+    "edit": "编辑交易",
+    "amount": "金额",
+    "description": "描述",
+    "category": "分类",
+    "date": "日期",
+    "selectCategory": "选择分类",
+    "add": "添加",
+    "update": "更新",
+    "cancel": "取消",
+    "filterTitle": "筛选交易",
+    "allCategories": "所有分类",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "applyFilters": "应用筛选",
+    "allTransactions": "所有交易",
+    "actions": "操作",
+    "editBtn": "编辑",
+    "deleteBtn": "删除",
+    "deleteConfirm": "确定要删除这条交易记录吗？",
+    "errorSaving": "保存交易失败",
+    "errorDeleting": "删除交易失败",
+    "noTransactions": "暂无交易记录",
+    "loading": "加载中..."
+  },
+  "categories": {
+    "title": "分类管理",
+    "addNew": "添加新分类",
+    "name": "名称",
+    "type": "类型",
+    "income": "收入",
+    "expense": "支出",
+    "add": "添加分类",
+    "allCategories": "所有分类",
+    "actions": "操作",
+    "deleteBtn": "删除",
+    "deleteConfirm": "确定要删除这个分类吗？",
+    "errorCreating": "创建分类失败",
+    "errorDeleting": "删除分类失败",
+    "noCategories": "暂无分类",
+    "loading": "加载中..."
+  }
+}

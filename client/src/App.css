@@ -17,6 +17,7 @@
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  gap: 1rem;
 }
 
 .navbar h1 {
@@ -27,6 +28,8 @@
 .nav-links {
   display: flex;
   gap: 2rem;
+  flex: 1;
+  justify-content: center;
 }
 
 .nav-links a {
@@ -204,4 +207,33 @@
   padding: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+}
+
+.language-switcher {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.language-switcher button {
+  padding: 0.4rem 0.8rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background-color: transparent;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.language-switcher button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.language-switcher button.active {
+  background-color: white;
+  color: #2c3e50;
+  border-color: white;
 }

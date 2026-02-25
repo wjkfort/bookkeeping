@@ -35,6 +35,7 @@ def get_transactions(
         transaction_dict = {
             "id": t.id,
             "amount": float(t.amount),
+            "currency": t.currency,
             "description": t.description,
             "date": t.date,
             "category_id": t.category_id,
@@ -56,6 +57,7 @@ def create_transaction(transaction: TransactionCreate, db: Session = Depends(get
     
     db_transaction = Transaction(
         amount=transaction.amount,
+        currency=transaction.currency,
         description=transaction.description or "",
         category_id=transaction.category_id,
         date=transaction_date
@@ -75,6 +77,8 @@ def update_transaction(id: int, transaction: TransactionUpdate, db: Session = De
     
     if transaction.amount is not None:
         db_transaction.amount = transaction.amount
+    if transaction.currency is not None:
+        db_transaction.currency = transaction.currency
     if transaction.description is not None:
         db_transaction.description = transaction.description
     if transaction.category_id is not None:
