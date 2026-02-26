@@ -147,10 +147,13 @@ pip install -r requirements.txt
 
 4. Run database migrations:
 ```bash
+cd backend
+source .env
 psql "$DATABASE_URL" -f migrations/add_currency_to_transactions.sql
 psql "$DATABASE_URL" -f migrations/create_exchange_rates_table.sql
 psql "$DATABASE_URL" -f migrations/add_parent_id_to_categories.sql
 psql "$DATABASE_URL" -f migrations/add_translations_to_categories.sql
+cd ..
 ```
 
 5. Run the backend:
