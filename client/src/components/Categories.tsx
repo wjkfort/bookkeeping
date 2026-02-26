@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Button, Form, Input, Select, Space, Modal, message } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { getCategories, createCategory, deleteCategory } from '../api';
+import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
 import { Category, CategoryFormData } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -14,6 +14,7 @@ const Categories: React.FC = () => {
   const [flatCategories, setFlatCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -38,19 +39,39 @@ const Categories: React.FC = () => {
 
   const handleSubmit = async (values: CategoryFormData) => {
     try {
-      await createCategory({
-        name: values.name,
-        type: values.type,
-        parent_id: values.parent_id || null
-      });
-      message.success(t('categories.successCreating'));
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, {
+          name: values.name,
+          type: values.type,
+          parent_id: values.parent_id || null
+        });
+        message.success(t('categories.successUpdating'));
+      } else {
+        await createCategory({
+          name: values.name,
+          type: values.type,
+          parent_id: values.parent_id || null
+        });
+        message.success(t('categories.successCreating'));
+      }
       form.resetFields();
       setIsModalVisible(false);
+      setEditingCategory(null);
       loadCategories();
     } catch (error: any) {
-      console.error('Error creating category:', error);
-      message.error(error.response?.data?.detail || t('categories.errorCreating'));
+      console.error('Error saving category:', error);
+      message.error(error.response?.data?.detail || t(editingCategory ? 'categories.errorUpdating' : 'categories.errorCreating'));
     }
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    form.setFieldsValue({
+      name: category.name,
+      type: category.type,
+      parent_id: category.parent_id
+    });
+    setIsModalVisible(true);
   };
 
   const handleDelete = async (id: number, hasChildren: boolean) => {
@@ -78,7 +99,11 @@ const Categories: React.FC = () => {
   };
 
   const getAvailableParents = (type: 'income' | 'expense'): Category[] => {
-    return flatCategories.filter(cat => cat.type === type && !cat.parent_id);
+    return flatCategories.filter(cat => 
+      cat.type === type && 
+      !cat.parent_id && 
+      (!editingCategory || cat.id !== editingCategory.id)
+    );
   };
 
   const flattenCategories = (cats: Category[], level: number = 0): any[] => {
@@ -124,14 +149,23 @@ const Categories: React.FC = () => {
       title: t('categories.actions'),
       key: 'actions',
       render: (_, record) => (
-        <Button
-          type="primary"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record.id, record.children && record.children.length > 0)}
-        >
-          {t('categories.deleteBtn')}
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
+            {t('categories.editBtn')}
+          </Button>
+          <Button
+            type="primary"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id, record.children && record.children.length > 0)}
+          >
+            {t('categories.deleteBtn')}
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -158,10 +192,11 @@ const Categories: React.FC = () => {
       </Card>
 
       <Modal
-        title={t('categories.addNew')}
+        title={editingCategory ? t('categories.editTitle') : t('categories.addNew')}
         open={isModalVisible}
         onCancel={() => {
           setIsModalVisible(false);
+          setEditingCategory(null);
           form.resetFields();
         }}
         footer={null}
@@ -215,10 +250,11 @@ const Categories: React.FC = () => {
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
-                {t('categories.add')}
+                {editingCategory ? t('categories.update') : t('categories.add')}
               </Button>
               <Button onClick={() => {
                 setIsModalVisible(false);
+                setEditingCategory(null);
                 form.resetFields();
               }}>
                 {t('common.cancel')}
