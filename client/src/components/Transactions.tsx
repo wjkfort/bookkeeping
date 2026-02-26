@@ -35,11 +35,27 @@ const Transactions: React.FC = () => {
   const loadCategories = async () => {
     try {
       const response = await getCategories(true);
-      setCategories(response.data);
+      // Sort categories to show parents first, then their children
+      const sorted = sortCategoriesWithChildren(response.data);
+      setCategories(sorted);
     } catch (error) {
       console.error('Error loading categories:', error);
       message.error(t('categories.errorLoading'));
     }
+  };
+
+  const sortCategoriesWithChildren = (cats: Category[]): Category[] => {
+    const result: Category[] = [];
+    const parentCategories = cats.filter(cat => !cat.parent_id);
+    const childCategories = cats.filter(cat => cat.parent_id);
+    
+    parentCategories.forEach(parent => {
+      result.push(parent);
+      const children = childCategories.filter(child => child.parent_id === parent.id);
+      result.push(...children);
+    });
+    
+    return result;
   };
 
   const loadTransactions = async () => {
