@@ -34,6 +34,13 @@ A full-stack bookkeeping application with multi-language support and automatic c
   - Full-featured API with automatic documentation
   - Real-time updates across the application
 
+## Roadmap / TODO
+
+- [ ] **Multi-layer Categories** - Support for nested/hierarchical category structures
+- [ ] **Rich Dashboard** - Enhanced dashboard with charts, graphs, and advanced analytics
+- [ ] **Mobile Support** - Native mobile application (Android first)
+- [ ] **Deploy to Web** - Production deployment and hosting setup
+
 ## Project Structure
 
 ```
