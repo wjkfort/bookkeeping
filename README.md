@@ -8,6 +8,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
   - English (EN) and Chinese (中文) interface
   - Language switcher in navigation bar
   - Persistent language preference in localStorage
+  - **Auto-Translation for Categories**: Automatically translate category names between English and Chinese with one click
 
 - **Automatic Currency Conversion**
   - USD ($) for English, CNY (¥) for Chinese
@@ -24,7 +25,10 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - **Category Management**
   - Create income and expense categories
   - Hierarchical categories with parent-child relationships
+  - **Bilingual category names**: Enter names in both English and Chinese
+  - **Auto-translation**: Click the translate button to automatically translate category names
   - Organize transactions by category and subcategory
+  - Categories display in user's current language
 
 - **Dashboard**
   - Summary cards showing total income, expense, and balance
@@ -146,6 +150,7 @@ pip install -r requirements.txt
 psql "$DATABASE_URL" -f migrations/add_currency_to_transactions.sql
 psql "$DATABASE_URL" -f migrations/create_exchange_rates_table.sql
 psql "$DATABASE_URL" -f migrations/add_parent_id_to_categories.sql
+psql "$DATABASE_URL" -f migrations/add_translations_to_categories.sql
 ```
 
 5. Run the backend:
@@ -218,8 +223,13 @@ When you switch languages:
 ### Managing Categories
 
 1. Go to **Categories** page
-2. Create income or expense categories
-3. Use categories when creating transactions
+2. Create income or expense categories with bilingual names:
+   - Enter category name in English (e.g., "Food")
+   - Enter category name in Chinese (e.g., "食物")
+   - Or use the **Auto Translate** button (🌐) to automatically translate from one language to the other
+3. Create subcategories by selecting a parent category
+4. Categories automatically display in your current language
+5. Use categories when creating transactions
 
 ## Features
 
@@ -237,6 +247,7 @@ When you switch languages:
 - **PostgreSQL** - Relational database
 - **Pydantic** - Data validation using Python type annotations
 - **httpx** - Async HTTP client for API requests
+- **googletrans** - Free Google Translate API for auto-translation
 - **uv** - Fast Python package installer and resolver
 
 ### Frontend
@@ -245,6 +256,7 @@ When you switch languages:
 - **React Router** - Client-side routing
 - **Axios** - Promise-based HTTP client
 - **i18next / react-i18next** - Internationalization framework
+- **Ant Design** - UI component library
 - **CSS** - Custom styling
 
 ## API Endpoints
@@ -254,7 +266,7 @@ All endpoints are prefixed with `/api/v1`:
 ### Categories
 - `GET /api/v1/categories?flat=false` - List categories (hierarchical by default, flat=true for all)
 - `GET /api/v1/categories/{id}` - Get a specific category
-- `POST /api/v1/categories` - Create a category (with optional parent_id for subcategories)
+- `POST /api/v1/categories` - Create a category (with optional parent_id for subcategories and translations object)
 - `PUT /api/v1/categories/{id}` - Update a category
 - `DELETE /api/v1/categories/{id}` - Delete a category (cascades to subcategories)
 
@@ -270,6 +282,11 @@ All endpoints are prefixed with `/api/v1`:
 ### Exchange Rates
 - `GET /api/v1/exchange-rates/rates?base=USD&force_refresh=false` - Get cached exchange rates (USD/CNY)
 - `GET /api/v1/exchange-rates/convert?amount=100&from_currency=USD&to_currency=CNY` - Convert amount between currencies
+
+### Translation
+- `POST /api/v1/translate` - Translate text between languages (English ↔ Chinese)
+  - Request body: `{"text": "Hello", "from_lang": "en", "to_lang": "zh"}`
+  - Response: `{"text": "你好"}`
 
 ## Development
 
