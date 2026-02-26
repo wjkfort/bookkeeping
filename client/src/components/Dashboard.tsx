@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Row, Col, Table, Spin, Statistic, Switch } from 'antd';
+import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useCurrency } from '../hooks/useCurrency';
@@ -17,8 +17,10 @@ const Dashboard: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<{ name: string; value: number; color: string; type: string; id: number }[]>([]);
-  const [weeklyExpenses, setWeeklyExpenses] = useState<{ date: string; amount: number }[]>([]);
+  const [weeklyExpenses, setWeeklyExpenses] = useState<any[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<{ name: string; color: string }[]>([]);
   const [showExpense, setShowExpense] = useState(true);
+  const [barChartRange, setBarChartRange] = useState<'7days' | '30days' | 'month'>('7days');
 
   // Helper function to get translated category name
   const getCategoryName = (categoryId: number): string => {
@@ -36,7 +38,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [currencyCode, i18n.language]);
+  }, [currencyCode, i18n.language, barChartRange]);
 
   const loadData = async () => {
     try {
@@ -69,9 +71,11 @@ const Dashboard: React.FC = () => {
       dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, 'day')
     );
 
-    // Color palette for different categories
+    // Color palette for pie chart (warm tones - red/orange/yellow)
     const incomeColors = ['#52c41a', '#73d13d', '#95de64', '#b7eb8f', '#d9f7be'];
-    const expenseColors = ['#ff4d4f', '#ff7875', '#ffa39e', '#ffccc7', '#fa8c16', '#ffc53d', '#fadb14'];
+    const expenseColors = ['#ff4d4f', '#fa8c16', '#fadb14', '#ffc53d', '#ff7875', '#ffccc7', '#ffa39e'];
+    // Distinct color palette for bar chart (cool tones - blue/purple/teal)
+    const barChartColors = ['#1890ff', '#722ed1', '#13c2c2', '#2f54eb', '#eb2f96', '#52c41a', '#faad14'];
     
     // Helper function to get root category
     const getRootCategory = (categoryId: number): Category | undefined => {
@@ -128,33 +132,75 @@ const Dashboard: React.FC = () => {
 
     setMonthlyData(Object.values(categoryMap));
 
-    // Calculate last 7 days expenses
-    const dailyExpenses: { [key: string]: number } = {};
+    // Calculate expenses by category based on selected range
+    const dailyExpensesByCategory: { [key: string]: { [category: string]: number } } = {};
+    const expenseCategorySet = new Set<string>();
+    const categoryColorMap: { [key: string]: string } = {};
     
-    for (let i = 0; i < 7; i++) {
-      const date = now.subtract(i, 'day').format('YYYY-MM-DD');
-      dailyExpenses[date] = 0;
+    // Determine date range and format based on selection
+    let startDate: dayjs.Dayjs;
+    let dateFormat: string;
+    let daysCount: number;
+    
+    if (barChartRange === '7days') {
+      startDate = now.subtract(6, 'day').startOf('day');
+      dateFormat = 'MM/DD';
+      daysCount = 7;
+    } else if (barChartRange === '30days') {
+      startDate = now.subtract(29, 'day').startOf('day');
+      dateFormat = 'MM/DD';
+      daysCount = 30;
+    } else { // 'month'
+      startDate = now.startOf('month');
+      dateFormat = 'MM/DD';
+      daysCount = now.daysInMonth();
+    }
+    
+    // Initialize all dates in range
+    for (let i = 0; i < daysCount; i++) {
+      const date = barChartRange === 'month' 
+        ? startDate.add(i, 'day').format('YYYY-MM-DD')
+        : now.subtract(daysCount - 1 - i, 'day').format('YYYY-MM-DD');
+      dailyExpensesByCategory[date] = {};
     }
 
     transactions.forEach(t => {
       const transactionDate = dayjs(t.date);
-      if (transactionDate.isAfter(last7Days) || transactionDate.isSame(last7Days, 'day')) {
+      if (transactionDate.isAfter(startDate) || transactionDate.isSame(startDate, 'day')) {
         const dateKey = transactionDate.format('YYYY-MM-DD');
-        const category = categoriesData.find(cat => cat.id === t.category_id);
-        if (category?.type === 'expense' && dailyExpenses[dateKey] !== undefined) {
-          dailyExpenses[dateKey] += t.amount;
+        const rootCategory = getRootCategory(t.category_id);
+        
+        if (rootCategory?.type === 'expense' && dailyExpensesByCategory[dateKey] !== undefined) {
+          const categoryName = getCategoryNameById(rootCategory.id);
+          expenseCategorySet.add(categoryName);
+          
+          if (!dailyExpensesByCategory[dateKey][categoryName]) {
+            dailyExpensesByCategory[dateKey][categoryName] = 0;
+          }
+          dailyExpensesByCategory[dateKey][categoryName] += t.amount;
+          
+          // Assign color to category if not already assigned
+          if (!categoryColorMap[categoryName]) {
+            const colorIndex = Object.keys(categoryColorMap).length;
+            categoryColorMap[categoryName] = barChartColors[colorIndex % barChartColors.length];
+          }
         }
       }
     });
 
-    const weeklyData = Object.entries(dailyExpenses)
-      .map(([date, amount]) => ({
-        date: dayjs(date).format('MM/DD'),
-        amount
-      }))
-      .reverse();
+    const expenseData = Object.entries(dailyExpensesByCategory)
+      .map(([date, categories]) => ({
+        date: dayjs(date).format(dateFormat),
+        ...categories
+      }));
 
-    setWeeklyExpenses(weeklyData);
+    setWeeklyExpenses(expenseData);
+    setExpenseCategories(
+      Array.from(expenseCategorySet).map(name => ({
+        name,
+        color: categoryColorMap[name]
+      }))
+    );
   };
 
   const columns: ColumnsType<Transaction> = [
@@ -281,14 +327,37 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.last7DaysExpense')}>
+          <Card 
+            title={
+              barChartRange === '7days' 
+                ? t('dashboard.last7DaysExpense')
+                : barChartRange === '30days'
+                ? t('dashboard.last30DaysExpense')
+                : t('dashboard.currentMonthExpense')
+            }
+            extra={
+              <Radio.Group value={barChartRange} onChange={(e) => setBarChartRange(e.target.value)} size="small">
+                <Radio.Button value="7days">7 {t('dashboard.days')}</Radio.Button>
+                <Radio.Button value="30days">30 {t('dashboard.days')}</Radio.Button>
+                <Radio.Button value="month">{t('dashboard.currentMonth')}</Radio.Button>
+              </Radio.Group>
+            }
+          >
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={weeklyExpenses}>
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip formatter={(value: number) => `${value.toFixed(2)} ${currencyCode}`} />
                 <Legend />
-                <Bar dataKey="amount" fill="#ff4d4f" name={t('dashboard.expense')} />
+                {expenseCategories.map((category) => (
+                  <Bar 
+                    key={category.name}
+                    dataKey={category.name} 
+                    stackId="a"
+                    fill={category.color} 
+                    name={category.name}
+                  />
+                ))}
               </BarChart>
             </ResponsiveContainer>
           </Card>

@@ -20,7 +20,11 @@
     "income": "Income",
     "expense": "Expense",
     "monthlyOverview": "Monthly Overview",
-    "last7DaysExpense": "Last 7 Days Expense"
+    "last7DaysExpense": "Last 7 Days Expense",
+    "last30DaysExpense": "Last 30 Days Expense",
+    "currentMonthExpense": "Current Month Expense",
+    "days": "Days",
+    "currentMonth": "Current Month"
   },
   "transactions": {
     "title": "Transactions",

@@ -20,7 +20,11 @@
     "income": "收入",
     "expense": "支出",
     "monthlyOverview": "本月概览",
-    "last7DaysExpense": "最近7天支出"
+    "last7DaysExpense": "最近7天支出",
+    "last30DaysExpense": "最近30天支出",
+    "currentMonthExpense": "当月支出",
+    "days": "天",
+    "currentMonth": "当月"
   },
   "transactions": {
     "title": "交易记录",
