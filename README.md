@@ -23,7 +23,8 @@ A full-stack bookkeeping application with multi-language support and automatic c
 
 - **Category Management**
   - Create income and expense categories
-  - Organize transactions by category
+  - Hierarchical categories with parent-child relationships
+  - Organize transactions by category and subcategory
 
 - **Dashboard**
   - Summary cards showing total income, expense, and balance
@@ -36,7 +37,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 
 ## Roadmap / TODO
 
-- [ ] **Multi-layer Categories** - Support for nested/hierarchical category structures
+- [x] **Multi-layer Categories** - Support for nested/hierarchical category structures ✅
 - [ ] **Rich Dashboard** - Enhanced dashboard with charts, graphs, and advanced analytics
 - [ ] **Mobile Support** - Native mobile application (Android first)
 - [ ] **Deploy to Web** - Production deployment and hosting setup
@@ -144,6 +145,7 @@ pip install -r requirements.txt
 ```bash
 psql "$DATABASE_URL" -f migrations/add_currency_to_transactions.sql
 psql "$DATABASE_URL" -f migrations/create_exchange_rates_table.sql
+psql "$DATABASE_URL" -f migrations/add_parent_id_to_categories.sql
 ```
 
 5. Run the backend:
@@ -250,9 +252,11 @@ When you switch languages:
 All endpoints are prefixed with `/api/v1`:
 
 ### Categories
-- `GET /api/v1/categories` - List all categories
-- `POST /api/v1/categories` - Create a category
-- `DELETE /api/v1/categories/{id}` - Delete a category
+- `GET /api/v1/categories?flat=false` - List categories (hierarchical by default, flat=true for all)
+- `GET /api/v1/categories/{id}` - Get a specific category
+- `POST /api/v1/categories` - Create a category (with optional parent_id for subcategories)
+- `PUT /api/v1/categories/{id}` - Update a category
+- `DELETE /api/v1/categories/{id}` - Delete a category (cascades to subcategories)
 
 ### Transactions
 - `GET /api/v1/transactions` - List transactions (with optional filters: category_id, start_date, end_date)
@@ -346,7 +350,8 @@ OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
 
 ## Additional Documentation
 
-- [Currency Conversion Setup Guide](./CURRENCY_SETUP.md) - Detailed guide for currency features
+- [Hierarchical Categories Guide](./docs/HIERARCHICAL_CATEGORIES.md) - Guide for nested category structures
+- [Currency Conversion Setup Guide](./docs/CURRENCY_SETUP.md) - Detailed guide for currency features
 - [Backend API Documentation](./backend/README.md) - Backend-specific details
 - [Frontend Documentation](./client/README.md) - Frontend-specific details
 

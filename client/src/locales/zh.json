@@ -57,9 +57,13 @@
     "actions": "操作",
     "deleteBtn": "删除",
     "deleteConfirm": "确定要删除这个分类吗？",
+    "deleteConfirmWithChildren": "此分类包含子分类。删除它将同时删除所有子分类。确定要继续吗？",
     "errorCreating": "创建分类失败",
     "errorDeleting": "删除分类失败",
     "noCategories": "暂无分类",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "parentCategory": "父分类",
+    "noParent": "无（顶级分类）",
+    "parentHint": "留空创建顶级分类，或选择父分类创建子分类"
   }
 }

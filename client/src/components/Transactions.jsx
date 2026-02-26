@@ -29,7 +29,8 @@ function Transactions() {
 
   const loadCategories = async () => {
     try {
-      const response = await getCategories();
+      // Load flat list to show all categories including subcategories
+      const response = await getCategories(true);
       setCategories(response.data);
     } catch (error) {
       console.error('Error loading categories:', error);
@@ -157,7 +158,7 @@ function Transactions() {
               <option value="">{t('transactions.selectCategory')}</option>
               {categories.map(category => (
                 <option key={category.id} value={category.id}>
-                  {category.name} ({category.type})
+                  {category.parent_id ? '  └─ ' : ''}{category.name} ({t(`categories.${category.type}`)})
                 </option>
               ))}
             </select>
@@ -208,7 +209,7 @@ function Transactions() {
             <option value="">{t('transactions.allCategories')}</option>
             {categories.map(category => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.parent_id ? '  └─ ' : ''}{category.name}
               </option>
             ))}
           </select>

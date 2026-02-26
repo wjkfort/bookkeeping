@@ -1,4 +1,4 @@
-from app.schemas.category import CategoryCreate, CategoryResponse, CategoryType
+from app.schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate, CategoryType
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.schemas.summary import SummaryResponse
 from app.schemas.exchange_rate import ExchangeRateResponse, ExchangeRatesResponse
@@ -6,6 +6,7 @@ from app.schemas.exchange_rate import ExchangeRateResponse, ExchangeRatesRespons
 __all__ = [
     "CategoryCreate",
     "CategoryResponse",
+    "CategoryUpdate",
     "CategoryType",
     "TransactionCreate",
     "TransactionUpdate",

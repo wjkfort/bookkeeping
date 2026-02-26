@@ -57,9 +57,13 @@
     "actions": "Actions",
     "deleteBtn": "Delete",
     "deleteConfirm": "Are you sure you want to delete this category?",
+    "deleteConfirmWithChildren": "This category has subcategories. Deleting it will also delete all subcategories. Are you sure?",
     "errorCreating": "Error creating category",
     "errorDeleting": "Error deleting category",
     "noCategories": "No categories yet",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "parentCategory": "Parent Category",
+    "noParent": "None (Top-level category)",
+    "parentHint": "Leave empty to create a top-level category, or select a parent to create a subcategory"
   }
 }
