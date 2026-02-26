@@ -78,6 +78,7 @@
     "translationSuccess": "翻译完成",
     "translationError": "翻译失败，请重试",
     "type": "类型",
+    "all": "全部",
     "income": "收入",
     "expense": "支出",
     "add": "添加分类",

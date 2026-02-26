@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Table, Button, Form, Input, Select, Space, Modal, message } from 'antd';
+import { Card, Table, Button, Form, Input, Select, Space, Modal, message, Segmented } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from '@ant-design/icons';
 import { getCategories, createCategory, updateCategory, deleteCategory, translateText } from '../api';
 import { Category, CategoryFormData } from '../types';
@@ -16,6 +16,7 @@ const Categories: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [translating, setTranslating] = useState<'en' | 'zh' | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [form] = Form.useForm();
 
   // Helper function to get translated category name
@@ -153,9 +154,10 @@ const Categories: React.FC = () => {
   const flattenCategories = (cats: Category[], level: number = 0): any[] => {
     const result: any[] = [];
     cats.forEach(cat => {
-      result.push({ ...cat, level });
-      if (cat.children && cat.children.length > 0) {
-        result.push(...flattenCategories(cat.children, level + 1));
+      const { children, ...catWithoutChildren } = cat;
+      result.push({ ...catWithoutChildren, level });
+      if (children && children.length > 0) {
+        result.push(...flattenCategories(children, level + 1));
       }
     });
     return result;
@@ -214,7 +216,11 @@ const Categories: React.FC = () => {
     },
   ];
 
-  const flatData = flattenCategories(categories);
+  const filteredCategories = typeFilter === 'all' 
+    ? categories 
+    : categories.filter(cat => cat.type === typeFilter);
+  
+  const flatData = flattenCategories(filteredCategories);
 
   return (
     <div>
@@ -226,6 +232,17 @@ const Categories: React.FC = () => {
       </div>
 
       <Card>
+        <div style={{ marginBottom: '16px' }}>
+          <Segmented
+            value={typeFilter}
+            onChange={(value) => setTypeFilter(value as 'all' | 'income' | 'expense')}
+            options={[
+              { label: t('categories.all'), value: 'all' },
+              { label: t('categories.income'), value: 'income' },
+              { label: t('categories.expense'), value: 'expense' },
+            ]}
+          />
+        </div>
         <Table
           columns={columns}
           dataSource={flatData}

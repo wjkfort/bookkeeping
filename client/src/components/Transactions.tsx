@@ -69,12 +69,13 @@ const Transactions: React.FC = () => {
     return result;
   };
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (filterParams?: TransactionFilters) => {
     try {
+      const activeFilters = filterParams || filters;
       const params: any = {};
-      if (filters.category_id) params.category_id = filters.category_id;
-      if (filters.start_date) params.start_date = filters.start_date;
-      if (filters.end_date) params.end_date = filters.end_date;
+      if (activeFilters.category_id) params.category_id = activeFilters.category_id;
+      if (activeFilters.start_date) params.start_date = activeFilters.start_date;
+      if (activeFilters.end_date) params.end_date = activeFilters.end_date;
       
       const response = await getTransactions(params);
       setTransactions(response.data);
@@ -149,12 +150,13 @@ const Transactions: React.FC = () => {
   };
 
   const handleFilterSubmit = (values: any) => {
-    setFilters({
+    const newFilters = {
       category_id: values.category_id || '',
       start_date: values.start_date ? values.start_date.format('YYYY-MM-DD') : '',
       end_date: values.end_date ? values.end_date.format('YYYY-MM-DD') : ''
-    });
-    setTimeout(() => loadTransactions(), 0);
+    };
+    setFilters(newFilters);
+    loadTransactions(newFilters);
   };
 
   const columns: ColumnsType<Transaction> = [

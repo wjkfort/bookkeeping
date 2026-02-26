@@ -78,6 +78,7 @@
     "translationSuccess": "Translation completed",
     "translationError": "Translation failed, please try again",
     "type": "Type",
+    "all": "All",
     "income": "Income",
     "expense": "Expense",
     "add": "Add Category",
