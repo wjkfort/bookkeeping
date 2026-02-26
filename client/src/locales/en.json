@@ -16,7 +16,11 @@
     "balance": "Balance",
     "recentTransactions": "Recent Transactions",
     "noTransactions": "No transactions yet",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "income": "Income",
+    "expense": "Expense",
+    "monthlyOverview": "Monthly Overview",
+    "last7DaysExpense": "Last 7 Days Expense"
   },
   "transactions": {
     "title": "Transactions",

@@ -42,7 +42,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 ## Roadmap / TODO
 
 - [x] **Multi-layer Categories** - Support for nested/hierarchical category structures ✅
-- [ ] **Rich Dashboard** - Enhanced dashboard with charts, graphs, and advanced analytics
+- [x] **Rich Dashboard** - Enhanced dashboard with charts, graphs, and advanced analytics ✅
 - [ ] **Mobile Support** - Native mobile application (Android first)
 - [ ] **Deploy to Web** - Production deployment and hosting setup
 

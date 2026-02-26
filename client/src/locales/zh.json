@@ -16,7 +16,11 @@
     "balance": "余额",
     "recentTransactions": "最近交易",
     "noTransactions": "暂无交易记录",
-    "loading": "加载中..."
+    "loading": "加载中...",
+    "income": "收入",
+    "expense": "支出",
+    "monthlyOverview": "本月概览",
+    "last7DaysExpense": "最近7天支出"
   },
   "transactions": {
     "title": "交易记录",

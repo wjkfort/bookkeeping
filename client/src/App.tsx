@@ -58,14 +58,12 @@ function AppContent() {
         </div>
         <LanguageSwitcher />
       </Header>
-      <Content style={{ padding: "16px 24px", background: "#f0f2f5" }}>
-        <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/categories" element={<Categories />} />
-          </Routes>
-        </div>
+      <Content style={{ padding: "24px", background: "#f0f2f5" }}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/categories" element={<Categories />} />
+        </Routes>
       </Content>
     </Layout>
   );
