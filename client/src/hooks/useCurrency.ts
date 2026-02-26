@@ -2,12 +2,28 @@ import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from 'react';
 import { getExchangeRates } from '../api';
 
-export const useCurrency = () => {
+interface ExchangeRates {
+  base: string;
+  rates: Record<string, number>;
+  last_updated: string;
+}
+
+interface UseCurrencyReturn {
+  currencyCode: string;
+  currencySymbol: string;
+  exchangeRates: ExchangeRates | null;
+  loading: boolean;
+  convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
+  formatCurrency: (amount: number, currency?: string | null) => string;
+  formatWithConversion: (amount: number, fromCurrency: string) => string;
+}
+
+export const useCurrency = (): UseCurrencyReturn => {
   const { t, i18n } = useTranslation();
-  const [exchangeRates, setExchangeRates] = useState(null);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const getCurrencyCode = () => {
+  const getCurrencyCode = (): string => {
     return t('currency.code');
   };
   
@@ -30,13 +46,13 @@ export const useCurrency = () => {
     loadExchangeRates();
   }, [i18n.language]);
   
-  const convertAmount = (amount, fromCurrency, toCurrency = currentCurrency) => {
+  const convertAmount = (amount: number, fromCurrency: string, toCurrency: string = currentCurrency): number => {
     if (!exchangeRates || fromCurrency === toCurrency) {
-      return parseFloat(amount);
+      return parseFloat(amount.toString());
     }
     
     // Convert from source currency to USD first (if not already USD)
-    let amountInUSD = parseFloat(amount);
+    let amountInUSD = parseFloat(amount.toString());
     if (fromCurrency !== 'USD') {
       const fromRate = exchangeRates.rates[fromCurrency];
       if (fromRate) {
@@ -55,17 +71,17 @@ export const useCurrency = () => {
     return amountInUSD;
   };
   
-  const formatCurrency = (amount, currency = null) => {
+  const formatCurrency = (amount: number, currency: string | null = null): string => {
     const targetCurrency = currency || currentCurrency;
     const symbol = currency ? 
       (currency === 'CNY' ? '¥' : '$') : 
       t('currency.symbol');
     
-    const formattedAmount = parseFloat(amount).toFixed(2);
+    const formattedAmount = parseFloat(amount.toString()).toFixed(2);
     return `${symbol}${formattedAmount}`;
   };
   
-  const formatWithConversion = (amount, fromCurrency) => {
+  const formatWithConversion = (amount: number, fromCurrency: string): string => {
     const convertedAmount = convertAmount(amount, fromCurrency, currentCurrency);
     return formatCurrency(convertedAmount);
   };
