@@ -5,7 +5,7 @@ import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from 
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
 import { Category, CategoryFormData } from '../types';
 import type { ColumnsType } from 'antd/es/table';
-import translate from '@vitalets/google-translate-api';
+import { translate } from '@vitalets/google-translate-api';
 
 const { Option } = Select;
 
