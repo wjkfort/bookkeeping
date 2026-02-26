@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Button, Form, Input, Select, Space, Modal, message } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from '@ant-design/icons';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
 import { Category, CategoryFormData } from '../types';
 import type { ColumnsType } from 'antd/es/table';
+import translate from '@vitalets/google-translate-api';
 
 const { Option } = Select;
 
@@ -15,6 +16,7 @@ const Categories: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [translating, setTranslating] = useState<'en' | 'zh' | null>(null);
   const [form] = Form.useForm();
 
   // Helper function to get translated category name
@@ -26,6 +28,30 @@ const Categories: React.FC = () => {
       return category.translations['en'];
     }
     return category.name;
+  };
+
+  // Auto-translate function
+  const handleAutoTranslate = async (fromLang: 'en' | 'zh', toLang: 'en' | 'zh') => {
+    const sourceField = fromLang === 'en' ? 'name_en' : 'name_zh';
+    const targetField = toLang === 'en' ? 'name_en' : 'name_zh';
+    const sourceText = form.getFieldValue(sourceField);
+
+    if (!sourceText) {
+      message.warning(t('categories.noTextToTranslate'));
+      return;
+    }
+
+    setTranslating(toLang);
+    try {
+      const result = await translate(sourceText, { from: fromLang, to: toLang });
+      form.setFieldsValue({ [targetField]: result.text });
+      message.success(t('categories.translationSuccess'));
+    } catch (error) {
+      console.error('Translation error:', error);
+      message.error(t('categories.translationError'));
+    } finally {
+      setTranslating(null);
+    }
   };
 
   useEffect(() => {
@@ -231,7 +257,20 @@ const Categories: React.FC = () => {
             label={t('categories.nameEn')}
             rules={[{ required: true, message: t('categories.nameEnRequired') }]}
           >
-            <Input placeholder={t('categories.nameEnPlaceholder')} />
+            <Input 
+              placeholder={t('categories.nameEnPlaceholder')}
+              addonAfter={
+                <Button
+                  type="text"
+                  icon={<TranslationOutlined />}
+                  loading={translating === 'en'}
+                  onClick={() => handleAutoTranslate('zh', 'en')}
+                  size="small"
+                >
+                  {t('categories.autoTranslate')}
+                </Button>
+              }
+            />
           </Form.Item>
 
           <Form.Item
@@ -239,7 +278,20 @@ const Categories: React.FC = () => {
             label={t('categories.nameZh')}
             rules={[{ required: true, message: t('categories.nameZhRequired') }]}
           >
-            <Input placeholder={t('categories.nameZhPlaceholder')} />
+            <Input 
+              placeholder={t('categories.nameZhPlaceholder')}
+              addonAfter={
+                <Button
+                  type="text"
+                  icon={<TranslationOutlined />}
+                  loading={translating === 'zh'}
+                  onClick={() => handleAutoTranslate('en', 'zh')}
+                  size="small"
+                >
+                  {t('categories.autoTranslate')}
+                </Button>
+              }
+            />
           </Form.Item>
 
           <Form.Item
