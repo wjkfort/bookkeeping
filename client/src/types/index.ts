@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   type: 'income' | 'expense';
   parent_id: number | null;
+  translations?: { [key: string]: string };
   children?: Category[];
 }
 
@@ -33,6 +34,7 @@ export interface CategoryFormData {
   name: string;
   type: 'income' | 'expense';
   parent_id: number | null;
+  translations?: { [key: string]: string };
 }
 
 export interface TransactionFilters {

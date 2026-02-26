@@ -9,13 +9,24 @@ import type { ColumnsType } from 'antd/es/table';
 const { Option } = Select;
 
 const Categories: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [flatCategories, setFlatCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
+
+  // Helper function to get translated category name
+  const getCategoryName = (category: Category): string => {
+    if (category.translations && category.translations[i18n.language]) {
+      return category.translations[i18n.language];
+    }
+    if (category.translations && category.translations['en']) {
+      return category.translations['en'];
+    }
+    return category.name;
+  };
 
   useEffect(() => {
     loadCategories();
@@ -37,20 +48,27 @@ const Categories: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (values: CategoryFormData) => {
+  const handleSubmit = async (values: any) => {
     try {
+      const translations = {
+        en: values.name_en || values.name,
+        zh: values.name_zh || values.name
+      };
+
       if (editingCategory) {
         await updateCategory(editingCategory.id, {
-          name: values.name,
+          name: values.name_en || values.name,
           type: values.type,
-          parent_id: values.parent_id || null
+          parent_id: values.parent_id || null,
+          translations: translations
         });
         message.success(t('categories.successUpdating'));
       } else {
         await createCategory({
-          name: values.name,
+          name: values.name_en || values.name,
           type: values.type,
-          parent_id: values.parent_id || null
+          parent_id: values.parent_id || null,
+          translations: translations
         });
         message.success(t('categories.successCreating'));
       }
@@ -67,7 +85,8 @@ const Categories: React.FC = () => {
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
     form.setFieldsValue({
-      name: category.name,
+      name_en: category.translations?.en || category.name,
+      name_zh: category.translations?.zh || category.name,
       type: category.type,
       parent_id: category.parent_id
     });
@@ -125,7 +144,7 @@ const Categories: React.FC = () => {
       render: (text, record) => (
         <span style={{ paddingLeft: `${record.level * 24}px` }}>
           {record.level > 0 && <span style={{ color: '#999', marginRight: '8px' }}>└─</span>}
-          {text}
+          {getCategoryName(record)}
         </span>
       ),
     },
@@ -208,11 +227,19 @@ const Categories: React.FC = () => {
           initialValues={{ type: 'expense', parent_id: null }}
         >
           <Form.Item
-            name="name"
-            label={t('categories.name')}
-            rules={[{ required: true, message: t('categories.nameRequired') }]}
+            name="name_en"
+            label={t('categories.nameEn')}
+            rules={[{ required: true, message: t('categories.nameEnRequired') }]}
           >
-            <Input placeholder={t('categories.namePlaceholder')} />
+            <Input placeholder={t('categories.nameEnPlaceholder')} />
+          </Form.Item>
+
+          <Form.Item
+            name="name_zh"
+            label={t('categories.nameZh')}
+            rules={[{ required: true, message: t('categories.nameZhRequired') }]}
+          >
+            <Input placeholder={t('categories.nameZhPlaceholder')} />
           </Form.Item>
 
           <Form.Item
@@ -239,7 +266,7 @@ const Categories: React.FC = () => {
                 <Select allowClear placeholder={t('categories.noParent')}>
                   {getAvailableParents(getFieldValue('type') || 'expense').map(cat => (
                     <Option key={cat.id} value={cat.id}>
-                      {cat.name}
+                      {getCategoryName(cat)}
                     </Option>
                   ))}
                 </Select>

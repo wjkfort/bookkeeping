@@ -58,7 +58,12 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Category with this name already exists in this parent")
     
-    db_category = Category(name=category.name, type=category.type, parent_id=category.parent_id)
+    db_category = Category(
+        name=category.name, 
+        type=category.type, 
+        parent_id=category.parent_id,
+        translations=category.translations
+    )
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
@@ -91,6 +96,8 @@ def update_category(id: int, category: CategoryUpdate, db: Session = Depends(get
         db_category.type = category.type
     if category.parent_id is not None:
         db_category.parent_id = category.parent_id
+    if category.translations is not None:
+        db_category.translations = category.translations
     
     db.commit()
     db.refresh(db_category)

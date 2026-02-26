@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Text, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, Text, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.core.database import Base
@@ -11,6 +11,7 @@ class Category(Base):
     name = Column(String(100), nullable=False)
     type = Column(String(20), nullable=False)  # 'income' or 'expense'
     parent_id = Column(Integer, ForeignKey('categories.id', ondelete='CASCADE'), nullable=True)
+    translations = Column(JSON, nullable=True)  # {"en": "Food", "zh": "食物"}
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Self-referential relationship for hierarchical structure

@@ -12,7 +12,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const Transactions: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { currencyCode, formatCurrency, formatWithConversion } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -26,6 +26,17 @@ const Transactions: React.FC = () => {
   });
   const [form] = Form.useForm();
   const [filterForm] = Form.useForm();
+
+  // Helper function to get translated category name
+  const getCategoryName = (category: Category): string => {
+    if (category.translations && category.translations[i18n.language]) {
+      return category.translations[i18n.language];
+    }
+    if (category.translations && category.translations['en']) {
+      return category.translations['en'];
+    }
+    return category.name;
+  };
 
   useEffect(() => {
     loadCategories();
@@ -221,7 +232,7 @@ const Transactions: React.FC = () => {
             <Select style={{ width: 200 }} placeholder={t('transactions.allCategories')} allowClear>
               {categories.map(category => (
                 <Option key={category.id} value={category.id}>
-                  {category.parent_id ? '  └─ ' : ''}{category.name}
+                  {category.parent_id ? '  └─ ' : ''}{getCategoryName(category)}
                 </Option>
               ))}
             </Select>
@@ -290,7 +301,7 @@ const Transactions: React.FC = () => {
             <Select placeholder={t('transactions.selectCategory')}>
               {categories.map(category => (
                 <Option key={category.id} value={category.id}>
-                  {category.parent_id ? '  └─ ' : ''}{category.name} ({t(`categories.${category.type}`)})
+                  {category.parent_id ? '  └─ ' : ''}{getCategoryName(category)} ({t(`categories.${category.type}`)})
                 </Option>
               ))}
             </Select>

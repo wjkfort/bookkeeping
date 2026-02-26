@@ -3,29 +3,46 @@ import { useTranslation } from 'react-i18next';
 import { Card, Row, Col, Table, Spin, Statistic } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined } from '@ant-design/icons';
 import { useCurrency } from '../hooks/useCurrency';
-import { getSummary, getTransactions } from '../api';
-import { Summary, Transaction } from '../types';
+import { getSummary, getTransactions, getCategories } from '../api';
+import { Summary, Transaction, Category } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
 const Dashboard: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { formatCurrency, formatWithConversion, currencyCode } = useCurrency();
   const [summary, setSummary] = useState<Summary>({ income: 0, expense: 0, balance: 0 });
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Helper function to get translated category name
+  const getCategoryName = (categoryId: number): string => {
+    const category = categories.find(cat => cat.id === categoryId);
+    if (!category) return '';
+    
+    if (category.translations && category.translations[i18n.language]) {
+      return category.translations[i18n.language];
+    }
+    if (category.translations && category.translations['en']) {
+      return category.translations['en'];
+    }
+    return category.name;
+  };
 
   useEffect(() => {
     loadData();
-  }, [currencyCode]);
+  }, [currencyCode, i18n.language]);
 
   const loadData = async () => {
     try {
-      const [summaryRes, transactionsRes] = await Promise.all([
+      const [summaryRes, transactionsRes, categoriesRes] = await Promise.all([
         getSummary({ target_currency: currencyCode }),
-        getTransactions()
+        getTransactions(),
+        getCategories(true)
       ]);
       setSummary(summaryRes.data);
       setRecentTransactions(transactionsRes.data.slice(0, 5));
+      setCategories(categoriesRes.data);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -46,8 +63,9 @@ const Dashboard: React.FC = () => {
     },
     {
       title: t('transactions.category'),
-      dataIndex: 'category_name',
-      key: 'category_name',
+      dataIndex: 'category_id',
+      key: 'category_id',
+      render: (categoryId: number) => getCategoryName(categoryId),
     },
     {
       title: t('transactions.amount'),
