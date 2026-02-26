@@ -171,8 +171,9 @@ const Transactions: React.FC = () => {
     },
     {
       title: t('transactions.category'),
-      dataIndex: 'category_name',
-      key: 'category_name',
+      dataIndex: 'category_id',
+      key: 'category_id',
+      render: (categoryId: number) => getCategoryName(categories.find(cat => cat.id === categoryId) || { id: categoryId, name: '', type: 'expense' } as Category),
     },
     {
       title: t('transactions.amount'),
