@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Button, Form, Input, Select, Space, Modal, message } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from '@ant-design/icons';
-import { getCategories, createCategory, updateCategory, deleteCategory } from '../api';
+import { getCategories, createCategory, updateCategory, deleteCategory, translateText } from '../api';
 import { Category, CategoryFormData } from '../types';
 import type { ColumnsType } from 'antd/es/table';
-import { translate } from '@vitalets/google-translate-api';
 
 const { Option } = Select;
 
@@ -43,8 +42,8 @@ const Categories: React.FC = () => {
 
     setTranslating(toLang);
     try {
-      const result = await translate(sourceText, { from: fromLang, to: toLang });
-      form.setFieldsValue({ [targetField]: result.text });
+      const result = await translateText(sourceText, fromLang, toLang);
+      form.setFieldsValue({ [targetField]: result.data.text });
       message.success(t('categories.translationSuccess'));
     } catch (error) {
       console.error('Translation error:', error);

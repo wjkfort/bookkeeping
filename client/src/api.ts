@@ -24,6 +24,10 @@ interface ConvertCurrencyResponse {
   rate: number;
 }
 
+interface TranslateResponse {
+  text: string;
+}
+
 // Categories
 export const getCategories = (flat: boolean = false): Promise<AxiosResponse<Category[]>> => 
   api.get('/categories', { params: { flat } });
@@ -62,5 +66,9 @@ export const convertCurrency = (amount: number, fromCurrency: string, toCurrency
   api.get('/exchange-rates/convert', { 
     params: { amount, from_currency: fromCurrency, to_currency: toCurrency } 
   });
+
+// Translate
+export const translateText = (text: string, fromLang: string, toLang: string): Promise<AxiosResponse<TranslateResponse>> =>
+  api.post('/translate', { text, from_lang: fromLang, to_lang: toLang });
 
 export default api;
