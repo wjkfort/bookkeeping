@@ -6,7 +6,7 @@ compatibility_date = "2024-02-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "bookkeeping-db"
-database_id = "" # Will be filled after creating D1 database
+database_id = "81d99dfc-618f-408f-8e28-d2752a807d45"
 
 # Environment variables
 [vars]
