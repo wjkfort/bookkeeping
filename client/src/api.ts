@@ -1,12 +1,12 @@
-import axios, { AxiosResponse } from 'axios';
-import { Category, Transaction, Summary } from './types';
+import axios, { AxiosResponse } from "axios";
+import { Category, Transaction, Summary } from "./types";
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = "http://localhost:8001/api/v1";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -29,46 +29,35 @@ interface TranslateResponse {
 }
 
 // Categories
-export const getCategories = (flat: boolean = false): Promise<AxiosResponse<Category[]>> => 
-  api.get('/categories', { params: { flat } });
+export const getCategories = (flat: boolean = false): Promise<AxiosResponse<Category[]>> => api.get("/categories/", { params: { flat } });
 
-export const createCategory = (data: Partial<Category>): Promise<AxiosResponse<Category>> => 
-  api.post('/categories', data);
+export const createCategory = (data: Partial<Category>): Promise<AxiosResponse<Category>> => api.post("/categories/", data);
 
-export const updateCategory = (id: number, data: Partial<Category>): Promise<AxiosResponse<Category>> => 
-  api.put(`/categories/${id}`, data);
+export const updateCategory = (id: number, data: Partial<Category>): Promise<AxiosResponse<Category>> => api.put(`/categories/${id}/`, data);
 
-export const deleteCategory = (id: number): Promise<AxiosResponse<void>> => 
-  api.delete(`/categories/${id}`);
+export const deleteCategory = (id: number): Promise<AxiosResponse<void>> => api.delete(`/categories/${id}/`);
 
 // Transactions
-export const getTransactions = (params?: Record<string, any>): Promise<AxiosResponse<Transaction[]>> => 
-  api.get('/transactions', { params });
+export const getTransactions = (params?: Record<string, any>): Promise<AxiosResponse<Transaction[]>> => api.get("/transactions/", { params });
 
-export const createTransaction = (data: Partial<Transaction>): Promise<AxiosResponse<Transaction>> => 
-  api.post('/transactions', data);
+export const createTransaction = (data: Partial<Transaction>): Promise<AxiosResponse<Transaction>> => api.post("/transactions/", data);
 
-export const updateTransaction = (id: number, data: Partial<Transaction>): Promise<AxiosResponse<Transaction>> => 
-  api.put(`/transactions/${id}`, data);
+export const updateTransaction = (id: number, data: Partial<Transaction>): Promise<AxiosResponse<Transaction>> => api.put(`/transactions/${id}/`, data);
 
-export const deleteTransaction = (id: number): Promise<AxiosResponse<void>> => 
-  api.delete(`/transactions/${id}`);
+export const deleteTransaction = (id: number): Promise<AxiosResponse<void>> => api.delete(`/transactions/${id}/`);
 
 // Summary
-export const getSummary = (params?: Record<string, any>): Promise<AxiosResponse<Summary>> => 
-  api.get('/summary', { params });
+export const getSummary = (params?: Record<string, any>): Promise<AxiosResponse<Summary>> => api.get("/summary/", { params });
 
 // Exchange Rates
-export const getExchangeRates = (base: string = 'USD', forceRefresh: boolean = false): Promise<AxiosResponse<ExchangeRatesResponse>> => 
-  api.get('/exchange-rates/rates', { params: { base, force_refresh: forceRefresh } });
+export const getExchangeRates = (base: string = "USD", forceRefresh: boolean = false): Promise<AxiosResponse<ExchangeRatesResponse>> => api.get("/exchange-rates/rates", { params: { base, force_refresh: forceRefresh } });
 
 export const convertCurrency = (amount: number, fromCurrency: string, toCurrency: string): Promise<AxiosResponse<ConvertCurrencyResponse>> =>
-  api.get('/exchange-rates/convert', { 
-    params: { amount, from_currency: fromCurrency, to_currency: toCurrency } 
+  api.get("/exchange-rates/convert", {
+    params: { amount, from_currency: fromCurrency, to_currency: toCurrency },
   });
 
 // Translate
-export const translateText = (text: string, fromLang: string, toLang: string): Promise<AxiosResponse<TranslateResponse>> =>
-  api.post('/translate', { text, from_lang: fromLang, to_lang: toLang });
+export const translateText = (text: string, fromLang: string, toLang: string): Promise<AxiosResponse<TranslateResponse>> => api.post("/translate", { text, from_lang: fromLang, to_lang: toLang });
 
 export default api;

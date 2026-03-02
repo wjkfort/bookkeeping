@@ -60,12 +60,12 @@ pip install -r requirements.txt
 
 Using uv:
 ```bash
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --port 8001
 ```
 
 Or using uvicorn directly:
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8001
 ```
 
 The API will be available at:

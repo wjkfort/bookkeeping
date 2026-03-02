@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio } from "antd";
+import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space } from "antd";
 import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useCurrency } from "../hooks/useCurrency";
 import { getSummary, getTransactions, getCategories } from "../api";
 import { Summary, Transaction, Category } from "../types";
 import type { ColumnsType } from "antd/es/table";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { formatCurrency, formatWithConversion, currencyCode } = useCurrency();
   const [summary, setSummary] = useState<Summary>({ income: 0, expense: 0, balance: 0 });
+  const [overallBalance, setOverallBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,8 @@ const Dashboard: React.FC = () => {
   const [expenseCategories, setExpenseCategories] = useState<{ name: string; color: string }[]>([]);
   const [showExpense, setShowExpense] = useState(true);
   const [barChartRange, setBarChartRange] = useState<"7days" | "30days" | "month">("7days");
+  const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
+  const [isOverall, setIsOverall] = useState(false);
 
   // Helper function to get translated category name
   const getCategoryName = (categoryId: number): string => {
@@ -38,18 +41,39 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [currencyCode, i18n.language, barChartRange]);
+  }, [currencyCode, i18n.language, barChartRange, selectedMonth, isOverall]);
 
   const loadData = async () => {
     try {
-      const [summaryRes, transactionsRes, categoriesRes] = await Promise.all([getSummary({ target_currency: currencyCode }), getTransactions(), getCategories(true)]);
+      // Prepare date range params
+      let dateParams = {};
+      if (!isOverall && selectedMonth) {
+        const startDate = selectedMonth.startOf("month").format("YYYY-MM-DD");
+        const endDate = selectedMonth.endOf("month").format("YYYY-MM-DD");
+        dateParams = { start_date: startDate, end_date: endDate };
+      }
+
+      const [summaryRes, overallSummaryRes, transactionsRes, categoriesRes] = await Promise.all([
+        getSummary({ target_currency: currencyCode, ...dateParams }), 
+        getSummary({ target_currency: currencyCode }), // Get overall balance without date filter
+        getTransactions(dateParams), 
+        getCategories(true)
+      ]);
       setSummary(summaryRes.data);
-      setRecentTransactions(transactionsRes.data.slice(0, 5));
+      setOverallBalance(overallSummaryRes.data.balance);
+      
       const categoriesData = categoriesRes.data;
       setCategories(categoriesData);
 
+      // Determine if we're viewing a specific month (not current month and not overall)
+      const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), 'month');
+      const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
+
       // Process data for charts
-      processChartData(transactionsRes.data, categoriesData);
+      processChartData(transactionsRes.data, categoriesData, effectiveBarChartRange);
+      
+      // Set recent transactions (top 5)
+      setRecentTransactions(transactionsRes.data.slice(0, 5));
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -57,12 +81,22 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const processChartData = (transactions: Transaction[], categoriesData: Category[]) => {
-    const now = dayjs();
+  const processChartData = (transactions: Transaction[], categoriesData: Category[], effectiveBarChartRange: "7days" | "30days" | "month") => {
+    const now = isOverall ? dayjs() : (selectedMonth || dayjs());
     const startOfMonth = now.startOf("month");
 
-    // Filter current month transactions
-    const currentMonthTransactions = transactions.filter((t) => dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, "day"));
+    // Filter transactions based on selection
+    let filteredTransactions: Transaction[];
+    if (isOverall) {
+      // For overall, use all transactions
+      filteredTransactions = transactions;
+    } else {
+      // Filter by selected month
+      filteredTransactions = transactions.filter((t) => 
+        dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, "day")
+      );
+    }
+    const currentMonthTransactions = filteredTransactions;
 
     // Color palette for pie chart (warm tones - red/orange/yellow)
     const incomeColors = ["#52c41a", "#73d13d", "#95de64", "#b7eb8f", "#d9f7be"];
@@ -134,25 +168,27 @@ const Dashboard: React.FC = () => {
     let startDate: dayjs.Dayjs;
     let dateFormat: string;
     let daysCount: number;
+    const referenceDate = isOverall ? dayjs() : (selectedMonth || dayjs());
 
-    if (barChartRange === "7days") {
-      startDate = now.subtract(6, "day").startOf("day");
+    // Use effectiveBarChartRange to determine the actual range
+    if (effectiveBarChartRange === "7days") {
+      startDate = referenceDate.subtract(6, "day").startOf("day");
       dateFormat = "MM/DD";
       daysCount = 7;
-    } else if (barChartRange === "30days") {
-      startDate = now.subtract(29, "day").startOf("day");
+    } else if (effectiveBarChartRange === "30days") {
+      startDate = referenceDate.subtract(29, "day").startOf("day");
       dateFormat = "MM/DD";
       daysCount = 30;
     } else {
       // 'month'
-      startDate = now.startOf("month");
+      startDate = referenceDate.startOf("month");
       dateFormat = "MM/DD";
-      daysCount = now.daysInMonth();
+      daysCount = referenceDate.daysInMonth();
     }
 
     // Initialize all dates in range
     for (let i = 0; i < daysCount; i++) {
-      const date = barChartRange === "month" ? startDate.add(i, "day").format("YYYY-MM-DD") : now.subtract(daysCount - 1 - i, "day").format("YYYY-MM-DD");
+      const date = effectiveBarChartRange === "month" ? startDate.add(i, "day").format("YYYY-MM-DD") : referenceDate.subtract(daysCount - 1 - i, "day").format("YYYY-MM-DD");
       dailyExpensesByCategory[date] = {};
     }
 
@@ -227,9 +263,50 @@ const Dashboard: React.FC = () => {
 
   const filteredMonthlyData = monthlyData.filter((item) => (showExpense ? item.type === "expense" : item.type === "income"));
 
+  // Determine if we're viewing a specific month (not current month and not overall)
+  const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), 'month');
+
+  // Determine the actual bar chart range to use
+  const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
+
+  // Generate title based on selection
+  const getBarChartTitle = () => {
+    if (isViewingSpecificMonth) {
+      return `${selectedMonth?.format("YYYY-MM")} ${t("dashboard.expense") || "Expense"}`;
+    }
+    if (barChartRange === "7days") {
+      return t("dashboard.last7DaysExpense");
+    }
+    if (barChartRange === "30days") {
+      return t("dashboard.last30DaysExpense");
+    }
+    return t("dashboard.currentMonthExpense");
+  };
+
   return (
     <div>
-      <h1 style={{ marginBottom: "24px" }}>{t("dashboard.title")}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <h1 style={{ margin: 0 }}>{t("dashboard.title")}</h1>
+        <Space>
+          <DatePicker
+            picker="month"
+            value={isOverall ? null : selectedMonth}
+            onChange={(date) => {
+              setSelectedMonth(date);
+              setIsOverall(false);
+            }}
+            disabled={isOverall}
+            format="YYYY-MM"
+            placeholder={t("dashboard.selectMonth") || "Select Month"}
+          />
+          <Button
+            type={isOverall ? "primary" : "default"}
+            onClick={() => setIsOverall(!isOverall)}
+          >
+            {t("dashboard.overall") || "Overall"}
+          </Button>
+        </Space>
+      </div>
 
       <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
         <Col xs={24} sm={8}>
@@ -244,7 +321,7 @@ const Dashboard: React.FC = () => {
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.balance")} value={summary.balance} precision={2} valueStyle={{ color: "#1890ff" }} prefix={<WalletOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.balance")} value={overallBalance} precision={2} valueStyle={{ color: "#1890ff" }} prefix={<WalletOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
       </Row>
@@ -275,13 +352,15 @@ const Dashboard: React.FC = () => {
         </Col>
         <Col xs={24} lg={12}>
           <Card
-            title={barChartRange === "7days" ? t("dashboard.last7DaysExpense") : barChartRange === "30days" ? t("dashboard.last30DaysExpense") : t("dashboard.currentMonthExpense")}
+            title={getBarChartTitle()}
             extra={
-              <Radio.Group value={barChartRange} onChange={(e) => setBarChartRange(e.target.value)} size="small">
-                <Radio.Button value="7days">7 {t("dashboard.days")}</Radio.Button>
-                <Radio.Button value="30days">30 {t("dashboard.days")}</Radio.Button>
-                <Radio.Button value="month">{t("dashboard.currentMonth")}</Radio.Button>
-              </Radio.Group>
+              !isViewingSpecificMonth && (
+                <Radio.Group value={barChartRange} onChange={(e) => setBarChartRange(e.target.value)} size="small">
+                  <Radio.Button value="7days">7 {t("dashboard.days")}</Radio.Button>
+                  <Radio.Button value="30days">30 {t("dashboard.days")}</Radio.Button>
+                  <Radio.Button value="month">{t("dashboard.currentMonth")}</Radio.Button>
+                </Radio.Group>
+              )
             }
           >
             <ResponsiveContainer width="100%" height={300}>

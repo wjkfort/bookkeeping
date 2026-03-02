@@ -24,7 +24,9 @@
     "last30DaysExpense": "最近30天支出",
     "currentMonthExpense": "当月支出",
     "days": "天",
-    "currentMonth": "当月"
+    "currentMonth": "当月",
+    "selectMonth": "选择月份",
+    "overall": "全部"
   },
   "transactions": {
     "title": "交易记录",
