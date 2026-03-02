@@ -2,9 +2,9 @@ import axios, { AxiosResponse } from "axios";
 import { Category, Transaction, Summary } from "./types";
 
 // Use environment variable in production, localhost in development
-const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://bookkeeping-backend.YOUR_SUBDOMAIN.workers.dev/api/v1' // Update this after deploying backend
-  : 'http://localhost:8787/api/v1'; // Wrangler dev default port
+const API_BASE_URL = import.meta.env.PROD
+  ? "https://bookkeeping-backend.stringwjk.workers.dev/api/v1"
+  : "http://localhost:8787/api/v1"; // Wrangler dev default port
 
 const api = axios.create({
   baseURL: API_BASE_URL,
