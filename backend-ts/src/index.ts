@@ -14,8 +14,8 @@ app.use('/*', cors({
   origin: [
     'http://localhost:5174',
     'http://localhost:5173',
-    'https://bookkeeping-app.pages.dev', // Update with your actual Pages URL
-    // Add your custom domain here if you have one
+    'https://bookkeeping-app-62m.pages.dev',
+    'https://01797f04.bookkeeping-app-62m.pages.dev',
   ],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type'],

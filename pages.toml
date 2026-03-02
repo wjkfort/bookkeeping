@@ -1,0 +1,18 @@
+# Cloudflare Pages Configuration for Frontend
+
+# This file tells Cloudflare Pages how to build the frontend
+# Place this in the root of your repository
+
+# Build settings
+[build]
+  command = "cd client && npm install && npm run build"
+  publish = "client/dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Redirects for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
