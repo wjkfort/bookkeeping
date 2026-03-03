@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu } from "antd";
