@@ -12,7 +12,7 @@ import dayjs, { Dayjs } from "dayjs";
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { formatCurrency, formatWithConversion, currencyCode } = useCurrency();
-  const [summary, setSummary] = useState<Summary>({ income: 0, expense: 0, balance: 0 });
+  const [summary, setSummary] = useState<Summary>({ total_income: 0, total_expense: 0, balance: 0, currency: 'USD' });
   const [overallBalance, setOverallBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -311,12 +311,12 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.totalIncome")} value={summary.income} precision={2} valueStyle={{ color: "#52c41a" }} prefix={<ArrowUpOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.totalIncome")} value={summary.total_income} precision={2} valueStyle={{ color: "#52c41a" }} prefix={<ArrowUpOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.totalExpense")} value={summary.expense} precision={2} valueStyle={{ color: "#ff4d4f" }} prefix={<ArrowDownOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.totalExpense")} value={summary.total_expense} precision={2} valueStyle={{ color: "#ff4d4f" }} prefix={<ArrowDownOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>

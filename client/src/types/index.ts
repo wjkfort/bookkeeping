@@ -18,9 +18,10 @@ export interface Transaction {
 }
 
 export interface Summary {
-  income: number;
-  expense: number;
+  total_income: number;
+  total_expense: number;
   balance: number;
+  currency: string;
 }
 
 export interface TransactionFormData {
