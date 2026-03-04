@@ -4,7 +4,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 
 ## Quick Links
 
-- **Live App**: https://bookkeeping-app-62m.pages.dev
+- **Live App**: https://bookkeeping-client-new.pages.dev
 - **Backend API**: https://bookkeeping-backend.stringwjk.workers.dev
 - **GitHub**: https://github.com/wjkfort/bookkeeping
 
