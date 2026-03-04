@@ -13,7 +13,15 @@ const app = new Hono<{ Bindings: Env }>();
 app.use(
   "/*",
   cors({
-    origin: ["http://localhost:5174", "http://localhost:5173", "https://bookkeeping-client-new.pages.dev", "https://50a34c08.bookkeeping-client-new.pages.dev"],
+    origin: (origin) => {
+      // Allow all Cloudflare Pages URLs (production and previews)
+      if (origin.endsWith('.pages.dev') ||
+          origin === 'http://localhost:5174' ||
+          origin === 'http://localhost:5173') {
+        return origin;
+      }
+      return null;
+    },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
     credentials: true,
