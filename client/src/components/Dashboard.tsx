@@ -12,13 +12,13 @@ import dayjs, { Dayjs } from "dayjs";
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { formatCurrency, formatWithConversion, currencyCode } = useCurrency();
-  const [summary, setSummary] = useState<Summary>({ total_income: 0, total_expense: 0, balance: 0, currency: 'USD' });
+  const [summary, setSummary] = useState<Summary>({ total_income: 0, total_expense: 0, balance: 0, currency: "USD" });
   const [overallBalance, setOverallBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<{ name: string; value: number; color: string; type: string; id: number }[]>([]);
-  const [weeklyExpenses, setWeeklyExpenses] = useState<any[]>([]);
+  const [weeklyExpenses, setWeeklyExpenses] = useState<unknown[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<{ name: string; color: string }[]>([]);
   const [showExpense, setShowExpense] = useState(true);
   const [barChartRange, setBarChartRange] = useState<"7days" | "30days" | "month">("7days");
@@ -54,24 +54,24 @@ const Dashboard: React.FC = () => {
       }
 
       const [summaryRes, overallSummaryRes, transactionsRes, categoriesRes] = await Promise.all([
-        getSummary({ target_currency: currencyCode, ...dateParams }), 
+        getSummary({ target_currency: currencyCode, ...dateParams }),
         getSummary({ target_currency: currencyCode }), // Get overall balance without date filter
-        getTransactions(dateParams), 
-        getCategories(true)
+        getTransactions(dateParams),
+        getCategories(true),
       ]);
       setSummary(summaryRes.data);
       setOverallBalance(overallSummaryRes.data.balance);
-      
+
       const categoriesData = categoriesRes.data;
       setCategories(categoriesData);
 
       // Determine if we're viewing a specific month (not current month and not overall)
-      const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), 'month');
+      const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), "month");
       const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
 
       // Process data for charts
       processChartData(transactionsRes.data, categoriesData, effectiveBarChartRange);
-      
+
       // Set recent transactions (top 5)
       setRecentTransactions(transactionsRes.data.slice(0, 5));
     } catch (error) {
@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
   };
 
   const processChartData = (transactions: Transaction[], categoriesData: Category[], effectiveBarChartRange: "7days" | "30days" | "month") => {
-    const now = isOverall ? dayjs() : (selectedMonth || dayjs());
+    const now = isOverall ? dayjs() : selectedMonth || dayjs();
     const startOfMonth = now.startOf("month");
 
     // Filter transactions based on selection
@@ -92,9 +92,7 @@ const Dashboard: React.FC = () => {
       filteredTransactions = transactions;
     } else {
       // Filter by selected month
-      filteredTransactions = transactions.filter((t) => 
-        dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, "day")
-      );
+      filteredTransactions = transactions.filter((t) => dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, "day"));
     }
     const currentMonthTransactions = filteredTransactions;
 
@@ -168,7 +166,7 @@ const Dashboard: React.FC = () => {
     let startDate: dayjs.Dayjs;
     let dateFormat: string;
     let daysCount: number;
-    const referenceDate = isOverall ? dayjs() : (selectedMonth || dayjs());
+    const referenceDate = isOverall ? dayjs() : selectedMonth || dayjs();
 
     // Use effectiveBarChartRange to determine the actual range
     if (effectiveBarChartRange === "7days") {
@@ -264,7 +262,7 @@ const Dashboard: React.FC = () => {
   const filteredMonthlyData = monthlyData.filter((item) => (showExpense ? item.type === "expense" : item.type === "income"));
 
   // Determine if we're viewing a specific month (not current month and not overall)
-  const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), 'month');
+  const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), "month");
 
   // Determine the actual bar chart range to use
   const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
@@ -299,10 +297,7 @@ const Dashboard: React.FC = () => {
             format="YYYY-MM"
             placeholder={t("dashboard.selectMonth") || "Select Month"}
           />
-          <Button
-            type={isOverall ? "primary" : "default"}
-            onClick={() => setIsOverall(!isOverall)}
-          >
+          <Button type={isOverall ? "primary" : "default"} onClick={() => setIsOverall(!isOverall)}>
             {t("dashboard.overall") || "Overall"}
           </Button>
         </Space>
