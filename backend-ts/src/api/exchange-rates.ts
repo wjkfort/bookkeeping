@@ -8,14 +8,14 @@ const app = new Hono<{ Bindings: Env }>();
 app.get('/rates', async (c) => {
   const base = c.req.query('base') || 'USD';
   const force_refresh = c.req.query('force_refresh') === 'true';
-  
+
   try {
     const rates = await fetchAndCacheRates(c.env, base, force_refresh);
-    
+
     return c.json({
       base,
       rates,
-      timestamp: Date.now()
+      last_updated: new Date().toISOString()
     });
   } catch (error) {
     console.error('Exchange rates error:', error);
