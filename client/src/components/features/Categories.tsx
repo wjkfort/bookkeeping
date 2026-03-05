@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card, Table, Button, Form, Input, Select, Space, Modal, message, Segmented } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from '@ant-design/icons';
-import { getCategories, createCategory, updateCategory, deleteCategory, translateText } from '../api';
-import { Category, CategoryFormData } from '../types';
+import { getCategories, createCategory, updateCategory, deleteCategory, translateText } from '../../api';
+import { Category, CategoryFormData } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Option } = Select;

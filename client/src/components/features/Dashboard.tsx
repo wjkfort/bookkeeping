@@ -4,9 +4,9 @@ import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Butt
 import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined, ArrowLeftOutlined, LineChartOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from '@ant-design/plots';
-import { useCurrency } from "../hooks/useCurrency";
-import { getSummary, getTransactions, getCategories, getItems, getItemHistory } from "../api";
-import { Summary, Transaction, Category, Item, ItemHistory } from "../types";
+import { useCurrency } from "../../hooks/useCurrency";
+import { getSummary, getTransactions, getCategories, getItems, getItemHistory } from "../../api";
+import { Summary, Transaction, Category, Item, ItemHistory } from "../../types";
 import TransactionTable from './TransactionTable';
 import dayjs, { Dayjs } from "dayjs";
 

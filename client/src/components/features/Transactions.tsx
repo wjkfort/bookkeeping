@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col, AutoComplete, Collapse, Tag, Statistic } from 'antd';
 import { PlusOutlined, FilterOutlined, HistoryOutlined, ArrowLeftOutlined, LineChartOutlined } from '@ant-design/icons';
 import { Line } from '@ant-design/plots';
-import { useCurrency } from '../hooks/useCurrency';
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from '../api';
-import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '../types';
+import { useCurrency } from '../../hooks/useCurrency';
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from '../../api';
+import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '../../types';
 import TransactionTable from './TransactionTable';
 import dayjs from 'dayjs';
 

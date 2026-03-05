@@ -2,8 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Table, Button, Space } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useCurrency } from '../hooks/useCurrency';
-import { Transaction, Category, Item } from '../types';
+import { useCurrency } from '../../hooks/useCurrency';
+import { Transaction, Category, Item } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
 
 interface TransactionTableProps {
