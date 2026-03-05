@@ -119,7 +119,8 @@ Secure user authentication and authorization using JWT tokens.
 
 **Features:**
 - **User Registration**: Create new accounts with email, username, and password
-- **Secure Login**: JWT-based authentication with 7-day token expiration
+- **Secure Login**: JWT-based authentication
+- **Token Expiry**: JWT tokens expire after 7 days (604,800 seconds)
 - **Password Security**: Passwords hashed with bcryptjs before storage
 - **Protected Routes**: All main features require authentication
 - **Auto-logout**: Automatic logout on token expiration or invalid tokens
