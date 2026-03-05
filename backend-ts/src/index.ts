@@ -6,6 +6,7 @@ import transactionsRouter from "./api/transactions";
 import summaryRouter from "./api/summary";
 import exchangeRatesRouter from "./api/exchange-rates";
 import translateRouter from "./api/translate";
+import itemsRouter from "./api/items";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -44,6 +45,7 @@ api.route("/transactions", transactionsRouter);
 api.route("/summary", summaryRouter);
 api.route("/exchange-rates", exchangeRatesRouter);
 api.route("/translate", translateRouter);
+api.route("/items", itemsRouter);
 
 app.route("/api/v1", api);
 

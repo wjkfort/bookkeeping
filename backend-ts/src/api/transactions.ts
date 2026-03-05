@@ -62,7 +62,7 @@ app.get('/:id', async (c) => {
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<CreateTransactionRequest>();
-    const { amount, currency, description, date, category_id } = body;
+    const { amount, currency, description, date, category_id, item_id, item_name } = body;
 
     if (!amount || !currency || !date || !category_id) {
       return c.json({ error: 'Amount, currency, date, and category_id are required' }, 400);
@@ -72,12 +72,35 @@ app.post('/', async (c) => {
       return c.json({ error: 'Currency must be a 3-letter code' }, 400);
     }
 
+    let finalItemId = item_id || null;
+
+    // If item_name is provided, create or find the item
+    if (item_name && item_name.trim().length > 0) {
+      // Check if item already exists
+      const existingItem = await c.env.DB.prepare(
+        'SELECT id FROM items WHERE name = ?'
+      ).bind(item_name.trim()).first<{ id: number }>();
+
+      if (existingItem) {
+        finalItemId = existingItem.id;
+      } else {
+        // Create new item
+        const newItem = await c.env.DB.prepare(
+          'INSERT INTO items (name, created_at) VALUES (?, ?) RETURNING id'
+        ).bind(item_name.trim(), new Date().toISOString()).first<{ id: number }>();
+        
+        if (newItem) {
+          finalItemId = newItem.id;
+        }
+      }
+    }
+
     const now = new Date().toISOString();
 
     const result = await c.env.DB.prepare(
-      `INSERT INTO transactions (amount, currency, description, date, category_id, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
-    ).bind(amount, currency, description || null, date, category_id, now, now).first<Transaction>();
+      `INSERT INTO transactions (amount, currency, description, date, category_id, item_id, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+    ).bind(amount, currency, description || null, date, category_id, finalItemId, now, now).first<Transaction>();
 
     return c.json(result, 201);
   } catch (error: any) {
@@ -119,6 +142,38 @@ app.put('/:id', async (c) => {
     if (body.category_id !== undefined) {
       updates.push('category_id = ?');
       values.push(body.category_id);
+    }
+    
+    // Handle item_id and item_name
+    if (body.item_name !== undefined) {
+      if (body.item_name && body.item_name.trim().length > 0) {
+        // Check if item already exists
+        const existingItem = await c.env.DB.prepare(
+          'SELECT id FROM items WHERE name = ?'
+        ).bind(body.item_name.trim()).first<{ id: number }>();
+
+        if (existingItem) {
+          updates.push('item_id = ?');
+          values.push(existingItem.id);
+        } else {
+          // Create new item
+          const newItem = await c.env.DB.prepare(
+            'INSERT INTO items (name, created_at) VALUES (?, ?) RETURNING id'
+          ).bind(body.item_name.trim(), new Date().toISOString()).first<{ id: number }>();
+          
+          if (newItem) {
+            updates.push('item_id = ?');
+            values.push(newItem.id);
+          }
+        }
+      } else {
+        // Clear item_id if item_name is empty
+        updates.push('item_id = ?');
+        values.push(null);
+      }
+    } else if (body.item_id !== undefined) {
+      updates.push('item_id = ?');
+      values.push(body.item_id);
     }
 
     if (updates.length === 0) {

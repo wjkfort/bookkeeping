@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu } from "antd";
-import { DashboardOutlined, TransactionOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined } from "@ant-design/icons";
 import Dashboard from "./components/Dashboard";
 import Transactions from "./components/Transactions";
 import Categories from "./components/Categories";
+import Items from "./components/Items";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import zhCN from "antd/locale/zh_CN";
 import enUS from "antd/locale/en_US";
@@ -37,6 +38,11 @@ function AppContent() {
       icon: <AppstoreOutlined />,
       label: <Link to="/categories">{t("nav.categories")}</Link>,
     },
+    {
+      key: "/items",
+      icon: <ShoppingOutlined />,
+      label: <Link to="/items">{t("nav.items")}</Link>,
+    },
   ];
 
   return (
@@ -63,6 +69,7 @@ function AppContent() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/items" element={<Items />} />
         </Routes>
       </Content>
     </Layout>

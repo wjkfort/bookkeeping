@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, FilterOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col, AutoComplete, Collapse, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, FilterOutlined, HistoryOutlined } from '@ant-design/icons';
 import { useCurrency } from '../hooks/useCurrency';
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories } from '../api';
-import { Transaction, Category, TransactionFilters } from '../types';
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory } from '../api';
+import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { TextArea } = Input;
+const { Panel } = Collapse;
 
 const Transactions: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -26,6 +27,9 @@ const Transactions: React.FC = () => {
   });
   const [form] = Form.useForm();
   const [filterForm] = Form.useForm();
+  const [itemOptions, setItemOptions] = useState<{ value: string }[]>([]);
+  const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
+  const [loadingItemHistory, setLoadingItemHistory] = useState(false);
 
   // Helper function to get translated category name
   const getCategoryName = (category: Category): string => {
@@ -100,6 +104,10 @@ const Transactions: React.FC = () => {
         data.description = values.description;
       }
       
+      if (values.item_name) {
+        data.item_name = values.item_name;
+      }
+      
       if (editingId) {
         await updateTransaction(editingId, data);
         message.success(t('transactions.successUpdating'));
@@ -118,11 +126,60 @@ const Transactions: React.FC = () => {
     }
   };
 
-  const handleEdit = (transaction: Transaction) => {
+  const handleItemSearch = async (searchText: string) => {
+    if (!searchText || searchText.length < 1) {
+      setItemOptions([]);
+      setSelectedItemHistory(null);
+      return;
+    }
+    
+    try {
+      const response = await searchItems(searchText);
+      setItemOptions(response.data.map((item: Item) => ({ value: item.name })));
+    } catch (error) {
+      console.error('Error searching items:', error);
+    }
+  };
+
+  const handleItemSelect = async (value: string) => {
+    // Find the item by name and load its history
+    try {
+      setLoadingItemHistory(true);
+      const response = await searchItems(value);
+      if (response.data.length > 0) {
+        const item = response.data.find((i: Item) => i.name === value);
+        if (item) {
+          const historyResponse = await getItemHistory(item.id);
+          setSelectedItemHistory(historyResponse.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading item history:', error);
+    } finally {
+      setLoadingItemHistory(false);
+    }
+  };
+
+  const handleEdit = async (transaction: Transaction) => {
+    // Load item name if transaction has an item_id
+    let itemName = '';
+    if (transaction.item_id) {
+      try {
+        const response = await getItemHistory(transaction.item_id);
+        itemName = response.data.item.name;
+        setSelectedItemHistory(response.data);
+      } catch (error) {
+        console.error('Error loading item:', error);
+      }
+    } else {
+      setSelectedItemHistory(null);
+    }
+
     form.setFieldsValue({
       amount: transaction.amount,
       description: transaction.description || '',
       category_id: transaction.category_id,
+      item_name: itemName,
       date: dayjs(transaction.date)
     });
     setEditingId(transaction.id);
@@ -222,6 +279,7 @@ const Transactions: React.FC = () => {
         <h1>{t('transactions.title')}</h1>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => {
           setEditingId(null);
+          setSelectedItemHistory(null);
           form.resetFields();
           setIsModalVisible(true);
         }}>
@@ -270,6 +328,7 @@ const Transactions: React.FC = () => {
         onCancel={() => {
           setIsModalVisible(false);
           setEditingId(null);
+          setSelectedItemHistory(null);
           form.resetFields();
         }}
         footer={null}
@@ -295,6 +354,53 @@ const Transactions: React.FC = () => {
           >
             <TextArea rows={3} placeholder={t('transactions.descriptionPlaceholder')} />
           </Form.Item>
+
+          <Form.Item
+            name="item_name"
+            label={t('transactions.itemName')}
+          >
+            <AutoComplete
+              options={itemOptions}
+              onSearch={handleItemSearch}
+              onSelect={handleItemSelect}
+              placeholder={t('transactions.itemNamePlaceholder')}
+              allowClear
+              onChange={(value) => {
+                if (!value) {
+                  setSelectedItemHistory(null);
+                }
+              }}
+            />
+          </Form.Item>
+
+          {selectedItemHistory && selectedItemHistory.stats.total_purchases > 0 && (
+            <Card 
+              size="small" 
+              title={<><HistoryOutlined /> {t('items.purchaseHistory')}</>}
+              style={{ marginBottom: '16px', backgroundColor: '#f5f5f5' }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div>
+                  <Tag color="blue">{t('items.totalPurchases')}: {selectedItemHistory.stats.total_purchases}</Tag>
+                  <Tag color="green">{t('items.averagePrice')}: {formatCurrency(selectedItemHistory.stats.average_price, 'USD')}</Tag>
+                  <Tag color="orange">{t('items.lastPurchase')}: {selectedItemHistory.stats.last_purchase_date ? dayjs(selectedItemHistory.stats.last_purchase_date).format('YYYY-MM-DD') : '-'}</Tag>
+                </div>
+                <Collapse ghost>
+                  <Panel header={t('items.recentTransactions')} key="1">
+                    {selectedItemHistory.transactions.slice(0, 3).map((txn) => (
+                      <div key={txn.id} style={{ padding: '4px 0', borderBottom: '1px solid #e8e8e8' }}>
+                        <Space>
+                          <span>{dayjs(txn.date).format('YYYY-MM-DD')}</span>
+                          <span>{formatCurrency(txn.amount, txn.currency)}</span>
+                          <span style={{ color: '#999' }}>{txn.description}</span>
+                        </Space>
+                      </div>
+                    ))}
+                  </Panel>
+                </Collapse>
+              </Space>
+            </Card>
+          )}
 
           <Form.Item
             name="category_id"
@@ -326,6 +432,7 @@ const Transactions: React.FC = () => {
               <Button onClick={() => {
                 setIsModalVisible(false);
                 setEditingId(null);
+                setSelectedItemHistory(null);
                 form.resetFields();
               }}>
                 {t('transactions.cancel')}

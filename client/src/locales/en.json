@@ -3,7 +3,8 @@
     "title": "Bookkeeping App",
     "dashboard": "Dashboard",
     "transactions": "Transactions",
-    "categories": "Categories"
+    "categories": "Categories",
+    "items": "Items"
   },
   "currency": {
     "symbol": "$",
@@ -62,7 +63,9 @@
     "amountRequired": "Please enter amount",
     "categoryRequired": "Please select a category",
     "dateRequired": "Please select a date",
-    "descriptionPlaceholder": "Enter description (optional)"
+    "descriptionPlaceholder": "Enter description (optional)",
+    "itemName": "Item Name",
+    "itemNamePlaceholder": "Enter item name (optional, e.g., iPhone, Netflix)"
   },
   "categories": {
     "title": "Categories",
@@ -111,5 +114,29 @@
     "yes": "Yes",
     "no": "No",
     "cancel": "Cancel"
+  },
+  "items": {
+    "title": "Item Purchase History",
+    "name": "Item Name",
+    "totalPurchases": "Total Purchases",
+    "totalSpent": "Total Spent",
+    "averagePrice": "Average Price",
+    "lastPurchase": "Last Purchase",
+    "viewHistory": "View History",
+    "noItems": "No items tracked yet",
+    "loading": "Loading...",
+    "historyTitle": "Purchase History",
+    "backToList": "Back to Items",
+    "firstPurchase": "First Purchase",
+    "purchaseFrequency": "Purchase Frequency",
+    "priceRange": "Price Range",
+    "priceTrend": "Price Trend",
+    "transactions": "Transactions",
+    "statistics": "Statistics",
+    "errorLoading": "Error loading items",
+    "errorLoadingHistory": "Error loading item history",
+    "searchPlaceholder": "Search items by name...",
+    "purchaseHistory": "Purchase History",
+    "recentTransactions": "Recent Transactions"
   }
 }

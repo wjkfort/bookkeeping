@@ -3,7 +3,8 @@
     "title": "记账应用",
     "dashboard": "仪表盘",
     "transactions": "交易记录",
-    "categories": "分类管理"
+    "categories": "分类管理",
+    "items": "物品记录"
   },
   "currency": {
     "symbol": "¥",
@@ -62,7 +63,9 @@
     "amountRequired": "请输入金额",
     "categoryRequired": "请选择分类",
     "dateRequired": "请选择日期",
-    "descriptionPlaceholder": "输入描述（可选）"
+    "descriptionPlaceholder": "输入描述（可选）",
+    "itemName": "物品名称",
+    "itemNamePlaceholder": "输入物品名称（可选，例如：iPhone、Netflix）"
   },
   "categories": {
     "title": "分类管理",
@@ -111,5 +114,29 @@
     "yes": "是",
     "no": "否",
     "cancel": "取消"
+  },
+  "items": {
+    "title": "物品购买历史",
+    "name": "物品名称",
+    "totalPurchases": "购买次数",
+    "totalSpent": "总花费",
+    "averagePrice": "平均价格",
+    "lastPurchase": "最后购买",
+    "viewHistory": "查看历史",
+    "noItems": "暂无物品记录",
+    "loading": "加载中...",
+    "historyTitle": "购买历史",
+    "backToList": "返回列表",
+    "firstPurchase": "首次购买",
+    "purchaseFrequency": "购买频率",
+    "priceRange": "价格区间",
+    "priceTrend": "价格趋势",
+    "transactions": "交易记录",
+    "statistics": "统计信息",
+    "errorLoading": "加载物品失败",
+    "errorLoadingHistory": "加载购买历史失败",
+    "searchPlaceholder": "按名称搜索物品...",
+    "purchaseHistory": "购买历史",
+    "recentTransactions": "最近交易"
   }
 }

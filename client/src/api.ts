@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { Category, Transaction, Summary } from "./types";
+import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory } from "./types";
 
 // Use environment variable in production, localhost in development
 const API_BASE_URL = import.meta.env.PROD
@@ -62,5 +62,20 @@ export const convertCurrency = (amount: number, fromCurrency: string, toCurrency
 
 // Translate
 export const translateText = (text: string, fromLang: string, toLang: string): Promise<AxiosResponse<TranslateResponse>> => api.post("/translate", { text, from_lang: fromLang, to_lang: toLang });
+
+// Items
+export const getItems = (withStats: boolean = false): Promise<AxiosResponse<Item[] | ItemWithStats[]>> => api.get("/items", { params: { with_stats: withStats } });
+
+export const getItem = (id: number): Promise<AxiosResponse<Item>> => api.get(`/items/${id}`);
+
+export const getItemHistory = (id: number): Promise<AxiosResponse<ItemHistory>> => api.get(`/items/${id}/history`);
+
+export const createItem = (data: { name: string }): Promise<AxiosResponse<Item>> => api.post("/items", data);
+
+export const updateItem = (id: number, data: { name: string }): Promise<AxiosResponse<Item>> => api.put(`/items/${id}`, data);
+
+export const deleteItem = (id: number): Promise<AxiosResponse<void>> => api.delete(`/items/${id}`);
+
+export const searchItems = (query: string): Promise<AxiosResponse<Item[]>> => api.get(`/items/search/${query}`);
 
 export default api;

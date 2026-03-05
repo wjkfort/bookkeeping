@@ -16,6 +16,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - Hierarchical Categories
 - Dashboard with Charts
 - Real-time Exchange Rates
+- **Item Purchase History Tracking** - Track recurring purchases and view purchase history
 
 ## Documentation
 
@@ -78,6 +79,38 @@ See [Deployment Guide](docs/cloudflare/DEPLOYMENT_GUIDE.md) for complete instruc
 - Workers: 100,000 requests/day
 - D1: 5GB storage, 5M reads/day
 - Pages: Unlimited requests & bandwidth
+
+## Item Purchase History Tracking
+
+**Status:** ✅ Implemented
+
+Track recurring purchases by linking transactions to specific items. When you buy something again (e.g., "iPhone", "Netflix subscription", "Coffee at Starbucks"), you can view its complete purchase history and statistics.
+
+**Features:**
+- **Item Creation**: When creating a transaction, optionally enter an item name (e.g., "iPhone 15 Pro")
+- **Auto-complete**: Search and select from existing items as you type
+- **History Tracking**: Each purchase is automatically linked to the same item record
+- **Purchase History View**: View detailed statistics including:
+  - All past purchases of that item
+  - Total amount spent
+  - Average price per purchase
+  - First and last purchase dates
+  - Complete transaction history
+
+**How to use:**
+1. Go to Transactions and create a new transaction
+2. Fill in the amount, category, and date as usual
+3. Optionally enter an item name in the "Item Name" field
+4. The system will auto-suggest existing items or create a new one
+5. Go to the "Items" page to view all tracked items and their purchase history
+
+**Technical Implementation:**
+- New `items` table with unique item names
+- `item_id` field added to `transactions` table (optional, nullable)
+- API endpoints: `GET /api/v1/items`, `GET /api/v1/items/:id/history`, `POST /api/v1/items`
+- Frontend: Item autocomplete in transaction form, new Items page with statistics
+
+## Planned Features
 
 ## License
 

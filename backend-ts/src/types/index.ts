@@ -28,9 +28,11 @@ export interface Transaction {
   description: string | null;
   date: string;
   category_id: number;
+  item_id: number | null;
   created_at: string;
   updated_at: string;
   category?: Category;
+  item?: Item;
 }
 
 export interface ExchangeRate {
@@ -39,6 +41,22 @@ export interface ExchangeRate {
   target_currency: string;
   rate: number;
   fetched_at: string;
+}
+
+export interface Item {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface ItemWithStats {
+  id: number;
+  name: string;
+  created_at: string;
+  total_purchases: number;
+  total_spent: number;
+  average_price: number;
+  last_purchase_date: string;
 }
 
 export interface Summary {
@@ -69,6 +87,8 @@ export interface CreateTransactionRequest {
   description?: string;
   date: string;
   category_id: number;
+  item_id?: number;
+  item_name?: string;
 }
 
 export interface UpdateTransactionRequest {
@@ -77,6 +97,8 @@ export interface UpdateTransactionRequest {
   description?: string;
   date?: string;
   category_id?: number;
+  item_id?: number;
+  item_name?: string;
 }
 
 export interface TranslateRequest {
