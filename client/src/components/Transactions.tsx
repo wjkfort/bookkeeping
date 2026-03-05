@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col, AutoComplete, Collapse, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, FilterOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col, AutoComplete, Collapse, Tag, Statistic } from 'antd';
+import { PlusOutlined, FilterOutlined, HistoryOutlined, ArrowLeftOutlined, LineChartOutlined } from '@ant-design/icons';
+import { Line } from '@ant-design/plots';
 import { useCurrency } from '../hooks/useCurrency';
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory } from '../api';
+import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from '../api';
 import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '../types';
-import type { ColumnsType } from 'antd/es/table';
+import TransactionTable from './TransactionTable';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -17,6 +18,7 @@ const Transactions: React.FC = () => {
   const { currencyCode, formatCurrency, formatWithConversion } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -30,6 +32,7 @@ const Transactions: React.FC = () => {
   const [itemOptions, setItemOptions] = useState<{ value: string }[]>([]);
   const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
   const [loadingItemHistory, setLoadingItemHistory] = useState(false);
+  const [itemHistoryModalVisible, setItemHistoryModalVisible] = useState(false);
 
   // Helper function to get translated category name
   const getCategoryName = (category: Category): string => {
@@ -44,6 +47,7 @@ const Transactions: React.FC = () => {
 
   useEffect(() => {
     loadCategories();
+    loadItems();
     loadTransactions();
   }, []);
 
@@ -56,6 +60,15 @@ const Transactions: React.FC = () => {
     } catch (error) {
       console.error('Error loading categories:', error);
       message.error(t('categories.errorLoading'));
+    }
+  };
+
+  const loadItems = async () => {
+    try {
+      const response = await getItems(false);
+      setItems(response.data as Item[]);
+    } catch (error) {
+      console.error('Error loading items:', error);
     }
   };
 
@@ -97,16 +110,10 @@ const Transactions: React.FC = () => {
         amount: parseFloat(values.amount),
         currency: currencyCode,
         category_id: parseInt(values.category_id),
-        date: values.date.format('YYYY-MM-DD')
+        date: values.date.format('YYYY-MM-DD'),
+        description: values.description || '',
+        item_name: values.item_name || ''
       };
-      
-      if (values.description) {
-        data.description = values.description;
-      }
-      
-      if (values.item_name) {
-        data.item_name = values.item_name;
-      }
       
       if (editingId) {
         await updateTransaction(editingId, data);
@@ -120,6 +127,7 @@ const Transactions: React.FC = () => {
       form.resetFields();
       setIsModalVisible(false);
       loadTransactions();
+      loadItems(); // Reload items in case a new item was created
     } catch (error: any) {
       console.error('Error saving transaction:', error);
       message.error(t('transactions.errorSaving') + ': ' + (error.response?.data?.detail || error.message));
@@ -157,6 +165,17 @@ const Transactions: React.FC = () => {
       console.error('Error loading item history:', error);
     } finally {
       setLoadingItemHistory(false);
+    }
+  };
+
+  const handleViewItemHistory = async (itemId: number) => {
+    try {
+      const response = await getItemHistory(itemId);
+      setSelectedItemHistory(response.data);
+      setItemHistoryModalVisible(true);
+    } catch (error) {
+      console.error('Error loading item history:', error);
+      message.error(t('items.errorLoadingHistory'));
     }
   };
 
@@ -216,63 +235,6 @@ const Transactions: React.FC = () => {
     loadTransactions(newFilters);
   };
 
-  const columns: ColumnsType<Transaction> = [
-    {
-      title: t('transactions.date'),
-      dataIndex: 'date',
-      key: 'date',
-      sorter: (a, b) => a.date.localeCompare(b.date),
-    },
-    {
-      title: t('transactions.description'),
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: t('transactions.category'),
-      dataIndex: 'category_id',
-      key: 'category_id',
-      render: (categoryId: number) => getCategoryName(categories.find(cat => cat.id === categoryId) || { id: categoryId, name: '', type: 'expense' } as Category),
-    },
-    {
-      title: t('transactions.amount'),
-      key: 'amount',
-      render: (_, record) => (
-        <span>
-          {formatWithConversion(record.amount, record.currency)}
-          {record.currency !== currencyCode && (
-            <span style={{ fontSize: '0.85em', color: '#999', marginLeft: '8px' }}>
-              ({formatCurrency(record.amount, record.currency)})
-            </span>
-          )}
-        </span>
-      ),
-    },
-    {
-      title: t('transactions.actions'),
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            {t('transactions.editBtn')}
-          </Button>
-          <Button
-            type="primary"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
-          >
-            {t('transactions.deleteBtn')}
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -313,12 +275,15 @@ const Transactions: React.FC = () => {
       </Card>
 
       <Card>
-        <Table
-          columns={columns}
-          dataSource={transactions}
-          rowKey="id"
+        <TransactionTable
+          transactions={transactions}
+          categories={categories}
+          items={items}
           loading={loading}
-          locale={{ emptyText: t('transactions.noTransactions') }}
+          showActions={true}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onItemClick={handleViewItemHistory}
         />
       </Card>
 
@@ -440,6 +405,116 @@ const Transactions: React.FC = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Item History Modal */}
+      <Modal
+        title={
+          <Space>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => setItemHistoryModalVisible(false)}
+            />
+            {selectedItemHistory?.item.name} - {t('items.historyTitle')}
+          </Space>
+        }
+        open={itemHistoryModalVisible}
+        onCancel={() => setItemHistoryModalVisible(false)}
+        footer={null}
+        width={1000}
+      >
+        {selectedItemHistory && (
+          <>
+            <Card title={t('items.statistics')} style={{ marginBottom: '16px' }}>
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Statistic
+                    title={t('items.totalPurchases')}
+                    value={selectedItemHistory.stats.total_purchases}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title={t('items.totalSpent')}
+                    value={formatCurrency(selectedItemHistory.stats.total_spent, 'USD')}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title={t('items.averagePrice')}
+                    value={formatCurrency(selectedItemHistory.stats.average_price, 'USD')}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Statistic
+                    title={t('items.firstPurchase')}
+                    value={selectedItemHistory.stats.first_purchase_date ? dayjs(selectedItemHistory.stats.first_purchase_date).format('YYYY-MM-DD') : '-'}
+                  />
+                </Col>
+              </Row>
+            </Card>
+
+            {selectedItemHistory.transactions.length > 1 && (
+              <Card title={<><LineChartOutlined /> {t('items.priceTrend')}</>} style={{ marginBottom: '16px' }}>
+                <Line
+                  data={selectedItemHistory.transactions.map(t => ({
+                    date: t.date,
+                    price: t.amount
+                  })).reverse()}
+                  xField="date"
+                  yField="price"
+                  point={{
+                    size: 5,
+                    shape: 'circle',
+                  }}
+                  label={{
+                    style: {
+                      fill: '#aaa',
+                    },
+                  }}
+                  tooltip={{
+                    formatter: (datum) => {
+                      return { name: t('transactions.amount'), value: formatCurrency(datum.price, 'USD') };
+                    },
+                  }}
+                  height={250}
+                />
+              </Card>
+            )}
+
+            <Card title={t('items.transactions')}>
+              <Table
+                columns={[
+                  {
+                    title: t('transactions.date'),
+                    dataIndex: 'date',
+                    key: 'date',
+                    render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
+                  },
+                  {
+                    title: t('transactions.description'),
+                    dataIndex: 'description',
+                    key: 'description',
+                  },
+                  {
+                    title: t('transactions.amount'),
+                    key: 'amount',
+                    render: (_, record) => (
+                      <span>
+                        {formatWithConversion(record.amount, record.currency)}
+                      </span>
+                    ),
+                  },
+                ]}
+                dataSource={selectedItemHistory.transactions}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                locale={{ emptyText: t('transactions.noTransactions') }}
+              />
+            </Card>
+          </>
+        )}
       </Modal>
     </div>
   );

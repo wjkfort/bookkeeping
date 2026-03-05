@@ -65,7 +65,8 @@
     "dateRequired": "Please select a date",
     "descriptionPlaceholder": "Enter description (optional)",
     "itemName": "Item Name",
-    "itemNamePlaceholder": "Enter item name (optional, e.g., iPhone, Netflix)"
+    "itemNamePlaceholder": "Enter item name (optional, e.g., iPhone, Netflix)",
+    "item": "Item"
   },
   "categories": {
     "title": "Categories",
