@@ -4,7 +4,8 @@
     "dashboard": "仪表盘",
     "transactions": "交易记录",
     "categories": "分类管理",
-    "items": "物品记录"
+    "items": "物品记录",
+    "logout": "退出登录"
   },
   "currency": {
     "symbol": "¥",
@@ -139,5 +140,39 @@
     "searchPlaceholder": "按名称搜索物品...",
     "purchaseHistory": "购买历史",
     "recentTransactions": "最近交易"
+  },
+  "login": {
+    "title": "登录",
+    "subtitle": "欢迎回到记账应用",
+    "emailPlaceholder": "邮箱",
+    "passwordPlaceholder": "密码",
+    "emailRequired": "请输入邮箱！",
+    "emailInvalid": "请输入有效的邮箱！",
+    "passwordRequired": "请输入密码！",
+    "button": "登录",
+    "noAccount": "还没有账号？",
+    "registerLink": "立即注册",
+    "success": "登录成功！",
+    "error": "登录失败"
+  },
+  "register": {
+    "title": "注册",
+    "subtitle": "创建您的记账账号",
+    "usernamePlaceholder": "用户名",
+    "emailPlaceholder": "邮箱",
+    "passwordPlaceholder": "密码（至少6个字符）",
+    "confirmPasswordPlaceholder": "确认密码",
+    "usernameRequired": "请输入用户名！",
+    "emailRequired": "请输入邮箱！",
+    "emailInvalid": "请输入有效的邮箱！",
+    "passwordRequired": "请输入密码！",
+    "passwordMin": "密码至少需要6个字符！",
+    "confirmPasswordRequired": "请确认密码！",
+    "passwordMismatch": "两次密码不一致！",
+    "button": "注册",
+    "hasAccount": "已有账号？",
+    "loginLink": "立即登录",
+    "success": "注册成功！",
+    "error": "注册失败"
   }
 }

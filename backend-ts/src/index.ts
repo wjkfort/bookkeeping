@@ -7,6 +7,8 @@ import summaryRouter from "./api/summary";
 import exchangeRatesRouter from "./api/exchange-rates";
 import translateRouter from "./api/translate";
 import itemsRouter from "./api/items";
+import authRouter from "./api/auth";
+import { authMiddleware } from "./middleware/auth";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -24,7 +26,7 @@ app.use(
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   }),
 );
@@ -40,6 +42,16 @@ app.get("/", (c) => {
 
 // API routes
 const api = new Hono<{ Bindings: Env }>();
+
+// Public routes (no auth required)
+api.route("/auth", authRouter);
+
+// Protected routes (auth required)
+api.use("/categories/*", authMiddleware);
+api.use("/transactions/*", authMiddleware);
+api.use("/summary/*", authMiddleware);
+api.use("/items/*", authMiddleware);
+
 api.route("/categories", categoriesRouter);
 api.route("/transactions", transactionsRouter);
 api.route("/summary", summaryRouter);

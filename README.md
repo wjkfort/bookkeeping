@@ -10,6 +10,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 
 ## Features
 
+- **User Authentication** - Secure JWT-based login and registration system
 - Multi-Language Support (English/Chinese)
 - Automatic Currency Conversion (USD/CNY)
 - Transaction Management
@@ -109,6 +110,52 @@ Track recurring purchases by linking transactions to specific items. When you bu
 - `item_id` field added to `transactions` table (optional, nullable)
 - API endpoints: `GET /api/v1/items`, `GET /api/v1/items/:id/history`, `POST /api/v1/items`
 - Frontend: Item autocomplete in transaction form, new Items page with statistics
+
+## User Authentication System
+
+**Status:** ✅ Implemented
+
+Secure user authentication and authorization using JWT tokens.
+
+**Features:**
+- **User Registration**: Create new accounts with email, username, and password
+- **Secure Login**: JWT-based authentication with 7-day token expiration
+- **Password Security**: Passwords hashed with bcryptjs before storage
+- **Protected Routes**: All main features require authentication
+- **Auto-logout**: Automatic logout on token expiration or invalid tokens
+- **Multi-language**: Login/register pages support English and Chinese
+
+**How to use:**
+1. Visit the app and you'll be redirected to the login page
+2. Click "Register now" to create a new account
+3. Enter your username, email, and password (minimum 6 characters)
+4. After registration, you'll be automatically logged in
+5. Use the logout button in the header to sign out
+
+**Technical Implementation:**
+- Backend: Hono JWT middleware with HS256 algorithm
+- Database: `users` table in Cloudflare D1
+- Frontend: React Context for auth state, axios interceptors for token management
+- Security: HTTPS in production, bcrypt password hashing, JWT tokens for session management
+
+**Setup for local development:**
+```bash
+# Run database migration
+cd backend-ts
+npx wrangler d1 execute bookkeeping-db --local --file=./migrations/add_users_table.sql
+
+# Add JWT_SECRET to .dev.vars
+echo "JWT_SECRET=YOUR_SECRET_KEY_CHANGE_ME" >> .dev.vars
+```
+
+**Setup for production:**
+```bash
+# Run migration on remote database
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_users_table.sql
+
+# Set JWT_SECRET as a secret
+npx wrangler secret put JWT_SECRET
+```
 
 ## Planned Features
 

@@ -4,7 +4,8 @@
     "dashboard": "Dashboard",
     "transactions": "Transactions",
     "categories": "Categories",
-    "items": "Items"
+    "items": "Items",
+    "logout": "Logout"
   },
   "currency": {
     "symbol": "$",
@@ -139,5 +140,39 @@
     "searchPlaceholder": "Search items by name...",
     "purchaseHistory": "Purchase History",
     "recentTransactions": "Recent Transactions"
+  },
+  "login": {
+    "title": "Login",
+    "subtitle": "Welcome back to Bookkeeping",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Password",
+    "emailRequired": "Please input your email!",
+    "emailInvalid": "Please enter a valid email!",
+    "passwordRequired": "Please input your password!",
+    "button": "Log in",
+    "noAccount": "Don't have an account?",
+    "registerLink": "Register now",
+    "success": "Login successful!",
+    "error": "Login failed"
+  },
+  "register": {
+    "title": "Register",
+    "subtitle": "Create your Bookkeeping account",
+    "usernamePlaceholder": "Username",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Password (min 6 characters)",
+    "confirmPasswordPlaceholder": "Confirm Password",
+    "usernameRequired": "Please input your username!",
+    "emailRequired": "Please input your email!",
+    "emailInvalid": "Please enter a valid email!",
+    "passwordRequired": "Please input your password!",
+    "passwordMin": "Password must be at least 6 characters!",
+    "confirmPasswordRequired": "Please confirm your password!",
+    "passwordMismatch": "Passwords do not match!",
+    "button": "Register",
+    "hasAccount": "Already have an account?",
+    "loginLink": "Log in",
+    "success": "Registration successful!",
+    "error": "Registration failed"
   }
 }

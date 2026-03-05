@@ -2,3 +2,4 @@
 # Copy this to .dev.vars and fill in your values
 
 OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
+JWT_SECRET=YOUR_JWT_SECRET_HERE_CHANGE_ME

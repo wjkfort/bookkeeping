@@ -9,6 +9,8 @@
     "db:migrate:remote": "wrangler d1 execute bookkeeping-db --remote --file=./migrations/schema.sql"
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.3",
     "hono": "^4.0.0"
   },
   "devDependencies": {
