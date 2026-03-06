@@ -40,7 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/v1/auth/login`, {
+      const apiBaseUrl = import.meta.env.PROD
+        ? "https://bookkeeping-backend.stringwjk.workers.dev/api/v1"
+        : "http://localhost:8787/api/v1";
+      const response = await axios.post(`${apiBaseUrl}/auth/login`, {
         email,
         password,
       });
@@ -63,7 +66,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (email: string, password: string, username: string) => {
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/v1/auth/register`, {
+      const apiBaseUrl = import.meta.env.PROD
+        ? "https://bookkeeping-backend.stringwjk.workers.dev/api/v1"
+        : "http://localhost:8787/api/v1";
+      const response = await axios.post(`${apiBaseUrl}/auth/register`, {
         email,
         password,
         username,
