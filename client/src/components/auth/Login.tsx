@@ -20,8 +20,15 @@ export const Login: React.FC = () => {
       await login(values.email, values.password);
       message.success(t("login.success") || "Login successful!");
       navigate("/");
-    } catch (error: unknown) {
-      message.error(error.message || t("login.error") || "Login failed");
+    } catch (error: any) {
+      const errorMsg = error.message || t("login.error") || "Login failed";
+      
+      // Show helpful hint instead of confusing error for invalid credentials
+      if (errorMsg.includes("Invalid credentials") || errorMsg.includes("credentials")) {
+        message.warning(t("login.hint") || "Don't have an account? Please register first!");
+      } else {
+        message.error(errorMsg);
+      }
     } finally {
       setLoading(false);
     }

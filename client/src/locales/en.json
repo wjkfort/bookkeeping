@@ -154,7 +154,8 @@
     "noAccount": "Don't have an account?",
     "registerLink": "Register now",
     "success": "Login successful!",
-    "error": "Login failed"
+    "error": "Login failed",
+    "hint": "Don't have an account? Please register first!"
   },
   "register": {
     "title": "Register",

@@ -154,7 +154,8 @@
     "noAccount": "还没有账号？",
     "registerLink": "立即注册",
     "success": "登录成功！",
-    "error": "登录失败"
+    "error": "登录失败",
+    "hint": "还没有账号？请先注册！"
   },
   "register": {
     "title": "注册",
