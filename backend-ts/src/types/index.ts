@@ -2,6 +2,7 @@
 
 export interface Env {
   DB: D1Database;
+  AI: any; // Cloudflare AI binding
   OPEN_EXCHANGE_RATES_API_KEY: string;
   EXCHANGE_RATE_CACHE_HOURS: string;
   JWT_SECRET: string;

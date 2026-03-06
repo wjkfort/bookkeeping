@@ -10,25 +10,28 @@ app.get('/', async (c) => {
   const end_date = c.req.query('end_date');
   
   try {
-    let query = 'SELECT * FROM transactions WHERE 1=1';
+    let query = `SELECT t.*, i.name as item_name 
+                 FROM transactions t 
+                 LEFT JOIN items i ON t.item_id = i.id 
+                 WHERE 1=1`;
     const params: any[] = [];
 
     if (category_id) {
-      query += ' AND category_id = ?';
+      query += ' AND t.category_id = ?';
       params.push(parseInt(category_id));
     }
 
     if (start_date) {
-      query += ' AND date >= ?';
+      query += ' AND t.date >= ?';
       params.push(start_date);
     }
 
     if (end_date) {
-      query += ' AND date <= ?';
+      query += ' AND t.date <= ?';
       params.push(end_date);
     }
 
-    query += ' ORDER BY date DESC, created_at DESC';
+    query += ' ORDER BY t.date DESC, t.created_at DESC';
 
     const stmt = c.env.DB.prepare(query);
     const { results } = await (params.length > 0 ? stmt.bind(...params) : stmt).all<Transaction>();
@@ -45,7 +48,10 @@ app.get('/:id', async (c) => {
   
   try {
     const transaction = await c.env.DB.prepare(
-      'SELECT * FROM transactions WHERE id = ?'
+      `SELECT t.*, i.name as item_name 
+       FROM transactions t 
+       LEFT JOIN items i ON t.item_id = i.id 
+       WHERE t.id = ?`
     ).bind(id).first<Transaction>();
 
     if (!transaction) {

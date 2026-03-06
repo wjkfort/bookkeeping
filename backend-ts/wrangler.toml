@@ -8,6 +8,10 @@ binding = "DB"
 database_name = "bookkeeping-db"
 database_id = "81d99dfc-618f-408f-8e28-d2752a807d45"
 
+# AI binding
+[ai]
+binding = "AI"
+
 # Environment variables
 [vars]
 EXCHANGE_RATE_CACHE_HOURS = "24"

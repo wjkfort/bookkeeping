@@ -8,6 +8,7 @@ import { useCurrency } from "../../hooks/useCurrency";
 import { getSummary, getTransactions, getCategories, getItems, getItemHistory } from "../../api";
 import { Summary, Transaction, Category, Item, ItemHistory } from "../../types";
 import TransactionTable from './TransactionTable';
+import AIInsights from './ai/AIInsights';
 import dayjs, { Dayjs } from "dayjs";
 
 const Dashboard: React.FC = () => {
@@ -357,6 +358,12 @@ const Dashboard: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
+        <Col xs={24}>
+          <AIInsights />
         </Col>
       </Row>
 

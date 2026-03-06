@@ -106,4 +106,43 @@ export const deleteItem = (id: number): Promise<AxiosResponse<void>> => api.dele
 
 export const searchItems = (query: string): Promise<AxiosResponse<Item[]>> => api.get(`/items/search/${query}`);
 
+// AI
+export interface ParsedTransaction {
+  amount: number;
+  currency: string;
+  description: string;
+  category_hint?: string;
+  item_name?: string;
+  date?: string;
+  suggested_category_id?: number;
+}
+
+export interface ChatMessage {
+  id: number;
+  message: string;
+  role: 'user' | 'assistant';
+  created_at: string;
+}
+
+export interface AnalysisResult {
+  summary: string;
+  insights: string[];
+  recommendations: string[];
+}
+
+export const parseTransaction = (text: string, language?: string): Promise<AxiosResponse<{ success: boolean; data: ParsedTransaction }>> =>
+  api.post("/ai/parse-transaction", { text, language });
+
+export const chatWithAI = (message: string, includeContext: boolean = true, language?: string): Promise<AxiosResponse<{ success: boolean; data: { message: string } }>> =>
+  api.post("/ai/chat", { message, include_context: includeContext, language });
+
+export const getChatHistory = (limit: number = 50): Promise<AxiosResponse<{ success: boolean; data: ChatMessage[] }>> =>
+  api.get("/ai/chat/history", { params: { limit } });
+
+export const analyzeSpending = (timeframe: 'week' | 'month' | 'year' = 'month', limit: number = 50, language?: string): Promise<AxiosResponse<{ success: boolean; data: AnalysisResult }>> =>
+  api.post("/ai/analyze", { timeframe, limit, language });
+
+export const suggestCategory = (description: string): Promise<AxiosResponse<{ success: boolean; data: { suggested_category_id: number | null; suggested_category_name?: string } }>> =>
+  api.post("/ai/suggest-category", { description });
+
 export default api;

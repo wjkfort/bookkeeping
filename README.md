@@ -11,6 +11,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 ## Features
 
 - **User Authentication** - Secure JWT-based login and registration system
+- **AI Assistant** - Natural language transaction entry, spending analysis, and chat assistant
 - Multi-Language Support (English/Chinese)
 - Automatic Currency Conversion (USD/CNY)
 - Transaction Management
@@ -20,6 +21,9 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - **Item Purchase History Tracking** - Track recurring purchases and view purchase history
 
 ## Documentation
+
+### AI Features
+- [AI Features Guide](docs/AI_FEATURES.md) - AI assistant, quick add, and insights
 
 ### Cloudflare Deployment (TypeScript)
 - [Deployment Guide](docs/cloudflare/DEPLOYMENT_GUIDE.md) - Complete deployment instructions
@@ -157,6 +161,47 @@ npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_users_ta
 # Set JWT_SECRET as a secret
 npx wrangler secret put JWT_SECRET
 ```
+
+## AI Features
+
+**Status:** ✅ Implemented
+
+Powered by Cloudflare Workers AI, the application includes intelligent features to help manage your finances.
+
+**Features:**
+- **AI Chat Assistant**: Ask questions about your finances in natural language
+  - "How much did I spend on food last month?"
+  - "What are my top expense categories?"
+  - Access via floating robot button
+  
+- **AI Quick Add**: Create transactions using natural language
+  - "I spent $50 on groceries at Walmart"
+  - "Received 2000 yuan salary today"
+  - Automatically extracts amount, currency, category, and item
+  
+- **AI Spending Insights**: Get intelligent analysis of your spending patterns
+  - Spending summaries and trends
+  - Anomaly detection
+  - Actionable recommendations
+  - Available on Dashboard
+
+**Technical Implementation:**
+- Backend: Cloudflare Workers AI with Llama 2 model
+- Database: `ai_conversations` table for chat history
+- API endpoints: `/api/v1/ai/*` for all AI features
+- Frontend: AIChat, AIQuickAdd, and AIInsights components
+
+**Setup:**
+```bash
+# Run AI migration
+cd backend-ts
+npx wrangler d1 execute bookkeeping-db --local --file=./migrations/add_ai_conversations_table.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_ai_conversations_table.sql
+```
+
+**Cost:** Free tier (10,000 neurons/day) - sufficient for personal use
+
+See [AI Features Guide](docs/AI_FEATURES.md) for detailed documentation.
 
 ## Planned Features
 

@@ -66,20 +66,19 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     },
     {
       title: t('transactions.item'),
-      dataIndex: 'item_id',
-      key: 'item_id',
-      render: (itemId: number | null) => {
-        if (!itemId) return '-';
-        const item = items.find(i => i.id === itemId);
-        return item ? (
+      dataIndex: 'item_name',
+      key: 'item_name',
+      render: (itemName: string | null, record: Transaction) => {
+        if (!itemName || !record.item_id) return '-';
+        return (
           <Button 
             type="link" 
             style={{ padding: 0 }}
-            onClick={() => onItemClick && onItemClick(itemId)}
+            onClick={() => onItemClick && onItemClick(record.item_id!)}
           >
-            {item.name}
+            {itemName}
           </Button>
-        ) : '-';
+        );
       },
     },
     {

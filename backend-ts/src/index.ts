@@ -8,6 +8,7 @@ import exchangeRatesRouter from "./api/exchange-rates";
 import translateRouter from "./api/translate";
 import itemsRouter from "./api/items";
 import authRouter from "./api/auth";
+import aiRouter from "./api/ai";
 import { authMiddleware } from "./middleware/auth";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -51,6 +52,7 @@ api.use("/categories/*", authMiddleware);
 api.use("/transactions/*", authMiddleware);
 api.use("/summary/*", authMiddleware);
 api.use("/items/*", authMiddleware);
+api.use("/ai/*", authMiddleware);
 
 api.route("/categories", categoriesRouter);
 api.route("/transactions", transactionsRouter);
@@ -58,6 +60,7 @@ api.route("/summary", summaryRouter);
 api.route("/exchange-rates", exchangeRatesRouter);
 api.route("/translate", translateRouter);
 api.route("/items", itemsRouter);
+api.route("/ai", aiRouter);
 
 app.route("/api/v1", api);
 

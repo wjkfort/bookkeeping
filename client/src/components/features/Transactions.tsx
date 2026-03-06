@@ -7,6 +7,7 @@ import { useCurrency } from '../../hooks/useCurrency';
 import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from '../../api';
 import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '../../types';
 import TransactionTable from './TransactionTable';
+import AIQuickAdd from './ai/AIQuickAdd';
 import dayjs from 'dayjs';
 
 const { Option } = Select;
@@ -239,14 +240,17 @@ const Transactions: React.FC = () => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h1>{t('transactions.title')}</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-          setEditingId(null);
-          setSelectedItemHistory(null);
-          form.resetFields();
-          setIsModalVisible(true);
-        }}>
-          {t('transactions.addNew')}
-        </Button>
+        <Space>
+          <AIQuickAdd categories={categories} onSuccess={loadTransactions} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+            setEditingId(null);
+            setSelectedItemHistory(null);
+            form.resetFields();
+            setIsModalVisible(true);
+          }}>
+            {t('transactions.addNew')}
+          </Button>
+        </Space>
       </div>
 
       <Card title={<><FilterOutlined /> {t('transactions.filterTitle')}</>} style={{ marginBottom: '16px' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu, Button } from "antd";
 import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined } from "@ant-design/icons";
@@ -7,6 +7,7 @@ import Dashboard from "./components/features/Dashboard";
 import Transactions from "./components/features/Transactions";
 import Categories from "./components/features/Categories";
 import Items from "./components/features/Items";
+import AIChat from "./components/features/ai/AIChat";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -20,12 +21,23 @@ const { Header, Content } = Layout;
 function AppContent() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState(location.pathname);
   const { isAuthenticated, logout, user } = useAuth();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setSelectedKey(location.pathname);
   }, [location.pathname]);
+
+  const handleTransactionCreated = () => {
+    // Trigger refresh by updating key
+    setRefreshKey(prev => prev + 1);
+    // If not on dashboard or transactions page, navigate there
+    if (location.pathname !== '/' && location.pathname !== '/transactions') {
+      navigate('/transactions');
+    }
+  };
 
   const menuItems = [
     {
@@ -89,11 +101,12 @@ function AppContent() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><Dashboard key={`dashboard-${refreshKey}`} /></ProtectedRoute>} />
+          <Route path="/transactions" element={<ProtectedRoute><Transactions key={`transactions-${refreshKey}`} /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
           <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
         </Routes>
+        {!isAuthPage && isAuthenticated && <AIChat onTransactionCreated={handleTransactionCreated} />}
       </Content>
     </Layout>
   );
