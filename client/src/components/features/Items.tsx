@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Card, Table, Button, Space, message, Modal, Statistic, Row, Col, Input } from 'antd';
-import { EyeOutlined, ArrowLeftOutlined, SearchOutlined, LineChartOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Space, message, Modal, Statistic, Row, Col, Input, Form } from 'antd';
+import { EyeOutlined, ArrowLeftOutlined, SearchOutlined, LineChartOutlined, EditOutlined } from '@ant-design/icons';
 import { Line } from '@ant-design/plots';
 import { useCurrency } from '../../hooks/useCurrency';
-import { getItems, getItemHistory } from '../../api';
+import { getItems, getItemHistory, updateItem } from '../../api';
 import { ItemWithStats, ItemHistory, Transaction } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -18,6 +18,9 @@ const Items: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<ItemHistory | null>(null);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<ItemWithStats | null>(null);
+  const [form] = Form.useForm();
 
   useEffect(() => {
     loadItems();
@@ -60,6 +63,29 @@ const Items: React.FC = () => {
     }
   };
 
+  const handleEdit = (item: ItemWithStats) => {
+    setEditingItem(item);
+    form.setFieldsValue({ name: item.name });
+    setEditModalVisible(true);
+  };
+
+  const handleUpdateItem = async () => {
+    try {
+      const values = await form.validateFields();
+      if (!editingItem) return;
+
+      await updateItem(editingItem.id, { name: values.name });
+      message.success(t('items.updateSuccess'));
+      setEditModalVisible(false);
+      setEditingItem(null);
+      form.resetFields();
+      loadItems();
+    } catch (error) {
+      console.error('Error updating item:', error);
+      message.error(t('items.errorUpdating'));
+    }
+  };
+
   const columns: ColumnsType<ItemWithStats> = [
     {
       title: t('items.name'),
@@ -98,14 +124,22 @@ const Items: React.FC = () => {
       title: t('transactions.actions'),
       key: 'actions',
       render: (_, record) => (
-        <Button
-          type="primary"
-          icon={<EyeOutlined />}
-          onClick={() => handleViewHistory(record.id)}
-          disabled={record.total_purchases === 0}
-        >
-          {t('items.viewHistory')}
-        </Button>
+        <Space>
+          <Button
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+          >
+            {t('common.edit')}
+          </Button>
+          <Button
+            type="primary"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewHistory(record.id)}
+            disabled={record.total_purchases === 0}
+          >
+            {t('items.viewHistory')}
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -246,6 +280,29 @@ const Items: React.FC = () => {
             </Card>
           </>
         )}
+      </Modal>
+
+      <Modal
+        title={t('items.editItem')}
+        open={editModalVisible}
+        onOk={handleUpdateItem}
+        onCancel={() => {
+          setEditModalVisible(false);
+          setEditingItem(null);
+          form.resetFields();
+        }}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="name"
+            label={t('items.name')}
+            rules={[{ required: true, message: t('items.nameRequired') }]}
+          >
+            <Input />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

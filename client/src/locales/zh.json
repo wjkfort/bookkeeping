@@ -116,7 +116,9 @@
   "common": {
     "yes": "是",
     "no": "否",
-    "cancel": "取消"
+    "cancel": "取消",
+    "edit": "编辑",
+    "save": "保存"
   },
   "items": {
     "title": "物品购买历史",
@@ -140,7 +142,11 @@
     "errorLoadingHistory": "加载购买历史失败",
     "searchPlaceholder": "按名称搜索物品...",
     "purchaseHistory": "购买历史",
-    "recentTransactions": "最近交易"
+    "recentTransactions": "最近交易",
+    "editItem": "编辑物品",
+    "nameRequired": "请输入物品名称",
+    "updateSuccess": "物品更新成功",
+    "errorUpdating": "更新物品失败"
   },
   "login": {
     "title": "登录",

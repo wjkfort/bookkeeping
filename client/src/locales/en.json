@@ -116,7 +116,9 @@
   "common": {
     "yes": "Yes",
     "no": "No",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "save": "Save"
   },
   "items": {
     "title": "Item Purchase History",
@@ -140,7 +142,11 @@
     "errorLoadingHistory": "Error loading item history",
     "searchPlaceholder": "Search items by name...",
     "purchaseHistory": "Purchase History",
-    "recentTransactions": "Recent Transactions"
+    "recentTransactions": "Recent Transactions",
+    "editItem": "Edit Item",
+    "nameRequired": "Please enter item name",
+    "updateSuccess": "Item updated successfully",
+    "errorUpdating": "Error updating item"
   },
   "login": {
     "title": "Login",
