@@ -3,12 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal } from "antd";
 import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined, ArrowLeftOutlined, LineChartOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Line } from '@ant-design/plots';
+import { Line } from "@ant-design/plots";
 import { useCurrency } from "../../hooks/useCurrency";
 import { getSummary, getTransactions, getCategories, getItems, getItemHistory } from "../../api";
 import { Summary, Transaction, Category, Item, ItemHistory } from "../../types";
-import TransactionTable from './TransactionTable';
-import AIInsights from './ai/AIInsights';
+import TransactionTable from "./TransactionTable";
+import AIInsights from "./ai/AIInsights";
 import dayjs, { Dayjs } from "dayjs";
 
 const Dashboard: React.FC = () => {
@@ -221,10 +221,14 @@ const Dashboard: React.FC = () => {
       }
     });
 
-    const expenseData = Object.entries(dailyExpensesByCategory).map(([date, categories]) => ({
-      date: dayjs(date).format(dateFormat),
-      ...categories,
-    }));
+    const expenseData = Object.entries(dailyExpensesByCategory).map(([date, categories]) => {
+      const total = Object.values(categories).reduce((sum, val) => sum + val, 0);
+      return {
+        date: dayjs(date).format(dateFormat),
+        ...categories,
+        total,
+      };
+    });
 
     setWeeklyExpenses(expenseData);
     setExpenseCategories(
@@ -241,8 +245,22 @@ const Dashboard: React.FC = () => {
       setSelectedItemHistory(response.data);
       setItemHistoryModalVisible(true);
     } catch (error) {
-      console.error('Error loading item history:', error);
+      console.error("Error loading item history:", error);
     }
+  };
+
+  const renderCustomLabel = (props: any) => {
+    const { x, y, width, index } = props;
+    const data = weeklyExpenses[index] as any;
+    const total = data?.total || 0;
+
+    if (total === 0) return null;
+
+    return (
+      <text x={x + width / 2} y={y - 5} fill="#000" textAnchor="middle" fontSize={11} fontWeight="bold">
+        {total.toFixed(2)} {currencyCode}
+      </text>
+    );
   };
 
   if (loading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
@@ -294,17 +312,17 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.totalIncome")} value={summary.total_income} precision={2} valueStyle={{ color: "#52c41a" }} prefix={<ArrowUpOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.totalIncome")} value={summary.total_income} precision={2} styles={{ content: { color: "#52c41a" } }} prefix={<ArrowUpOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.totalExpense")} value={summary.total_expense} precision={2} valueStyle={{ color: "#ff4d4f" }} prefix={<ArrowDownOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.totalExpense")} value={summary.total_expense} precision={2} styles={{ content: { color: "#ff4d4f" } }} prefix={<ArrowDownOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card>
-            <Statistic title={t("dashboard.balance")} value={overallBalance} precision={2} valueStyle={{ color: "#1890ff" }} prefix={<WalletOutlined />} suffix={currencyCode} />
+            <Statistic title={t("dashboard.balance")} value={overallBalance} precision={2} styles={{ content: { color: "#1890ff" } }} prefix={<WalletOutlined />} suffix={currencyCode} />
           </Card>
         </Col>
       </Row>
@@ -346,14 +364,14 @@ const Dashboard: React.FC = () => {
               )
             }
           >
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={weeklyExpenses}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={weeklyExpenses} margin={{ top: 20, right: 5, left: 5, bottom: 5 }} barSize={50}>
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip formatter={(value: number) => `${value.toFixed(2)} ${currencyCode}`} />
                 <Legend />
-                {expenseCategories.map((category) => (
-                  <Bar key={category.name} dataKey={category.name} stackId="a" fill={category.color} name={category.name} />
+                {expenseCategories.map((category, index) => (
+                  <Bar key={category.name} dataKey={category.name} stackId="a" fill={category.color} name={category.name} label={index === expenseCategories.length - 1 ? renderCustomLabel : undefined} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -367,31 +385,14 @@ const Dashboard: React.FC = () => {
         </Col>
       </Row>
 
-      <Card title={t("dashboard.recentTransactions")}>
-        {recentTransactions.length === 0 ? (
-          <p>{t("dashboard.noTransactions")}</p>
-        ) : (
-          <TransactionTable
-            transactions={recentTransactions}
-            categories={categories}
-            items={items}
-            showActions={false}
-            pagination={false}
-            onItemClick={handleViewItemHistory}
-          />
-        )}
-      </Card>
+      <Card title={t("dashboard.recentTransactions")}>{recentTransactions.length === 0 ? <p>{t("dashboard.noTransactions")}</p> : <TransactionTable transactions={recentTransactions} categories={categories} items={items} showActions={false} pagination={false} onItemClick={handleViewItemHistory} />}</Card>
 
       {/* Item History Modal */}
       <Modal
         title={
           <Space>
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => setItemHistoryModalVisible(false)}
-            />
-            {selectedItemHistory?.item.name} - {t('items.historyTitle')}
+            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setItemHistoryModalVisible(false)} />
+            {selectedItemHistory?.item.name} - {t("items.historyTitle")}
           </Space>
         }
         open={itemHistoryModalVisible}
@@ -401,56 +402,53 @@ const Dashboard: React.FC = () => {
       >
         {selectedItemHistory && (
           <>
-            <Card title={t('items.statistics')} style={{ marginBottom: '16px' }}>
+            <Card title={t("items.statistics")} style={{ marginBottom: "16px" }}>
               <Row gutter={16}>
                 <Col span={6}>
-                  <Statistic
-                    title={t('items.totalPurchases')}
-                    value={selectedItemHistory.stats.total_purchases}
-                  />
+                  <Statistic title={t("items.totalPurchases")} value={selectedItemHistory.stats.total_purchases} />
                 </Col>
                 <Col span={6}>
-                  <Statistic
-                    title={t('items.totalSpent')}
-                    value={formatCurrency(selectedItemHistory.stats.total_spent, 'USD')}
-                  />
+                  <Statistic title={t("items.totalSpent")} value={formatCurrency(selectedItemHistory.stats.total_spent, "USD")} />
                 </Col>
                 <Col span={6}>
-                  <Statistic
-                    title={t('items.averagePrice')}
-                    value={formatCurrency(selectedItemHistory.stats.average_price, 'USD')}
-                  />
+                  <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItemHistory.stats.average_price, "USD")} />
                 </Col>
                 <Col span={6}>
-                  <Statistic
-                    title={t('items.firstPurchase')}
-                    value={selectedItemHistory.stats.first_purchase_date ? dayjs(selectedItemHistory.stats.first_purchase_date).format('YYYY-MM-DD') : '-'}
-                  />
+                  <Statistic title={t("items.firstPurchase")} value={selectedItemHistory.stats.first_purchase_date ? dayjs(selectedItemHistory.stats.first_purchase_date).format("YYYY-MM-DD") : "-"} />
                 </Col>
               </Row>
             </Card>
 
             {selectedItemHistory.transactions.length > 1 && (
-              <Card title={<><LineChartOutlined /> {t('items.priceTrend')}</>} style={{ marginBottom: '16px' }}>
+              <Card
+                title={
+                  <>
+                    <LineChartOutlined /> {t("items.priceTrend")}
+                  </>
+                }
+                style={{ marginBottom: "16px" }}
+              >
                 <Line
-                  data={selectedItemHistory.transactions.map(t => ({
-                    date: t.date,
-                    price: t.amount
-                  })).reverse()}
+                  data={selectedItemHistory.transactions
+                    .map((t) => ({
+                      date: t.date,
+                      price: t.amount,
+                    }))
+                    .reverse()}
                   xField="date"
                   yField="price"
                   point={{
                     size: 5,
-                    shape: 'circle',
+                    shape: "circle",
                   }}
                   label={{
                     style: {
-                      fill: '#aaa',
+                      fill: "#aaa",
                     },
                   }}
                   tooltip={{
                     formatter: (datum) => {
-                      return { name: t('transactions.amount'), value: formatCurrency(datum.price, 'USD') };
+                      return { name: t("transactions.amount"), value: formatCurrency(datum.price, "USD") };
                     },
                   }}
                   height={250}
@@ -458,34 +456,30 @@ const Dashboard: React.FC = () => {
               </Card>
             )}
 
-            <Card title={t('items.transactions')}>
+            <Card title={t("items.transactions")}>
               <Table
                 columns={[
                   {
-                    title: t('transactions.date'),
-                    dataIndex: 'date',
-                    key: 'date',
-                    render: (date: string) => dayjs(date).format('YYYY-MM-DD'),
+                    title: t("transactions.date"),
+                    dataIndex: "date",
+                    key: "date",
+                    render: (date: string) => dayjs(date).format("YYYY-MM-DD"),
                   },
                   {
-                    title: t('transactions.description'),
-                    dataIndex: 'description',
-                    key: 'description',
+                    title: t("transactions.description"),
+                    dataIndex: "description",
+                    key: "description",
                   },
                   {
-                    title: t('transactions.amount'),
-                    key: 'amount',
-                    render: (_, record) => (
-                      <span>
-                        {formatWithConversion(record.amount, record.currency)}
-                      </span>
-                    ),
+                    title: t("transactions.amount"),
+                    key: "amount",
+                    render: (_, record) => <span>{formatWithConversion(record.amount, record.currency)}</span>,
                   },
                 ]}
                 dataSource={selectedItemHistory.transactions}
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
-                locale={{ emptyText: t('transactions.noTransactions') }}
+                locale={{ emptyText: t("transactions.noTransactions") }}
               />
             </Card>
           </>
