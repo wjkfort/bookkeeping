@@ -203,6 +203,22 @@ npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_ai_conve
 
 See [AI Features Guide](docs/AI_FEATURES.md) for detailed documentation.
 
+## TODO List
+
+### Known Issues & Improvements
+
+1. **Item Statistics Enhancement**
+   - **Issue**: Current item statistics only show total expense and average price
+   - **Need**: For items like gas, need to track the last purchase price separately from total expense
+   - **Example**: User wants to see "last gas price was $3.50/gallon" while also tracking total gas expenses
+   - **Proposed Solution**: Add "last_price" field to item statistics display
+
+2. **Category Search in Transactions**
+   - **Issue**: Searching for a parent category (e.g., "food") returns empty results
+   - **Root Cause**: Search only queries transactions directly linked to that category, not subcategories
+   - **Example**: Searching "food" doesn't show transactions in "Restaurants" or "Groceries" subcategories
+   - **Proposed Solution**: Update search/filter logic to include all transactions from subcategories when parent category is selected
+
 ## Planned Features
 
 ## License
