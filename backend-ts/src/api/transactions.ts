@@ -3,6 +3,28 @@ import type { Env, Transaction, CreateTransactionRequest, UpdateTransactionReque
 
 const app = new Hono<{ Bindings: Env }>();
 
+// Helper function to get all subcategory IDs recursively
+async function getAllSubcategoryIds(db: D1Database, categoryId: number): Promise<number[]> {
+  const categoryIds = [categoryId];
+  
+  // Get all categories to build the tree
+  const { results: allCategories } = await db.prepare(
+    'SELECT id, parent_id FROM categories'
+  ).all<{ id: number; parent_id: number | null }>();
+  
+  // Recursively find all children
+  const findChildren = (parentId: number) => {
+    const children = allCategories.filter(cat => cat.parent_id === parentId);
+    children.forEach(child => {
+      categoryIds.push(child.id);
+      findChildren(child.id); // Recursive call for nested children
+    });
+  };
+  
+  findChildren(categoryId);
+  return categoryIds;
+}
+
 // GET /api/v1/transactions - List transactions with filters
 app.get('/', async (c) => {
   const category_id = c.req.query('category_id');
@@ -17,8 +39,13 @@ app.get('/', async (c) => {
     const params: any[] = [];
 
     if (category_id) {
-      query += ' AND t.category_id = ?';
-      params.push(parseInt(category_id));
+      // Get all subcategory IDs including the parent
+      const categoryIds = await getAllSubcategoryIds(c.env.DB, parseInt(category_id));
+      
+      // Build IN clause for all category IDs
+      const placeholders = categoryIds.map(() => '?').join(',');
+      query += ` AND t.category_id IN (${placeholders})`;
+      params.push(...categoryIds);
     }
 
     if (start_date) {
@@ -68,7 +95,7 @@ app.get('/:id', async (c) => {
 app.post('/', async (c) => {
   try {
     const body = await c.req.json<CreateTransactionRequest>();
-    const { amount, currency, description, date, category_id, item_id, item_name } = body;
+    const { amount, currency, description, date, category_id, item_id, item_name, unit_price, quantity, unit } = body;
 
     if (!amount || !currency || !date || !category_id) {
       return c.json({ error: 'Amount, currency, date, and category_id are required' }, 400);
@@ -104,9 +131,9 @@ app.post('/', async (c) => {
     const now = new Date().toISOString();
 
     const result = await c.env.DB.prepare(
-      `INSERT INTO transactions (amount, currency, description, date, category_id, item_id, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
-    ).bind(amount, currency, description || null, date, category_id, finalItemId, now, now).first<Transaction>();
+      `INSERT INTO transactions (amount, currency, description, date, category_id, item_id, unit_price, quantity, unit, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+    ).bind(amount, currency, description || null, date, category_id, finalItemId, unit_price || null, quantity || null, unit || null, now, now).first<Transaction>();
 
     return c.json(result, 201);
   } catch (error: any) {
@@ -180,6 +207,20 @@ app.put('/:id', async (c) => {
     } else if (body.item_id !== undefined) {
       updates.push('item_id = ?');
       values.push(body.item_id);
+    }
+
+    // Handle unit price fields
+    if (body.unit_price !== undefined) {
+      updates.push('unit_price = ?');
+      values.push(body.unit_price);
+    }
+    if (body.quantity !== undefined) {
+      updates.push('quantity = ?');
+      values.push(body.quantity);
+    }
+    if (body.unit !== undefined) {
+      updates.push('unit = ?');
+      values.push(body.unit);
     }
 
     if (updates.length === 0) {

@@ -68,7 +68,16 @@
     "descriptionPlaceholder": "输入描述（可选）",
     "itemName": "物品名称",
     "itemNamePlaceholder": "输入物品名称（可选，例如：iPhone、Netflix）",
-    "item": "物品"
+    "item": "物品",
+    "total": "总计",
+    "unitPrice": "单价",
+    "quantity": "数量",
+    "unit": "单位",
+    "trackUnitPrice": "跟踪单价和数量",
+    "calculatedTotal": "计算总额",
+    "unitPlaceholder": "选择单位",
+    "unitPricePlaceholder": "例如：3.50",
+    "quantityPlaceholder": "例如：28.57"
   },
   "categories": {
     "title": "分类管理",
@@ -146,7 +155,21 @@
     "editItem": "编辑物品",
     "nameRequired": "请输入物品名称",
     "updateSuccess": "物品更新成功",
-    "errorUpdating": "更新物品失败"
+    "errorUpdating": "更新物品失败",
+    "lastUnitPrice": "最近单价",
+    "averageUnitPrice": "平均单价",
+    "totalQuantity": "总数量",
+    "unitPriceTrend": "单价趋势"
+  },
+  "units": {
+    "gallon": "加仑",
+    "liter": "升",
+    "kg": "千克",
+    "lb": "磅",
+    "piece": "个",
+    "box": "盒",
+    "bottle": "瓶",
+    "pack": "包"
   },
   "login": {
     "title": "登录",

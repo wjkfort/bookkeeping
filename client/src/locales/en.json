@@ -68,7 +68,16 @@
     "descriptionPlaceholder": "Enter description (optional)",
     "itemName": "Item Name",
     "itemNamePlaceholder": "Enter item name (optional, e.g., iPhone, Netflix)",
-    "item": "Item"
+    "item": "Item",
+    "total": "Total",
+    "unitPrice": "Unit Price",
+    "quantity": "Quantity",
+    "unit": "Unit",
+    "trackUnitPrice": "Track unit price & quantity",
+    "calculatedTotal": "Calculated Total",
+    "unitPlaceholder": "Select unit",
+    "unitPricePlaceholder": "e.g., 3.50",
+    "quantityPlaceholder": "e.g., 28.57"
   },
   "categories": {
     "title": "Categories",
@@ -146,7 +155,21 @@
     "editItem": "Edit Item",
     "nameRequired": "Please enter item name",
     "updateSuccess": "Item updated successfully",
-    "errorUpdating": "Error updating item"
+    "errorUpdating": "Error updating item",
+    "lastUnitPrice": "Last Unit Price",
+    "averageUnitPrice": "Average Unit Price",
+    "totalQuantity": "Total Quantity",
+    "unitPriceTrend": "Unit Price Trend"
+  },
+  "units": {
+    "gallon": "gallon",
+    "liter": "liter",
+    "kg": "kg",
+    "lb": "lb",
+    "piece": "piece",
+    "box": "box",
+    "bottle": "bottle",
+    "pack": "pack"
   },
   "login": {
     "title": "Login",

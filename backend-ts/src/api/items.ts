@@ -18,7 +18,11 @@ app.get('/', async (c) => {
           COUNT(t.id) as total_purchases,
           SUM(t.amount) as total_spent,
           AVG(t.amount) as average_price,
-          MAX(t.date) as last_purchase_date
+          MAX(t.date) as last_purchase_date,
+          (SELECT t2.unit_price FROM transactions t2 WHERE t2.item_id = i.id AND t2.unit_price IS NOT NULL ORDER BY t2.date DESC, t2.created_at DESC LIMIT 1) as last_unit_price,
+          AVG(CASE WHEN t.unit_price IS NOT NULL THEN t.unit_price ELSE NULL END) as average_unit_price,
+          SUM(CASE WHEN t.quantity IS NOT NULL THEN t.quantity ELSE 0 END) as total_quantity,
+          (SELECT t3.unit FROM transactions t3 WHERE t3.item_id = i.id AND t3.unit IS NOT NULL ORDER BY t3.date DESC, t3.created_at DESC LIMIT 1) as unit
         FROM items i
         LEFT JOIN transactions t ON t.item_id = i.id
         GROUP BY i.id
@@ -78,6 +82,9 @@ app.get('/:id/history', async (c) => {
     ).bind(id).all<Transaction>();
 
     // Calculate statistics
+    const transactionsWithUnitPrice = transactions.filter(t => t.unit_price !== null);
+    const transactionsWithQuantity = transactions.filter(t => t.quantity !== null);
+    
     const stats = {
       total_purchases: transactions.length,
       total_spent: transactions.reduce((sum, t) => sum + t.amount, 0),
@@ -86,6 +93,12 @@ app.get('/:id/history', async (c) => {
         : 0,
       first_purchase_date: transactions.length > 0 ? transactions[transactions.length - 1].date : null,
       last_purchase_date: transactions.length > 0 ? transactions[0].date : null,
+      last_unit_price: transactionsWithUnitPrice.length > 0 ? transactionsWithUnitPrice[0].unit_price : null,
+      average_unit_price: transactionsWithUnitPrice.length > 0
+        ? transactionsWithUnitPrice.reduce((sum, t) => sum + (t.unit_price || 0), 0) / transactionsWithUnitPrice.length
+        : null,
+      total_quantity: transactionsWithQuantity.reduce((sum, t) => sum + (t.quantity || 0), 0),
+      unit: transactionsWithUnitPrice.length > 0 ? transactionsWithUnitPrice[0].unit : null,
     };
 
     return c.json({

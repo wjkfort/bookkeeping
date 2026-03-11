@@ -207,17 +207,39 @@ See [AI Features Guide](docs/AI_FEATURES.md) for detailed documentation.
 
 ### Known Issues & Improvements
 
-1. **Item Statistics Enhancement**
-   - **Issue**: Current item statistics only show total expense and average price
-   - **Need**: For items like gas, need to track the last purchase price separately from total expense
-   - **Example**: User wants to see "last gas price was $3.50/gallon" while also tracking total gas expenses
-   - **Proposed Solution**: Add "last_price" field to item statistics display
+(No open issues at this time)
 
-2. **Category Search in Transactions**
-   - **Issue**: Searching for a parent category (e.g., "food") returns empty results
-   - **Root Cause**: Search only queries transactions directly linked to that category, not subcategories
-   - **Example**: Searching "food" doesn't show transactions in "Restaurants" or "Groceries" subcategories
-   - **Proposed Solution**: Update search/filter logic to include all transactions from subcategories when parent category is selected
+## Recent Fixes & Features
+
+### Unit Price & Quantity Tracking ✅ Implemented
+
+**Feature**: Track unit prices and quantities for items (e.g., $3.50/gallon for gas).
+
+**What's New**:
+- Optional unit price, quantity, and unit fields in transactions
+- Unit price trend chart showing price changes over time
+- Statistics: last unit price, average unit price, total quantity
+- Backward compatible - existing transactions work unchanged
+
+**How to Use**:
+1. Create a transaction and click "+ Track unit price & quantity"
+2. Enter unit price (e.g., 3.50), quantity (e.g., 28.57), and unit (e.g., gallon)
+3. View items page to see last unit price column
+4. Click "View History" to see unit price trend chart and statistics
+
+**Documentation**: See [Item Tracking Complete Guide](docs/ITEM_TRACKING_COMPLETE_GUIDE.md)
+
+### Category Search in Transactions ✅ Fixed
+
+**Issue**: Searching for a parent category (e.g., "food") returned empty results when transactions were only in subcategories.
+
+**Solution**: Updated the transaction filter logic to recursively include all subcategory IDs when filtering by a parent category.
+
+**Example**: Now when you search for "Food" (parent category), you'll see transactions from all subcategories (Restaurants, Groceries, etc.)
+
+### Transaction Table Total Amount ✅ Added
+
+**Feature**: Transaction tables now display a total amount row at the bottom, showing the sum of all displayed transactions in the current currency.
 
 ## Planned Features
 

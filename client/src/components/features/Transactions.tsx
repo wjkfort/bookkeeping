@@ -34,6 +34,7 @@ const Transactions: React.FC = () => {
   const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
   const [loadingItemHistory, setLoadingItemHistory] = useState(false);
   const [itemHistoryModalVisible, setItemHistoryModalVisible] = useState(false);
+  const [showUnitTracking, setShowUnitTracking] = useState(false);
 
   // Helper function to get translated category name
   const getCategoryName = (category: Category): string => {
@@ -116,6 +117,17 @@ const Transactions: React.FC = () => {
         item_name: values.item_name || ''
       };
       
+      // Add unit tracking fields if provided
+      if (values.unit_price) {
+        data.unit_price = parseFloat(values.unit_price);
+      }
+      if (values.quantity) {
+        data.quantity = parseFloat(values.quantity);
+      }
+      if (values.unit) {
+        data.unit = values.unit;
+      }
+      
       if (editingId) {
         await updateTransaction(editingId, data);
         message.success(t('transactions.successUpdating'));
@@ -127,6 +139,7 @@ const Transactions: React.FC = () => {
       
       form.resetFields();
       setIsModalVisible(false);
+      setShowUnitTracking(false);
       loadTransactions();
       loadItems(); // Reload items in case a new item was created
     } catch (error: any) {
@@ -200,8 +213,17 @@ const Transactions: React.FC = () => {
       description: transaction.description || '',
       category_id: transaction.category_id,
       item_name: itemName,
-      date: dayjs(transaction.date)
+      date: dayjs(transaction.date),
+      unit_price: transaction.unit_price,
+      quantity: transaction.quantity,
+      unit: transaction.unit
     });
+    
+    // Show unit tracking section if transaction has unit data
+    if (transaction.unit_price || transaction.quantity || transaction.unit) {
+      setShowUnitTracking(true);
+    }
+    
     setEditingId(transaction.id);
     setIsModalVisible(true);
   };
@@ -316,6 +338,54 @@ const Transactions: React.FC = () => {
           >
             <Input type="number" step="0.01" placeholder="0.00" />
           </Form.Item>
+
+          <Form.Item>
+            <Button 
+              type="link" 
+              onClick={() => setShowUnitTracking(!showUnitTracking)}
+              style={{ padding: 0 }}
+            >
+              {showUnitTracking ? '− ' : '+ '}{t('transactions.trackUnitPrice')}
+            </Button>
+          </Form.Item>
+
+          {showUnitTracking && (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="unit_price"
+                    label={t('transactions.unitPrice')}
+                  >
+                    <Input type="number" step="0.01" placeholder={t('transactions.unitPricePlaceholder')} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="quantity"
+                    label={t('transactions.quantity')}
+                  >
+                    <Input type="number" step="0.01" placeholder={t('transactions.quantityPlaceholder')} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item
+                name="unit"
+                label={t('transactions.unit')}
+              >
+                <Select placeholder={t('transactions.unitPlaceholder')} allowClear>
+                  <Option value="gallon">{t('units.gallon')}</Option>
+                  <Option value="liter">{t('units.liter')}</Option>
+                  <Option value="kg">{t('units.kg')}</Option>
+                  <Option value="lb">{t('units.lb')}</Option>
+                  <Option value="piece">{t('units.piece')}</Option>
+                  <Option value="box">{t('units.box')}</Option>
+                  <Option value="bottle">{t('units.bottle')}</Option>
+                  <Option value="pack">{t('units.pack')}</Option>
+                </Select>
+              </Form.Item>
+            </>
+          )}
 
           <Form.Item
             name="description"

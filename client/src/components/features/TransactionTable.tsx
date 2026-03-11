@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Table, Button, Space } from 'antd';
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -30,7 +30,15 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   onItemClick,
 }) => {
   const { t, i18n } = useTranslation();
-  const { currencyCode, formatCurrency, formatWithConversion } = useCurrency();
+  const { currencyCode, formatCurrency, formatWithConversion, convertAmount } = useCurrency();
+
+  // Calculate total amount in current currency
+  const totalAmount = useMemo(() => {
+    return transactions.reduce((sum, transaction) => {
+      const convertedAmount = convertAmount(transaction.amount, transaction.currency, currencyCode);
+      return sum + convertedAmount;
+    }, 0);
+  }, [transactions, currencyCode, convertAmount]);
 
   // Helper function to get translated category name
   const getCategoryName = (categoryId: number): string => {
@@ -125,14 +133,29 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   }
 
   return (
-    <Table
-      columns={columns}
-      dataSource={transactions}
-      rowKey="id"
-      loading={loading}
-      pagination={pagination}
-      locale={{ emptyText: t('transactions.noTransactions') }}
-    />
+    <div>
+      <Table
+        columns={columns}
+        dataSource={transactions}
+        rowKey="id"
+        loading={loading}
+        pagination={pagination}
+        locale={{ emptyText: t('transactions.noTransactions') }}
+        summary={() => (
+          <Table.Summary fixed>
+            <Table.Summary.Row>
+              <Table.Summary.Cell index={0} colSpan={4}>
+                <strong>{t('transactions.total')}</strong>
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={1}>
+                <strong>{formatCurrency(totalAmount, currencyCode)}</strong>
+              </Table.Summary.Cell>
+              {showActions && <Table.Summary.Cell index={2} />}
+            </Table.Summary.Row>
+          </Table.Summary>
+        )}
+      />
+    </div>
   );
 };
 

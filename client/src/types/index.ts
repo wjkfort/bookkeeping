@@ -17,6 +17,9 @@ export interface Transaction {
   item_id: number | null;
   item_name: string;
   date: string;
+  unit_price: number | null;
+  quantity: number | null;
+  unit: string | null;
 }
 
 export interface Summary {
@@ -32,6 +35,9 @@ export interface TransactionFormData {
   category_id: string;
   item_name: string;
   date: string;
+  unit_price: string;
+  quantity: string;
+  unit: string;
 }
 
 export interface CategoryFormData {
@@ -61,6 +67,10 @@ export interface ItemWithStats {
   total_spent: number;
   average_price: number;
   last_purchase_date: string;
+  last_unit_price: number | null;
+  average_unit_price: number | null;
+  total_quantity: number | null;
+  unit: string | null;
 }
 
 export interface ItemHistory {
@@ -72,5 +82,9 @@ export interface ItemHistory {
     average_price: number;
     first_purchase_date: string | null;
     last_purchase_date: string | null;
+    last_unit_price: number | null;
+    average_unit_price: number | null;
+    total_quantity: number | null;
+    unit: string | null;
   };
 }
