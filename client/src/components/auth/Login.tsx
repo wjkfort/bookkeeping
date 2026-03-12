@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Card, Typography, message } from "antd";
-import { UserOutlined, LockOutlined } from "@ant-design/icons";
+import { UserOutlined, LockOutlined, ArrowRightOutlined } from "@ant-design/icons";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "../ui/LanguageSwitcher";
+import "./Auth.css";
 
 const { Title, Text } = Typography;
 
@@ -23,7 +24,6 @@ export const Login: React.FC = () => {
     } catch (error: any) {
       const errorMsg = error.message || t("login.error") || "Login failed";
       
-      // Show helpful hint instead of confusing error for invalid credentials
       if (errorMsg.includes("Invalid credentials") || errorMsg.includes("credentials")) {
         message.warning(t("login.hint") || "Don't have an account? Please register first!");
       } else {
@@ -35,53 +35,79 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-        background: "#f0f2f5",
-        position: "relative",
-      }}
-    >
-      <div style={{ position: "absolute", top: 24, right: 24 }}>
+    <div className="auth-container">
+      <div className="auth-background">
+        <div className="auth-blob auth-blob-1"></div>
+        <div className="auth-blob auth-blob-2"></div>
+        <div className="auth-blob auth-blob-3"></div>
+      </div>
+      
+      <div className="auth-language-switcher">
         <LanguageSwitcher />
       </div>
-      <Card style={{ width: 400, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <Title level={2}>{t("login.title") || "Login"}</Title>
-          <Text type="secondary">{t("login.subtitle") || "Welcome back to Bookkeeping"}</Text>
+
+      <div className="auth-content">
+        <div className="auth-brand">
+          <div className="auth-brand-icon">💰</div>
+          <h1 className="auth-brand-title">{t("nav.title") || "Bookkeeping"}</h1>
+          <p className="auth-brand-subtitle">{t("login.subtitle") || "Track your finances with ease"}</p>
         </div>
 
-        <Form name="login" onFinish={onFinish} autoComplete="off" layout="vertical">
-          <Form.Item
-            name="email"
-            rules={[
-              { required: true, message: t("login.emailRequired") || "Please input your email!" },
-              { type: "email", message: t("login.emailInvalid") || "Please enter a valid email!" },
-            ]}
-          >
-            <Input prefix={<UserOutlined />} placeholder={t("login.emailPlaceholder") || "Email"} size="large" />
-          </Form.Item>
-
-          <Form.Item name="password" rules={[{ required: true, message: t("login.passwordRequired") || "Please input your password!" }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder={t("login.passwordPlaceholder") || "Password"} size="large" />
-          </Form.Item>
-
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading} block size="large">
-              {t("login.button") || "Log in"}
-            </Button>
-          </Form.Item>
-
-          <div style={{ textAlign: "center" }}>
-            <Text>
-              {t("login.noAccount") || "Don't have an account?"} <Link to="/register">{t("login.registerLink") || "Register now"}</Link>
-            </Text>
+        <Card className="auth-card" variant="borderless">
+          <div className="auth-card-header">
+            <Title level={2} className="auth-card-title">{t("login.title") || "Welcome Back"}</Title>
+            <Text className="auth-card-subtitle">{t("login.subtitle") || "Sign in to continue"}</Text>
           </div>
-        </Form>
-      </Card>
+
+          <Form name="login" onFinish={onFinish} autoComplete="off" layout="vertical" size="large">
+            <Form.Item
+              name="email"
+              rules={[
+                { required: true, message: t("login.emailRequired") || "Please input your email!" },
+                { type: "email", message: t("login.emailInvalid") || "Please enter a valid email!" },
+              ]}
+            >
+              <Input 
+                prefix={<UserOutlined style={{ color: "#a8a29e" }} />} 
+                placeholder={t("login.emailPlaceholder") || "Email"} 
+              />
+            </Form.Item>
+
+            <Form.Item 
+              name="password" 
+              rules={[{ required: true, message: t("login.passwordRequired") || "Please input your password!" }]}
+            >
+              <Input.Password 
+                prefix={<LockOutlined style={{ color: "#a8a29e" }} />} 
+                placeholder={t("login.passwordPlaceholder") || "Password"} 
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                loading={loading} 
+                block 
+                icon={<ArrowRightOutlined />}
+                iconPlacement="end"
+                className="auth-submit-btn"
+              >
+                {t("login.button") || "Log in"}
+              </Button>
+            </Form.Item>
+
+            <div className="auth-footer">
+              <Text className="auth-footer-text">
+                {t("login.noAccount") || "Don't have an account?"}{" "}
+                <Link to="/register" className="auth-link">
+                  {t("login.registerLink") || "Register now"}
+                </Link>
+              </Text>
+            </div>
+          </Form>
+        </Card>
+      </div>
     </div>
   );
 };

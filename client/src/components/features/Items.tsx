@@ -8,6 +8,7 @@ import { getItems, getItemHistory, updateItem } from "../../api";
 import { ItemWithStats, ItemHistory, Transaction } from "../../types";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
+import "./Items.css";
 
 const Items: React.FC = () => {
   const { t } = useTranslation();
@@ -185,16 +186,24 @@ const Items: React.FC = () => {
   ];
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1>{t("items.title")}</h1>
+    <div className="items-page">
+      <div className="items-header">
+        <h1 className="items-title">{t("items.title")}</h1>
       </div>
 
-      <Card style={{ marginBottom: "16px" }}>
-        <Input placeholder={t("items.searchPlaceholder")} prefix={<SearchOutlined />} value={searchText} onChange={(e) => handleSearch(e.target.value)} allowClear style={{ width: "100%", maxWidth: "400px" }} />
+      <Card className="items-search-card" bordered={false}>
+        <Input 
+          placeholder={t("items.searchPlaceholder")} 
+          prefix={<SearchOutlined />} 
+          value={searchText} 
+          onChange={(e) => handleSearch(e.target.value)} 
+          allowClear 
+          style={{ width: "100%", maxWidth: "400px" }} 
+          size="large"
+        />
       </Card>
 
-      <Card>
+      <Card className="items-table-card" bordered={false}>
         <Table columns={columns} dataSource={filteredItems} rowKey="id" loading={loading} locale={{ emptyText: t("items.noItems") }} />
       </Card>
 
@@ -212,7 +221,7 @@ const Items: React.FC = () => {
       >
         {selectedItem && (
           <>
-            <Card title={t("items.statistics")} style={{ marginBottom: "16px" }}>
+            <div className="item-history-stats">
               <Row gutter={16}>
                 <Col span={8} style={{ textAlign: "center" }}>
                   <Statistic title={t("items.totalPurchases")} value={selectedItem.stats.total_purchases} />
@@ -224,33 +233,13 @@ const Items: React.FC = () => {
                   <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItem.stats.average_price, "USD")} />
                 </Col>
               </Row>
-              {selectedItem.stats.last_unit_price && selectedItem.stats.unit && (
-                <Row gutter={16} style={{ marginTop: "16px" }}>
-                  <Col span={8} style={{ textAlign: "center" }}>
-                    <Statistic title={t("items.lastUnitPrice")} value={`${formatCurrency(selectedItem.stats.last_unit_price, "USD")}/${t(`units.${selectedItem.stats.unit}`)}`} />
-                  </Col>
-                  {selectedItem.stats.average_unit_price && (
-                    <Col span={8} style={{ textAlign: "center" }}>
-                      <Statistic title={t("items.averageUnitPrice")} value={`${formatCurrency(selectedItem.stats.average_unit_price, "USD")}/${t(`units.${selectedItem.stats.unit}`)}`} />
-                    </Col>
-                  )}
-                  {selectedItem.stats.total_quantity && (
-                    <Col span={8} style={{ textAlign: "center" }}>
-                      <Statistic title={t("items.totalQuantity")} value={`${selectedItem.stats.total_quantity.toFixed(2)} ${t(`units.${selectedItem.stats.unit}`)}`} />
-                    </Col>
-                  )}
-                </Row>
-              )}
-            </Card>
+            </div>
 
             {selectedItem.transactions.filter((t) => t.unit_price !== null).length > 1 && (
-              <Card
-                title={
-                  <>
-                    <LineChartOutlined /> {t("items.unitPriceTrend")}
-                  </>
-                }
+              <Card 
+                title={<><LineChartOutlined /> {t("items.unitPriceTrend")}</>}
                 style={{ marginBottom: "16px" }}
+                bordered={false}
               >
                 <Line
                   data={selectedItem.transactions
@@ -280,7 +269,7 @@ const Items: React.FC = () => {
               </Card>
             )}
 
-            <Card title={t("items.transactions")}>
+            <Card title={t("items.transactions")} bordered={false}>
               <Table columns={transactionColumns} dataSource={selectedItem.transactions} rowKey="id" pagination={{ pageSize: 10 }} locale={{ emptyText: t("transactions.noTransactions") }} />
             </Card>
           </>

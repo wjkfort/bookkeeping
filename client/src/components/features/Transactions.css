@@ -1,0 +1,103 @@
+/* Transactions Page Styles - Refined and Consistent */
+
+.transactions-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #f5f5f4;
+}
+
+.transactions-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #f4623d 0%, #e89b0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.transactions-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Filter Card */
+.filter-card {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: 1px solid #f5f5f4;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.filter-card .ant-card-head {
+  border-bottom: 1px solid #f5f5f4;
+  padding: 20px 24px;
+}
+
+.filter-card .ant-card-body {
+  padding: 24px;
+}
+
+.filter-card .ant-card-head-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #292524;
+}
+
+/* Transactions Table Card */
+.transactions-table-card {
+  border-radius: 16px;
+  border: 1px solid #f5f5f4;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.transactions-table-card .ant-card-body {
+  padding: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .transactions-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .transactions-title {
+    font-size: 2rem;
+  }
+
+  .transactions-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .transactions-actions button {
+    width: 100%;
+  }
+
+  .filter-card .ant-form {
+    flex-direction: column;
+  }
+
+  .filter-card .ant-form-item {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .transactions-title {
+    font-size: 1.75rem;
+  }
+}

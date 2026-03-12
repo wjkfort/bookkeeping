@@ -36,4 +36,8 @@ Thumbs.db
 # Logs
 *.log
 
+# AI
 .kiro-specs.md
+skills-lock.json
+.agents/
+.factory/

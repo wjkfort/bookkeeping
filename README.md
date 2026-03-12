@@ -207,7 +207,16 @@ See [AI Features Guide](docs/AI_FEATURES.md) for detailed documentation.
 
 ### Known Issues & Improvements
 
-(No open issues at this time)
+#### Item Selection UX Issue
+
+**Problem**: When creating transactions, the item name field uses free-text autocomplete. Users can easily create duplicate items due to typos (e.g., "Appl" instead of "Apple"), leading to fragmented purchase history.
+
+**Proposed Solution**: 
+- Add fuzzy matching to suggest similar existing items
+- Show visual distinction between "Create new: X" and existing items
+- Add confirmation step before creating new items to prevent accidental duplicates
+
+**Impact**: Medium - Affects data quality and purchase history accuracy
 
 ## Recent Fixes & Features
 

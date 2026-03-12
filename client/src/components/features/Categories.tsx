@@ -5,6 +5,7 @@ import { PlusOutlined, DeleteOutlined, EditOutlined, TranslationOutlined } from 
 import { getCategories, createCategory, updateCategory, deleteCategory, translateText } from '../../api';
 import { Category, CategoryFormData } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
+import './Categories.css';
 
 const { Option } = Select;
 
@@ -223,26 +224,32 @@ const Categories: React.FC = () => {
   const flatData = flattenCategories(filteredCategories);
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1>{t('categories.title')}</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>
+    <div className="categories-page">
+      <div className="categories-header">
+        <h1 className="categories-title">{t('categories.title')}</h1>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => {
+          setEditingCategory(null);
+          form.resetFields();
+          setIsModalVisible(true);
+        }}>
           {t('categories.addNew')}
         </Button>
       </div>
 
-      <Card>
-        <div style={{ marginBottom: '16px' }}>
-          <Segmented
-            value={typeFilter}
-            onChange={(value) => setTypeFilter(value as 'all' | 'income' | 'expense')}
-            options={[
-              { label: t('categories.all'), value: 'all' },
-              { label: t('categories.income'), value: 'income' },
-              { label: t('categories.expense'), value: 'expense' },
-            ]}
-          />
-        </div>
+      <Card className="categories-filter-card" bordered={false}>
+        <Segmented
+          value={typeFilter}
+          onChange={(value) => setTypeFilter(value as 'all' | 'income' | 'expense')}
+          options={[
+            { label: t('categories.all'), value: 'all' },
+            { label: t('categories.income'), value: 'income' },
+            { label: t('categories.expense'), value: 'expense' },
+          ]}
+          size="large"
+        />
+      </Card>
+
+      <Card className="categories-table-card" bordered={false}>
         <Table
           columns={columns}
           dataSource={flatData}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal } from "antd";
-import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined, ArrowLeftOutlined, LineChartOutlined } from "@ant-design/icons";
+import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal, App } from "antd";
+import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined, ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from "@ant-design/plots";
 import { useCurrency } from "../../hooks/useCurrency";
@@ -10,10 +10,12 @@ import { Summary, Transaction, Category, Item, ItemHistory } from "../../types";
 import TransactionTable from "./TransactionTable";
 import AIInsights from "./ai/AIInsights";
 import dayjs, { Dayjs } from "dayjs";
+import "./Dashboard.css";
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { formatCurrency, formatWithConversion, currencyCode } = useCurrency();
+  const { message } = App.useApp();
   const [summary, setSummary] = useState<Summary>({ total_income: 0, total_expense: 0, balance: 0, currency: "USD" });
   const [overallBalance, setOverallBalance] = useState<number>(0);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -95,26 +97,23 @@ const Dashboard: React.FC = () => {
     // Filter transactions based on selection
     let filteredTransactions: Transaction[];
     if (isOverall) {
-      // For overall, use all transactions
       filteredTransactions = transactions;
     } else {
-      // Filter by selected month
       filteredTransactions = transactions.filter((t) => dayjs(t.date).isAfter(startOfMonth) || dayjs(t.date).isSame(startOfMonth, "day"));
     }
     const currentMonthTransactions = filteredTransactions;
 
-    // Color palette for pie chart (warm tones - red/orange/yellow)
-    const incomeColors = ["#52c41a", "#73d13d", "#95de64", "#b7eb8f", "#d9f7be"];
-    const expenseColors = ["#ff4d4f", "#fa8c16", "#fadb14", "#ffc53d", "#ff7875", "#ffccc7", "#ffa39e"];
-    // Distinct color palette for bar chart (cool tones - blue/purple/teal)
-    const barChartColors = ["#1890ff", "#722ed1", "#13c2c2", "#2f54eb", "#eb2f96", "#52c41a", "#faad14"];
+    // Color palette for pie chart (warm tones)
+    const incomeColors = ["#22c55e", "#16a34a", "#15803d", "#86efac", "#4ade80"];
+    const expenseColors = ["#f43f5e", "#ff6b3d", "#f59e0b", "#fb7185", "#fbbf24", "#fda4af", "#fcd34d"];
+    // Distinct color palette for bar chart
+    const barChartColors = ["#ff6b3d", "#f59e0b", "#14b8a6", "#f43f5e", "#22c55e", "#8b5cf6", "#ec4899"];
 
     // Helper function to get root category
     const getRootCategory = (categoryId: number): Category | undefined => {
       let category = categoriesData.find((cat) => cat.id === categoryId);
       if (!category) return undefined;
 
-      // Traverse up to find root category
       while (category.parent_id !== null) {
         const parent = categoriesData.find((cat) => cat.id === category!.parent_id);
         if (!parent) break;
@@ -169,13 +168,11 @@ const Dashboard: React.FC = () => {
     const expenseCategorySet = new Set<string>();
     const categoryColorMap: { [key: string]: string } = {};
 
-    // Determine date range and format based on selection
     let startDate: dayjs.Dayjs;
     let dateFormat: string;
     let daysCount: number;
     const referenceDate = isOverall ? dayjs() : selectedMonth || dayjs();
 
-    // Use effectiveBarChartRange to determine the actual range
     if (effectiveBarChartRange === "7days") {
       startDate = referenceDate.subtract(6, "day").startOf("day");
       dateFormat = "MM/DD";
@@ -185,13 +182,11 @@ const Dashboard: React.FC = () => {
       dateFormat = "MM/DD";
       daysCount = 30;
     } else {
-      // 'month'
       startDate = referenceDate.startOf("month");
       dateFormat = "MM/DD";
       daysCount = referenceDate.daysInMonth();
     }
 
-    // Initialize all dates in range
     for (let i = 0; i < daysCount; i++) {
       const date = effectiveBarChartRange === "month" ? startDate.add(i, "day").format("YYYY-MM-DD") : referenceDate.subtract(daysCount - 1 - i, "day").format("YYYY-MM-DD");
       dailyExpensesByCategory[date] = {};
@@ -212,7 +207,6 @@ const Dashboard: React.FC = () => {
           }
           dailyExpensesByCategory[dateKey][categoryName] += t.amount;
 
-          // Assign color to category if not already assigned
           if (!categoryColorMap[categoryName]) {
             const colorIndex = Object.keys(categoryColorMap).length;
             categoryColorMap[categoryName] = barChartColors[colorIndex % barChartColors.length];
@@ -246,6 +240,7 @@ const Dashboard: React.FC = () => {
       setItemHistoryModalVisible(true);
     } catch (error) {
       console.error("Error loading item history:", error);
+      message.error(t("items.loadHistoryError") || "Failed to load item history");
     }
   };
 
@@ -257,8 +252,8 @@ const Dashboard: React.FC = () => {
     if (total === 0) return null;
 
     return (
-      <text x={x + width / 2} y={y - 5} fill="#000" textAnchor="middle" fontSize={11} fontWeight="bold">
-        {total.toFixed(2)} {currencyCode}
+      <text x={x + width / 2} y={y - 5} fill="#292524" textAnchor="middle" fontSize={11} fontWeight="600">
+        {total.toFixed(0)}
       </text>
     );
   };
@@ -267,13 +262,9 @@ const Dashboard: React.FC = () => {
 
   const filteredMonthlyData = monthlyData.filter((item) => (showExpense ? item.type === "expense" : item.type === "income"));
 
-  // Determine if we're viewing a specific month (not current month and not overall)
   const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), "month");
-
-  // Determine the actual bar chart range to use
   const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
 
-  // Generate title based on selection
   const getBarChartTitle = () => {
     if (isViewingSpecificMonth) {
       return `${selectedMonth?.format("YYYY-MM")} ${t("dashboard.expense") || "Expense"}`;
@@ -288,10 +279,14 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-        <h1 style={{ margin: 0 }}>{t("dashboard.title")}</h1>
-        <Space>
+    <div className="dashboard">
+      {/* Header */}
+      <div className="dashboard-header">
+        <div>
+          <h1 className="dashboard-title">{t("dashboard.title")}</h1>
+          <p className="dashboard-subtitle">{isOverall ? t("dashboard.overall") : selectedMonth?.format("MMMM YYYY")}</p>
+        </div>
+        <Space size="middle">
           <DatePicker
             picker="month"
             value={isOverall ? null : selectedMonth}
@@ -302,46 +297,70 @@ const Dashboard: React.FC = () => {
             disabled={isOverall}
             format="YYYY-MM"
             placeholder={t("dashboard.selectMonth") || "Select Month"}
+            size="large"
           />
-          <Button type={isOverall ? "primary" : "default"} onClick={() => setIsOverall(!isOverall)}>
+          <Button type={isOverall ? "primary" : "default"} onClick={() => setIsOverall(!isOverall)} size="large">
             {t("dashboard.overall") || "Overall"}
           </Button>
         </Space>
       </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title={t("dashboard.totalIncome")} value={summary.total_income} precision={2} styles={{ content: { color: "#52c41a" } }} prefix={<ArrowUpOutlined />} suffix={currencyCode} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title={t("dashboard.totalExpense")} value={summary.total_expense} precision={2} styles={{ content: { color: "#ff4d4f" } }} prefix={<ArrowDownOutlined />} suffix={currencyCode} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic title={t("dashboard.balance")} value={overallBalance} precision={2} styles={{ content: { color: "#1890ff" } }} prefix={<WalletOutlined />} suffix={currencyCode} />
-          </Card>
-        </Col>
-      </Row>
+      {/* Hero Stats - No cards, just beautiful typography and color */}
+      <div className="hero-stats">
+        <div className="stat-card stat-income">
+          <div className="stat-icon">
+            <RiseOutlined />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">{t("dashboard.totalIncome")}</div>
+            <div className="stat-value amount">{summary.total_income.toFixed(2)}</div>
+            <div className="stat-currency">{currencyCode}</div>
+          </div>
+        </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
+        <div className="stat-card stat-expense">
+          <div className="stat-icon">
+            <FallOutlined />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">{t("dashboard.totalExpense")}</div>
+            <div className="stat-value amount">{summary.total_expense.toFixed(2)}</div>
+            <div className="stat-currency">{currencyCode}</div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-balance">
+          <div className="stat-icon">
+            <WalletOutlined />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">{t("dashboard.balance")}</div>
+            <div className="stat-value amount">{overallBalance.toFixed(2)}</div>
+            <div className="stat-currency">{currencyCode}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Section */}
+      <Row gutter={[24, 24]} style={{ marginBottom: "32px" }}>
         <Col xs={24} lg={12}>
           <Card
-            title={t("dashboard.monthlyOverview")}
-            extra={
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ color: showExpense ? "#999" : "#52c41a", fontWeight: showExpense ? "normal" : "bold" }}>{t("dashboard.income")}</span>
-                <Switch checked={showExpense} onChange={setShowExpense} style={{ backgroundColor: showExpense ? "#ff4d4f" : "#52c41a" }} />
-                <span style={{ color: showExpense ? "#ff4d4f" : "#999", fontWeight: showExpense ? "bold" : "normal" }}>{t("dashboard.expense")}</span>
+            className="chart-card"
+            title={
+              <div className="chart-header">
+                <span className="chart-title">{t("dashboard.monthlyOverview")}</span>
+                <div className="chart-toggle">
+                  <span className={!showExpense ? "active" : ""}>{t("dashboard.income")}</span>
+                  <Switch checked={showExpense} onChange={setShowExpense} />
+                  <span className={showExpense ? "active" : ""}>{t("dashboard.expense")}</span>
+                </div>
               </div>
             }
+            variant="borderless"
           >
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={320}>
               <PieChart>
-                <Pie data={filteredMonthlyData} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value.toFixed(2)} ${currencyCode}`} outerRadius={80} fill="#8884d8" dataKey="value">
+                <Pie data={filteredMonthlyData} cx="50%" cy="50%" labelLine={false} label={({ name, value }) => `${name}: ${value.toFixed(0)}`} outerRadius={100} fill="#8884d8" dataKey="value">
                   {filteredMonthlyData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
@@ -351,27 +370,32 @@ const Dashboard: React.FC = () => {
             </ResponsiveContainer>
           </Card>
         </Col>
+
         <Col xs={24} lg={12}>
           <Card
-            title={getBarChartTitle()}
-            extra={
-              !isViewingSpecificMonth && (
-                <Radio.Group value={barChartRange} onChange={(e) => setBarChartRange(e.target.value)} size="small">
-                  <Radio.Button value="7days">7 {t("dashboard.days")}</Radio.Button>
-                  <Radio.Button value="30days">30 {t("dashboard.days")}</Radio.Button>
-                  <Radio.Button value="month">{t("dashboard.currentMonth")}</Radio.Button>
-                </Radio.Group>
-              )
+            className="chart-card"
+            title={
+              <div className="chart-header">
+                <span className="chart-title">{getBarChartTitle()}</span>
+                {!isViewingSpecificMonth && (
+                  <Radio.Group value={barChartRange} onChange={(e) => setBarChartRange(e.target.value)} size="small">
+                    <Radio.Button value="7days">7{t("dashboard.days")}</Radio.Button>
+                    <Radio.Button value="30days">30{t("dashboard.days")}</Radio.Button>
+                    <Radio.Button value="month">{t("dashboard.currentMonth")}</Radio.Button>
+                  </Radio.Group>
+                )}
+              </div>
             }
+            variant="borderless"
           >
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={weeklyExpenses} margin={{ top: 20, right: 5, left: 5, bottom: 5 }} barSize={50}>
-                <XAxis dataKey="date" />
-                <YAxis />
+              <BarChart data={weeklyExpenses} margin={{ top: 20, right: 5, left: 5, bottom: 5 }}>
+                <XAxis dataKey="date" stroke="#78716c" />
+                <YAxis stroke="#78716c" />
                 <Tooltip formatter={(value: number) => `${value.toFixed(2)} ${currencyCode}`} />
                 <Legend />
                 {expenseCategories.map((category, index) => (
-                  <Bar key={category.name} dataKey={category.name} stackId="a" fill={category.color} name={category.name} label={index === expenseCategories.length - 1 ? renderCustomLabel : undefined} />
+                  <Bar key={category.name} dataKey={category.name} stackId="a" fill={category.color} name={category.name} label={index === expenseCategories.length - 1 ? renderCustomLabel : undefined} radius={index === expenseCategories.length - 1 ? [8, 8, 0, 0] : undefined} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -379,13 +403,21 @@ const Dashboard: React.FC = () => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: "24px" }}>
-        <Col xs={24}>
-          <AIInsights />
-        </Col>
-      </Row>
+      {/* AI Insights */}
+      <div style={{ marginBottom: "32px" }}>
+        <AIInsights />
+      </div>
 
-      <Card title={t("dashboard.recentTransactions")}>{recentTransactions.length === 0 ? <p>{t("dashboard.noTransactions")}</p> : <TransactionTable transactions={recentTransactions} categories={categories} items={items} showActions={false} pagination={false} onItemClick={handleViewItemHistory} />}</Card>
+      {/* Recent Transactions */}
+      <Card className="transactions-card" title={<span className="card-title">{t("dashboard.recentTransactions")}</span>} variant="borderless">
+        {recentTransactions.length === 0 ? (
+          <div className="empty-state">
+            <p>{t("dashboard.noTransactions")}</p>
+          </div>
+        ) : (
+          <TransactionTable transactions={recentTransactions} categories={categories} items={items} showActions={false} pagination={false} onItemClick={handleViewItemHistory} />
+        )}
+      </Card>
 
       {/* Item History Modal */}
       <Modal
@@ -398,11 +430,11 @@ const Dashboard: React.FC = () => {
         open={itemHistoryModalVisible}
         onCancel={() => setItemHistoryModalVisible(false)}
         footer={null}
-        width={1000}
+        size={1000}
       >
         {selectedItemHistory && (
           <>
-            <Card title={t("items.statistics")} style={{ marginBottom: "16px" }}>
+            <div style={{ marginBottom: "24px", padding: "24px", background: "#fffaf8", borderRadius: "12px" }}>
               <Row gutter={16}>
                 <Col span={6}>
                   <Statistic title={t("items.totalPurchases")} value={selectedItemHistory.stats.total_purchases} />
@@ -417,7 +449,7 @@ const Dashboard: React.FC = () => {
                   <Statistic title={t("items.firstPurchase")} value={selectedItemHistory.stats.first_purchase_date ? dayjs(selectedItemHistory.stats.first_purchase_date).format("YYYY-MM-DD") : "-"} />
                 </Col>
               </Row>
-            </Card>
+            </div>
 
             {selectedItemHistory.transactions.length > 1 && (
               <Card
@@ -427,6 +459,7 @@ const Dashboard: React.FC = () => {
                   </>
                 }
                 style={{ marginBottom: "16px" }}
+                bordered={false}
               >
                 <Line
                   data={selectedItemHistory.transactions
@@ -437,15 +470,7 @@ const Dashboard: React.FC = () => {
                     .reverse()}
                   xField="date"
                   yField="price"
-                  point={{
-                    size: 5,
-                    shape: "circle",
-                  }}
-                  label={{
-                    style: {
-                      fill: "#aaa",
-                    },
-                  }}
+                  point={{ size: 5, shape: "circle" }}
                   tooltip={{
                     formatter: (datum) => {
                       return { name: t("transactions.amount"), value: formatCurrency(datum.price, "USD") };
@@ -456,7 +481,7 @@ const Dashboard: React.FC = () => {
               </Card>
             )}
 
-            <Card title={t("items.transactions")}>
+            <Card title={t("items.transactions")} bordered={false}>
               <Table
                 columns={[
                   {
@@ -473,7 +498,7 @@ const Dashboard: React.FC = () => {
                   {
                     title: t("transactions.amount"),
                     key: "amount",
-                    render: (_, record) => <span>{formatWithConversion(record.amount, record.currency)}</span>,
+                    render: (_, record) => <span className="amount">{formatWithConversion(record.amount, record.currency)}</span>,
                   },
                 ]}
                 dataSource={selectedItemHistory.transactions}

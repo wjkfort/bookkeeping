@@ -1,0 +1,383 @@
+/* Dashboard Styles - Bold, warm, approachable */
+
+.dashboard {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #f5f5f4;
+}
+
+.dashboard-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #f4623d 0%, #e89b0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-subtitle {
+  font-size: 1.125rem;
+  color: #78716c;
+  margin: 8px 0 0 0;
+  font-weight: 500;
+}
+
+/* Hero Stats - No cards, pure design */
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.stat-card {
+  position: relative;
+  padding: 28px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.08;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08);
+}
+
+.stat-card:hover::before {
+  opacity: 0.12;
+}
+
+/* Income stat - softer green */
+.stat-income {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #bbf7d0;
+}
+
+.stat-income::before {
+  background: #20b55a;
+}
+
+.stat-income .stat-icon {
+  color: #16934a;
+}
+
+.stat-income .stat-value {
+  color: #15703d;
+}
+
+/* Expense stat - softer rose */
+.stat-expense {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1px solid #fecdd3;
+}
+
+.stat-expense::before {
+  background: #e63f5a;
+}
+
+.stat-expense .stat-icon {
+  color: #d11d48;
+}
+
+.stat-expense .stat-value {
+  color: #ae123c;
+}
+
+/* Balance stat - softer terracotta */
+.stat-balance {
+  background: linear-gradient(135deg, #fff5f2 0%, #ffe8e0 100%);
+  border: 1px solid #ffd4c7;
+}
+
+.stat-balance::before {
+  background: #f4623d;
+}
+
+.stat-balance .stat-icon {
+  color: #e04e1f;
+}
+
+.stat-balance .stat-value {
+  color: #c13a0f;
+}
+
+.stat-icon {
+  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-label {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #78716c;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.stat-currency {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #a8a29e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Chart Cards */
+.chart-card {
+  border-radius: 20px;
+  border: 2px solid #f5f5f4;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chart-card:hover {
+  border-color: rgba(255, 107, 61, 0.2);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.chart-card .ant-card-head {
+  border-bottom: 2px solid #f5f5f4;
+  padding: 24px 32px;
+}
+
+.chart-card .ant-card-body {
+  padding: 32px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.chart-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #292524;
+}
+
+.chart-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.chart-toggle span {
+  color: #a8a29e;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chart-toggle span.active {
+  color: #ff6b3d;
+}
+
+.chart-toggle .ant-switch-checked {
+  background: #f43f5e;
+}
+
+.chart-toggle .ant-switch {
+  background: #22c55e;
+}
+
+/* Transactions Card */
+.transactions-card {
+  border-radius: 20px;
+  border: 2px solid #f5f5f4;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.transactions-card .ant-card-head {
+  border-bottom: 2px solid #f5f5f4;
+  padding: 24px 32px;
+}
+
+.transactions-card .ant-card-body {
+  padding: 0;
+}
+
+.card-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #292524;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 24px;
+  color: #a8a29e;
+}
+
+.empty-state p {
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  .dashboard-title {
+    font-size: 2rem;
+  }
+
+  .hero-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-card {
+    padding: 24px;
+  }
+
+  .stat-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 36px;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .chart-card .ant-card-head {
+    padding: 20px 24px;
+  }
+  
+  .chart-card .ant-card-body {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-title {
+    font-size: 1.75rem;
+  }
+  
+  .stat-value {
+    font-size: 1.75rem;
+  }
+  
+  .stat-icon {
+    width: 56px;
+    height: 56px;
+    font-size: 32px;
+  }
+}
+
+/* Radio button group styling */
+.ant-radio-group {
+  display: flex;
+  gap: 4px;
+}
+
+.ant-radio-button-wrapper {
+  border-radius: 8px !important;
+  border: 2px solid #e7e5e4 !important;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ant-radio-button-wrapper:hover {
+  color: #ff6b3d;
+  border-color: rgba(255, 107, 61, 0.3) !important;
+}
+
+.ant-radio-button-wrapper-checked {
+  background: linear-gradient(135deg, #ff6b3d 0%, #f04e1f 100%) !important;
+  border-color: #ff6b3d !important;
+  color: white !important;
+}
+
+.ant-radio-button-wrapper-checked:hover {
+  color: white !important;
+}
+
+.ant-radio-button-wrapper::before {
+  display: none;
+}
+
+/* Chart improvements */
+.recharts-pie-label-text {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  fill: #292524;
+}
+
+.recharts-legend-item-text {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  color: #57534e !important;
+}
+
+.recharts-cartesian-axis-tick-value {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  fill: #78716c;
+}

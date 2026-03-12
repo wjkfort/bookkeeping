@@ -15,6 +15,8 @@ import LanguageSwitcher from "./components/ui/LanguageSwitcher";
 import { useAuth } from "./contexts/AuthContext";
 import zhCN from "antd/locale/zh_CN";
 import enUS from "antd/locale/en_US";
+import { antdTheme } from "./theme/antdTheme";
+import "./theme/globalStyles.css";
 
 const { Header, Content } = Layout;
 
@@ -66,38 +68,39 @@ function AppContent() {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
   return (
-    <Layout style={{ minHeight: "100vh", borderRadius: isAuthPage ? "0" : "8px" }}>
+    <Layout style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
       {!isAuthPage && isAuthenticated && (
-        <Header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "0 24px",
-            borderRadius: "8px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            margin: "8px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "24px", flex: 1 }}>
-            <h1 style={{ color: "white", margin: 0, fontSize: "20px", whiteSpace: "nowrap" }}>{t("nav.title")}</h1>
-            <Menu theme="dark" mode="horizontal" selectedKeys={[selectedKey]} items={menuItems} style={{ flex: 1, minWidth: 0, border: "none" }} />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <span style={{ color: "white" }}>{user?.username}</span>
-            <LanguageSwitcher />
-            <Button 
-              type="text" 
-              icon={<LogoutOutlined />} 
-              onClick={logout}
-              style={{ color: "white" }}
-            >
-              {t("nav.logout")}
-            </Button>
+        <Header className="app-header">
+          <div className="header-content">
+            <div className="header-left">
+              <div className="header-brand">
+                <span className="header-brand-icon">💰</span>
+                <h1 className="header-brand-title">{t("nav.title")}</h1>
+              </div>
+              <Menu 
+                theme="light" 
+                mode="horizontal" 
+                selectedKeys={[selectedKey]} 
+                items={menuItems} 
+                className="header-menu"
+              />
+            </div>
+            <div className="header-right">
+              <span className="header-username">{user?.username}</span>
+              <LanguageSwitcher />
+              <Button 
+                type="text" 
+                icon={<LogoutOutlined />} 
+                onClick={logout}
+                className="header-logout-btn"
+              >
+                {t("nav.logout")}
+              </Button>
+            </div>
           </div>
         </Header>
       )}
-      <Content style={{ padding: isAuthPage ? "0" : "24px", background: "#f0f2f5" }}>
+      <Content className={isAuthPage ? "content-auth" : "content-main"}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -117,7 +120,7 @@ function App() {
   const locale = i18n.language === "zh" ? zhCN : enUS;
 
   return (
-    <ConfigProvider locale={locale}>
+    <ConfigProvider locale={locale} theme={antdTheme}>
       <Router>
         <AppContent />
       </Router>

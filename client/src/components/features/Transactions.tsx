@@ -9,6 +9,7 @@ import { Transaction, Category, TransactionFilters, Item, ItemHistory } from '..
 import TransactionTable from './TransactionTable';
 import AIQuickAdd from './ai/AIQuickAdd';
 import dayjs from 'dayjs';
+import './Transactions.css';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -259,10 +260,10 @@ const Transactions: React.FC = () => {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1>{t('transactions.title')}</h1>
-        <Space>
+    <div className="transactions-page">
+      <div className="transactions-header">
+        <h1 className="transactions-title">{t('transactions.title')}</h1>
+        <Space className="transactions-actions">
           <AIQuickAdd categories={categories} onSuccess={loadTransactions} />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => {
             setEditingId(null);
@@ -275,7 +276,7 @@ const Transactions: React.FC = () => {
         </Space>
       </div>
 
-      <Card title={<><FilterOutlined /> {t('transactions.filterTitle')}</>} style={{ marginBottom: '16px' }}>
+      <Card className="filter-card" title={<><FilterOutlined /> {t('transactions.filterTitle')}</>} bordered={false}>
         <Form form={filterForm} layout="inline" onFinish={handleFilterSubmit}>
           <Form.Item name="category_id">
             <Select style={{ width: 200 }} placeholder={t('transactions.allCategories')} allowClear>
@@ -300,7 +301,7 @@ const Transactions: React.FC = () => {
         </Form>
       </Card>
 
-      <Card>
+      <Card className="transactions-table-card" bordered={false}>
         <TransactionTable
           transactions={transactions}
           categories={categories}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Drawer, Button, Input, List, Avatar, Space, Spin, message } from "antd";
-import { RobotOutlined, SendOutlined, CloseOutlined } from "@ant-design/icons";
+import { RobotOutlined, SendOutlined, CloseOutlined, StarOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { chatWithAI, getChatHistory, ChatMessage } from "../../../api";
 import { useTranslation } from "react-i18next";
 import "./AIChat.css";
@@ -117,128 +117,71 @@ export default function AIChat({ onTransactionCreated }: AIChatProps) {
 
   return (
     <>
-      {/* Floating AI Button */}
-      <Button
-        type="primary"
-        shape="circle"
-        size="large"
-        icon={<RobotOutlined />}
-        onClick={() => setOpen(true)}
-        style={{
-          position: "fixed",
-          bottom: 24,
-          right: 24,
-          width: 60,
-          height: 60,
-          fontSize: 24,
-          zIndex: 1000,
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        }}
-      />
+      {/* Floating AI Button - Redesigned */}
+      <button className="ai-chat-fab" onClick={() => setOpen(true)} aria-label="Open AI Assistant">
+        <ThunderboltOutlined className="ai-chat-fab-icon" />
+        <span className="ai-chat-fab-label">AI</span>
+      </button>
 
       {/* Chat Drawer */}
       <Drawer
         title={
           <Space>
-            <RobotOutlined />
+            <ThunderboltOutlined style={{ color: "#ff6b3d" }} />
             <span>{t("ai.chatTitle", "AI Assistant")}</span>
           </Space>
         }
         placement="right"
         onClose={() => {
           setOpen(false);
-          setInputValue(""); // Clear input when closing
+          setInputValue("");
         }}
         open={open}
-        size={400}
+        size={440}
         closeIcon={<CloseOutlined />}
         extra={
-          <Button size="small" onClick={clearChat}>
+          <Button size="small" onClick={clearChat} style={{ borderRadius: "8px" }}>
             {t("ai.clearChat", "Clear")}
           </Button>
         }
-        styles={{
-          body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" },
-        }}
       >
         {/* Messages Area */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "16px",
-            backgroundColor: "#f5f5f5",
-          }}
-        >
+        <div className="ai-chat-messages">
           {loadingHistory ? (
-            <div style={{ textAlign: "center", padding: "20px" }}>
+            <div className="ai-chat-loading">
               <Spin />
             </div>
           ) : messages.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>
-              <p>{t("ai.startConversation", "Start a conversation with your AI assistant!")}</p>
-              <p style={{ fontSize: "12px", marginTop: "8px" }}>{t("ai.chatTip", 'You can ask questions or tell me to add transactions like: "I spent 50 dollars on groceries"')}</p>
+            <div className="ai-chat-empty">
+              <div className="ai-chat-empty-icon">
+                <ThunderboltOutlined />
+              </div>
+              <h3>{t("ai.startConversation", "Start a conversation!")}</h3>
+              <p>{t("ai.chatTip", 'Ask questions or add transactions like: "I spent 50 dollars on groceries"')}</p>
             </div>
           ) : (
-            <List
-              dataSource={messages}
-              renderItem={(msg) => (
-                <div
-                  key={msg.id}
-                  style={{
-                    marginBottom: 12,
-                    display: "flex",
-                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: "80%",
-                      display: "flex",
-                      flexDirection: msg.role === "user" ? "row-reverse" : "row",
-                      gap: 8,
-                    }}
-                  >
-                    <Avatar
-                      icon={msg.role === "assistant" ? <RobotOutlined /> : undefined}
-                      style={{
-                        backgroundColor: msg.role === "assistant" ? "#1890ff" : "#52c41a",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {msg.role === "user" ? "U" : ""}
-                    </Avatar>
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        backgroundColor: msg.role === "user" ? "#1890ff" : "#fff",
-                        color: msg.role === "user" ? "#fff" : "#000",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {msg.message}
-                    </div>
+            <>
+              {messages.map((msg) => (
+                <div key={msg.id} className={`ai-chat-message ${msg.role}`}>
+                  <div className="ai-chat-message-content">
+                    <div className={`ai-chat-avatar ${msg.role}`}>{msg.role === "assistant" ? <ThunderboltOutlined /> : "U"}</div>
+                    <div className="ai-chat-bubble">{msg.message}</div>
                   </div>
                 </div>
-              )}
-            />
+              ))}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
-        <div
-          style={{
-            padding: "16px",
-            borderTop: "1px solid #f0f0f0",
-            backgroundColor: "#fff",
-          }}
-        >
-          <Space.Compact style={{ width: "100%" }}>
-            <TextArea value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={handleKeyPress} placeholder={t("ai.inputPlaceholder", "Ask me anything about your finances...")} autoSize={{ minRows: 1, maxRows: 4 }} disabled={loading} />
-            <Button type="primary" icon={<SendOutlined />} onClick={handleSend} loading={loading} disabled={!inputValue.trim()} />
-          </Space.Compact>
+        <div className="ai-chat-input-area">
+          <div className="ai-chat-input-wrapper">
+            <TextArea value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={handleKeyPress} placeholder={t("ai.inputPlaceholder", "Ask me anything about your finances...")} autoSize={{ minRows: 1, maxRows: 4 }} disabled={loading} bordered={false} />
+            <button className="ai-chat-send-btn" onClick={handleSend} disabled={loading || !inputValue.trim()}>
+              {loading ? <Spin /> : <SendOutlined />}
+            </button>
+          </div>
         </div>
       </Drawer>
     </>
