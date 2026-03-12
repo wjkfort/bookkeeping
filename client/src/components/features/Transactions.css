@@ -66,6 +66,17 @@
   padding: 0;
 }
 
+/* Item AutoComplete Options */
+.ant-select-item-option-content {
+  position: relative;
+  z-index: 1;
+}
+
+.ant-select-item-option-content > div {
+  position: relative;
+  z-index: 1;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .transactions-header {

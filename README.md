@@ -207,18 +207,25 @@ See [AI Features Guide](docs/AI_FEATURES.md) for detailed documentation.
 
 ### Known Issues & Improvements
 
-#### Item Selection UX Issue
-
-**Problem**: When creating transactions, the item name field uses free-text autocomplete. Users can easily create duplicate items due to typos (e.g., "Appl" instead of "Apple"), leading to fragmented purchase history.
-
-**Proposed Solution**: 
-- Add fuzzy matching to suggest similar existing items
-- Show visual distinction between "Create new: X" and existing items
-- Add confirmation step before creating new items to prevent accidental duplicates
-
-**Impact**: Medium - Affects data quality and purchase history accuracy
+_No known issues at this time._
 
 ## Recent Fixes & Features
+
+### Item Selection UX Improvements ✅ Fixed
+
+**Issue**: When creating transactions, the item name field used free-text autocomplete. Users could easily create duplicate items due to typos (e.g., "Appl" instead of "Apple"), leading to fragmented purchase history.
+
+**Solution Implemented**: 
+- ✅ Added fuzzy matching using Fuse.js (threshold: 0.4) to intelligently suggest similar existing items
+- ✅ Visual distinction with color-coded tags:
+  - Green tag + checkmark for exact matches
+  - Blue tag + checkmark for similar matches  
+  - Orange tag + plus icon for creating new items
+- ✅ Confirmation modal before creating new items when similar items exist, showing up to 3 similar alternatives
+- ✅ Warning alert below input field showing similar items with clickable links to select them instead
+- ✅ Clean input display using `optionLabelProp="value"` to show only text (no icon overlap) after selection
+
+**Impact**: Significantly improves data quality and prevents accidental duplicate items. Users are now guided to reuse existing items when appropriate.
 
 ### Unit Price & Quantity Tracking ✅ Implemented
 
