@@ -1,9 +1,20 @@
 import { Hono } from "hono";
 import { sign } from "hono/jwt";
 import bcrypt from "bcryptjs";
-import type { Env } from "../types";
+import type { Env, HonoVariables, UserPayload } from "../types";
 
-const authRouter = new Hono<{ Bindings: Env }>();
+const authRouter = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
+
+const defaultCategories = [
+  { name: "Salary", type: "income" },
+  { name: "Freelance", type: "income" },
+  { name: "Food & Dining", type: "expense" },
+  { name: "Transport", type: "expense" },
+  { name: "Housing", type: "expense" },
+  { name: "Entertainment", type: "expense" },
+  { name: "Healthcare", type: "expense" },
+  { name: "Shopping", type: "expense" },
+] as const;
 
 // Register new user
 authRouter.post("/register", async (c) => {
@@ -28,10 +39,7 @@ authRouter.post("/register", async (c) => {
     const db = c.env.DB;
 
     // Check if user already exists
-    const existingUser = await db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .bind(email)
-      .first();
+    const existingUser = await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
 
     if (existingUser) {
       return c.json({ error: "User already exists" }, 409);
@@ -41,37 +49,43 @@ authRouter.post("/register", async (c) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Insert user
-    const result = await db
-      .prepare(
-        "INSERT INTO users (email, password_hash, username) VALUES (?, ?, ?)"
-      )
-      .bind(email, passwordHash, username)
-      .run();
+    const result = await db.prepare("INSERT INTO users (email, password_hash, username) VALUES (?, ?, ?)").bind(email, passwordHash, username).run();
 
     if (!result.success) {
       return c.json({ error: "Failed to create user" }, 500);
     }
 
+    const userId = Number(result.meta.last_row_id);
+
+    for (const category of defaultCategories) {
+      await db.prepare(
+        "INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, NULL, NULL, ?)"
+      ).bind(category.name, category.type, userId).run();
+    }
+
     // Generate JWT token
     const token = await sign(
       {
-        sub: result.meta.last_row_id,
+        sub: userId,
         email,
         username,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // 7 days
       },
-      c.env.JWT_SECRET
+      c.env.JWT_SECRET,
     );
 
-    return c.json({
-      message: "User registered successfully",
-      token,
-      user: {
-        id: result.meta.last_row_id,
-        email,
-        username,
+    return c.json(
+      {
+        message: "User registered successfully",
+        token,
+        user: {
+          id: userId,
+          email,
+          username,
+        },
       },
-    }, 201);
+      201,
+    );
   } catch (error) {
     console.error("Registration error:", error);
     return c.json({ error: "Internal server error" }, 500);
@@ -90,10 +104,7 @@ authRouter.post("/login", async (c) => {
     const db = c.env.DB;
 
     // Get user from database
-    const user = await db
-      .prepare("SELECT id, email, username, password_hash FROM users WHERE email = ?")
-      .bind(email)
-      .first();
+    const user = await db.prepare("SELECT id, email, username, password_hash FROM users WHERE email = ?").bind(email).first();
 
     if (!user) {
       return c.json({ error: "Invalid credentials" }, 401);
@@ -114,7 +125,7 @@ authRouter.post("/login", async (c) => {
         username: user.username,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7, // 7 days
       },
-      c.env.JWT_SECRET
+      c.env.JWT_SECRET,
     );
 
     return c.json({
@@ -135,17 +146,14 @@ authRouter.post("/login", async (c) => {
 // Get current user (protected route)
 authRouter.get("/me", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
-    
+    const payload = c.get("jwtPayload") as UserPayload;
+
     if (!payload) {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
     const db = c.env.DB;
-    const user = await db
-      .prepare("SELECT id, email, username, created_at FROM users WHERE id = ?")
-      .bind(payload.sub)
-      .first();
+    const user = await db.prepare("SELECT id, email, username, created_at FROM users WHERE id = ?").bind(payload.sub).first();
 
     if (!user) {
       return c.json({ error: "User not found" }, 404);

@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
-import type { Env, Item, ItemWithStats, Transaction } from '../types';
+import type { Env, HonoVariables, Item, ItemWithStats, Transaction } from '../types';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // GET /api/v1/items - List all items with optional stats
 app.get('/', async (c) => {
   const withStats = c.req.query('with_stats') === 'true';
+  const userId = c.get('userId');
   
   try {
     if (withStats) {
@@ -13,28 +14,30 @@ app.get('/', async (c) => {
       const { results } = await c.env.DB.prepare(`
         SELECT 
           i.id,
+          i.user_id,
           i.name,
           i.created_at,
           COUNT(t.id) as total_purchases,
           SUM(t.amount) as total_spent,
           AVG(t.amount) as average_price,
           MAX(t.date) as last_purchase_date,
-          (SELECT t2.unit_price FROM transactions t2 WHERE t2.item_id = i.id AND t2.unit_price IS NOT NULL ORDER BY t2.date DESC, t2.created_at DESC LIMIT 1) as last_unit_price,
+          (SELECT t2.unit_price FROM transactions t2 WHERE t2.item_id = i.id AND t2.user_id = i.user_id AND t2.unit_price IS NOT NULL ORDER BY t2.date DESC, t2.created_at DESC LIMIT 1) as last_unit_price,
           AVG(CASE WHEN t.unit_price IS NOT NULL THEN t.unit_price ELSE NULL END) as average_unit_price,
           SUM(CASE WHEN t.quantity IS NOT NULL THEN t.quantity ELSE 0 END) as total_quantity,
-          (SELECT t3.unit FROM transactions t3 WHERE t3.item_id = i.id AND t3.unit IS NOT NULL ORDER BY t3.date DESC, t3.created_at DESC LIMIT 1) as unit
+          (SELECT t3.unit FROM transactions t3 WHERE t3.item_id = i.id AND t3.user_id = i.user_id AND t3.unit IS NOT NULL ORDER BY t3.date DESC, t3.created_at DESC LIMIT 1) as unit
         FROM items i
-        LEFT JOIN transactions t ON t.item_id = i.id
+        LEFT JOIN transactions t ON t.item_id = i.id AND t.user_id = i.user_id
+        WHERE i.user_id = ?
         GROUP BY i.id
         ORDER BY last_purchase_date DESC, i.name ASC
-      `).all<ItemWithStats>();
+      `).bind(userId).all<ItemWithStats>();
       
       return c.json(results);
     } else {
       // Get simple item list
       const { results } = await c.env.DB.prepare(
-        'SELECT * FROM items ORDER BY name ASC'
-      ).all<Item>();
+        'SELECT * FROM items WHERE user_id = ? ORDER BY name ASC'
+      ).bind(userId).all<Item>();
       
       return c.json(results);
     }
@@ -46,11 +49,12 @@ app.get('/', async (c) => {
 // GET /api/v1/items/:id - Get single item
 app.get('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const item = await c.env.DB.prepare(
-      'SELECT * FROM items WHERE id = ?'
-    ).bind(id).first<Item>();
+      'SELECT * FROM items WHERE id = ? AND user_id = ?'
+    ).bind(id, userId).first<Item>();
 
     if (!item) {
       return c.json({ error: 'Item not found' }, 404);
@@ -65,12 +69,13 @@ app.get('/:id', async (c) => {
 // GET /api/v1/items/:id/history - Get purchase history for an item
 app.get('/:id/history', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     // First check if item exists
     const item = await c.env.DB.prepare(
-      'SELECT * FROM items WHERE id = ?'
-    ).bind(id).first<Item>();
+      'SELECT * FROM items WHERE id = ? AND user_id = ?'
+    ).bind(id, userId).first<Item>();
 
     if (!item) {
       return c.json({ error: 'Item not found' }, 404);
@@ -78,8 +83,8 @@ app.get('/:id/history', async (c) => {
 
     // Get all transactions for this item
     const { results: transactions } = await c.env.DB.prepare(
-      'SELECT * FROM transactions WHERE item_id = ? ORDER BY date DESC, created_at DESC'
-    ).bind(id).all<Transaction>();
+      'SELECT * FROM transactions WHERE item_id = ? AND user_id = ? ORDER BY date DESC, created_at DESC'
+    ).bind(id, userId).all<Transaction>();
 
     // Calculate statistics
     const transactionsWithUnitPrice = transactions.filter(t => t.unit_price !== null);
@@ -114,6 +119,7 @@ app.get('/:id/history', async (c) => {
 // POST /api/v1/items - Create new item
 app.post('/', async (c) => {
   try {
+    const userId = c.get('userId');
     const body = await c.req.json<{ name: string }>();
     const { name } = body;
 
@@ -124,8 +130,8 @@ app.post('/', async (c) => {
     const now = new Date().toISOString();
 
     const result = await c.env.DB.prepare(
-      'INSERT INTO items (name, created_at) VALUES (?, ?) RETURNING *'
-    ).bind(name.trim(), now).first<Item>();
+      'INSERT INTO items (name, user_id, created_at) VALUES (?, ?, ?) RETURNING *'
+    ).bind(name.trim(), userId, now).first<Item>();
 
     return c.json(result, 201);
   } catch (error: any) {
@@ -139,6 +145,7 @@ app.post('/', async (c) => {
 // PUT /api/v1/items/:id - Update item
 app.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const body = await c.req.json<{ name: string }>();
@@ -149,8 +156,8 @@ app.put('/:id', async (c) => {
     }
 
     const result = await c.env.DB.prepare(
-      'UPDATE items SET name = ? WHERE id = ? RETURNING *'
-    ).bind(name.trim(), id).first<Item>();
+      'UPDATE items SET name = ? WHERE id = ? AND user_id = ? RETURNING *'
+    ).bind(name.trim(), id, userId).first<Item>();
 
     if (!result) {
       return c.json({ error: 'Item not found' }, 404);
@@ -168,11 +175,12 @@ app.put('/:id', async (c) => {
 // DELETE /api/v1/items/:id - Delete item
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const result = await c.env.DB.prepare(
-      'DELETE FROM items WHERE id = ? RETURNING id'
-    ).bind(id).first();
+      'DELETE FROM items WHERE id = ? AND user_id = ? RETURNING id'
+    ).bind(id, userId).first();
 
     if (!result) {
       return c.json({ error: 'Item not found' }, 404);
@@ -187,11 +195,12 @@ app.delete('/:id', async (c) => {
 // GET /api/v1/items/search/:query - Search items by name
 app.get('/search/:query', async (c) => {
   const query = c.req.param('query');
+  const userId = c.get('userId');
   
   try {
     const { results } = await c.env.DB.prepare(
-      'SELECT * FROM items WHERE name LIKE ? ORDER BY name ASC LIMIT 10'
-    ).bind(`%${query}%`).all<Item>();
+      'SELECT * FROM items WHERE user_id = ? AND name LIKE ? ORDER BY name ASC LIMIT 10'
+    ).bind(userId, `%${query}%`).all<Item>();
 
     return c.json(results);
   } catch (error) {

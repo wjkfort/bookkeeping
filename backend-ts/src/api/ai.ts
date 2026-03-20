@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { Env, HonoVariables, UserPayload } from "../types";
 import {
   parseTransactionFromText,
   generateChatResponse,
@@ -7,7 +7,7 @@ import {
   suggestCategory,
 } from "../utils/ai";
 
-const aiRouter = new Hono<{ Bindings: Env }>();
+const aiRouter = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 /**
  * POST /api/v1/ai/parse-transaction
@@ -15,7 +15,7 @@ const aiRouter = new Hono<{ Bindings: Env }>();
  */
 aiRouter.post("/parse-transaction", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
+    const payload = c.get("jwtPayload") as UserPayload;
     const userId = payload.sub;
     const { text, language = "en" } = await c.req.json();
 
@@ -33,8 +33,8 @@ aiRouter.post("/parse-transaction", async (c) => {
     let suggestedCategoryId = null;
     if (parsed.category_hint) {
       const categories = await c.env.DB.prepare(
-        `SELECT id, name FROM categories`
-      ).all();
+        `SELECT id, name FROM categories WHERE user_id = ?`
+      ).bind(userId).all();
 
       const matchedCategory = categories.results.find(
         (cat: any) =>
@@ -65,7 +65,7 @@ aiRouter.post("/parse-transaction", async (c) => {
  */
 aiRouter.post("/chat", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
+    const payload = c.get("jwtPayload") as UserPayload;
     const userId = payload.sub;
     const { message, include_context = true, language = "en" } = await c.req.json();
 
@@ -88,9 +88,10 @@ aiRouter.post("/chat", async (c) => {
         `SELECT t.*, c.name as category_name, c.type as category_type
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id
+         WHERE t.user_id = ?
          ORDER BY t.date DESC
          LIMIT 20`
-      ).all();
+      ).bind(userId).all();
 
       // Get summary for current month
       const now = new Date();
@@ -104,15 +105,15 @@ aiRouter.post("/chat", async (c) => {
           SUM(CASE WHEN c.type = 'expense' THEN t.amount ELSE 0 END) as total_expense
          FROM transactions t
          LEFT JOIN categories c ON t.category_id = c.id
-         WHERE t.date >= ?`
+         WHERE t.user_id = ? AND t.date >= ?`
       )
-        .bind(startOfMonth)
+        .bind(userId, startOfMonth)
         .first();
 
       // Get categories
       const categories = await c.env.DB.prepare(
-        `SELECT name, type FROM categories`
-      ).all();
+        `SELECT name, type FROM categories WHERE user_id = ?`
+      ).bind(userId).all();
 
       context = {
         recentTransactions: recentTransactions.results,
@@ -136,8 +137,8 @@ aiRouter.post("/chat", async (c) => {
         let categoryId = null;
         if (transactionData.category_hint) {
           const categories = await c.env.DB.prepare(
-            `SELECT id, name FROM categories`
-          ).all();
+            `SELECT id, name FROM categories WHERE user_id = ?`
+          ).bind(userId).all();
 
           const matchedCategory = categories.results.find(
             (cat: any) =>
@@ -151,9 +152,9 @@ aiRouter.post("/chat", async (c) => {
             // Category doesn't exist, create it
             console.log("Creating new category:", transactionData.category_hint);
             const newCategory = await c.env.DB.prepare(
-              `INSERT INTO categories (name, type) VALUES (?, 'expense') RETURNING id`
+              `INSERT INTO categories (name, type, user_id) VALUES (?, 'expense', ?) RETURNING id`
             )
-              .bind(transactionData.category_hint)
+              .bind(transactionData.category_hint, userId)
               .first();
             
             categoryId = newCategory?.id;
@@ -164,8 +165,8 @@ aiRouter.post("/chat", async (c) => {
         if (!categoryId) {
           // Default to first expense category
           const defaultCategory = await c.env.DB.prepare(
-            `SELECT id FROM categories WHERE type = 'expense' LIMIT 1`
-          ).first();
+            `SELECT id FROM categories WHERE user_id = ? AND type = 'expense' LIMIT 1`
+          ).bind(userId).first();
           categoryId = defaultCategory?.id;
         }
 
@@ -173,9 +174,9 @@ aiRouter.post("/chat", async (c) => {
         let itemId = null;
         if (transactionData.item_name) {
           const existingItem = await c.env.DB.prepare(
-            `SELECT id FROM items WHERE name = ?`
+            `SELECT id FROM items WHERE name = ? AND user_id = ?`
           )
-            .bind(transactionData.item_name)
+            .bind(transactionData.item_name, userId)
             .first();
 
           if (existingItem) {
@@ -184,9 +185,9 @@ aiRouter.post("/chat", async (c) => {
           } else {
             console.log("Creating new item:", transactionData.item_name);
             const newItem = await c.env.DB.prepare(
-              `INSERT INTO items (name) VALUES (?) RETURNING id`
+              `INSERT INTO items (name, user_id) VALUES (?, ?) RETURNING id`
             )
-              .bind(transactionData.item_name)
+              .bind(transactionData.item_name, userId)
               .first();
             itemId = newItem?.id;
             console.log("Created item with ID:", itemId);
@@ -196,10 +197,11 @@ aiRouter.post("/chat", async (c) => {
         // Create transaction
         const today = new Date().toISOString().split('T')[0];
         await c.env.DB.prepare(
-          `INSERT INTO transactions (amount, currency, description, date, category_id, item_id)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO transactions (user_id, amount, currency, description, date, category_id, item_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
           .bind(
+            userId,
             transactionData.amount,
             transactionData.currency || 'USD',
             transactionData.description,
@@ -241,7 +243,7 @@ aiRouter.post("/chat", async (c) => {
  */
 aiRouter.get("/chat/history", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
+    const payload = c.get("jwtPayload") as UserPayload;
     const userId = payload.sub;
     const limit = parseInt(c.req.query("limit") || "50");
 
@@ -271,7 +273,7 @@ aiRouter.get("/chat/history", async (c) => {
  */
 aiRouter.post("/analyze", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
+    const payload = c.get("jwtPayload") as UserPayload;
     const userId = payload.sub;
     const { timeframe = "month", limit = 50, language = "en" } = await c.req.json();
 
@@ -300,11 +302,11 @@ aiRouter.post("/analyze", async (c) => {
       `SELECT t.*, c.name as category_name, c.type as category_type
        FROM transactions t
        LEFT JOIN categories c ON t.category_id = c.id
-       WHERE t.date >= ?
+       WHERE t.user_id = ? AND t.date >= ?
        ORDER BY t.date DESC
        LIMIT ?`
     )
-      .bind(startDateStr, limit)
+      .bind(userId, startDateStr, limit)
       .all();
 
     if (!transactions.results || transactions.results.length === 0) {
@@ -342,7 +344,7 @@ aiRouter.post("/analyze", async (c) => {
  */
 aiRouter.post("/suggest-category", async (c) => {
   try {
-    const payload = c.get("jwtPayload");
+    const payload = c.get("jwtPayload") as UserPayload;
     const userId = payload.sub;
     const { description } = await c.req.json();
 
@@ -352,8 +354,8 @@ aiRouter.post("/suggest-category", async (c) => {
 
     // Get user's categories
     const categories = await c.env.DB.prepare(
-      `SELECT id, name FROM categories`
-    ).all();
+      `SELECT id, name FROM categories WHERE user_id = ?`
+    ).bind(userId).all();
 
     const categoryNames = categories.results.map((cat: any) => cat.name);
 

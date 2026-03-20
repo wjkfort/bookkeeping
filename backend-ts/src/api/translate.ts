@@ -17,7 +17,7 @@ app.post('/', async (c) => {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from_lang}&tl=${to_lang}&dt=t&q=${encodeURIComponent(text)}`;
     
     const response = await fetch(url);
-    const data = await response.json();
+    const data = await response.json() as any[];
     
     // Extract translated text from response
     const translatedText = data[0][0][0];

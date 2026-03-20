@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import type { Env } from "./types";
+import type { Env, HonoVariables } from "./types";
 import categoriesRouter from "./api/categories";
 import transactionsRouter from "./api/transactions";
 import summaryRouter from "./api/summary";
@@ -11,7 +11,7 @@ import authRouter from "./api/auth";
 import aiRouter from "./api/ai";
 import { authMiddleware } from "./middleware/auth";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // CORS middleware
 app.use(
@@ -42,7 +42,7 @@ app.get("/", (c) => {
 });
 
 // API routes
-const api = new Hono<{ Bindings: Env }>();
+const api = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // Public routes (no auth required)
 api.route("/auth", authRouter);

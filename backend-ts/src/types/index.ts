@@ -10,8 +10,9 @@ export interface Env {
 
 export interface Category {
   id: number;
+  user_id: number;
   name: string;
-  type: 'income' | 'expense';
+  type: "income" | "expense";
   parent_id: number | null;
   translations: CategoryTranslations | null;
   created_at: string;
@@ -25,6 +26,7 @@ export interface CategoryTranslations {
 
 export interface Transaction {
   id: number;
+  user_id: number;
   amount: number;
   currency: string;
   description: string | null;
@@ -50,12 +52,14 @@ export interface ExchangeRate {
 
 export interface Item {
   id: number;
+  user_id: number;
   name: string;
   created_at: string;
 }
 
 export interface ItemWithStats {
   id: number;
+  user_id: number;
   name: string;
   created_at: string;
   total_purchases: number;
@@ -78,14 +82,14 @@ export interface Summary {
 // Request/Response types
 export interface CreateCategoryRequest {
   name: string;
-  type: 'income' | 'expense';
+  type: "income" | "expense";
   parent_id?: number | null;
   translations?: CategoryTranslations;
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
-  type?: 'income' | 'expense';
+  type?: "income" | "expense";
   parent_id?: number | null;
   translations?: CategoryTranslations;
 }
@@ -132,4 +136,16 @@ export interface ConvertCurrencyRequest {
   amount: number;
   from_currency: string;
   to_currency: string;
+}
+
+export interface UserPayload {
+  sub: number;
+  email?: string;
+  username?: string;
+  exp?: number;
+}
+
+export interface HonoVariables {
+  jwtPayload: UserPayload;
+  userId: number;
 }

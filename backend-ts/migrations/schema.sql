@@ -4,21 +4,24 @@
 -- Categories table
 CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
     parent_id INTEGER,
     translations TEXT, -- JSON string: {"en": "Food", "zh": "食物"}
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE,
-    UNIQUE(name, parent_id)
+    UNIQUE(name, parent_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);
 CREATE INDEX IF NOT EXISTS idx_categories_type ON categories(type);
+CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
 
 -- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     amount REAL NOT NULL,
     currency TEXT NOT NULL DEFAULT 'USD' CHECK(length(currency) = 3),
     description TEXT,
@@ -35,6 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_category_id ON transactions(category
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_transactions_currency ON transactions(currency);
 CREATE INDEX IF NOT EXISTS idx_transactions_item_id ON transactions(item_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 
 -- Exchange rates table
 CREATE TABLE IF NOT EXISTS exchange_rates (
@@ -52,8 +56,11 @@ CREATE INDEX IF NOT EXISTS idx_exchange_rates_lookup ON exchange_rates(base_curr
 -- Items table for purchase history tracking
 CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    name TEXT NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(name, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
+CREATE INDEX IF NOT EXISTS idx_items_user_id ON items(user_id);

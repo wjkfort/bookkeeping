@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import type { Env, Category, CreateCategoryRequest, UpdateCategoryRequest } from '../types';
+import type { Env, HonoVariables, Category, CreateCategoryRequest, UpdateCategoryRequest } from '../types';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // Helper function to build category tree
 function buildCategoryTree(categories: Category[]): Category[] {
@@ -33,11 +33,12 @@ function buildCategoryTree(categories: Category[]): Category[] {
 // GET /api/v1/categories - List all categories
 app.get('/', async (c) => {
   const flat = c.req.query('flat') === 'true';
+  const userId = c.get('userId');
   
   try {
     const { results } = await c.env.DB.prepare(
-      'SELECT * FROM categories ORDER BY created_at ASC'
-    ).all<Category>();
+      'SELECT * FROM categories WHERE user_id = ? ORDER BY created_at ASC'
+    ).bind(userId).all<Category>();
 
     const categories = results.map(cat => ({
       ...cat,
@@ -58,11 +59,12 @@ app.get('/', async (c) => {
 // GET /api/v1/categories/:id - Get single category
 app.get('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const category = await c.env.DB.prepare(
-      'SELECT * FROM categories WHERE id = ?'
-    ).bind(id).first<Category>();
+      'SELECT * FROM categories WHERE id = ? AND user_id = ?'
+    ).bind(id, userId).first<Category>();
 
     if (!category) {
       return c.json({ error: 'Category not found' }, 404);
@@ -80,6 +82,7 @@ app.get('/:id', async (c) => {
 // POST /api/v1/categories - Create category
 app.post('/', async (c) => {
   try {
+    const userId = c.get('userId');
     const body = await c.req.json<CreateCategoryRequest>();
     const { name, type, parent_id, translations } = body;
 
@@ -91,11 +94,21 @@ app.post('/', async (c) => {
       return c.json({ error: 'Type must be income or expense' }, 400);
     }
 
+    if (parent_id !== undefined && parent_id !== null) {
+      const parent = await c.env.DB.prepare(
+        'SELECT id FROM categories WHERE id = ? AND user_id = ?'
+      ).bind(parent_id, userId).first();
+
+      if (!parent) {
+        return c.json({ error: 'Parent category not found' }, 404);
+      }
+    }
+
     const translationsJson = translations ? JSON.stringify(translations) : null;
 
     const result = await c.env.DB.prepare(
-      'INSERT INTO categories (name, type, parent_id, translations) VALUES (?, ?, ?, ?) RETURNING *'
-    ).bind(name, type, parent_id || null, translationsJson).first<Category>();
+      'INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, ?, ?, ?) RETURNING *'
+    ).bind(name, type, parent_id || null, translationsJson, userId).first<Category>();
 
     return c.json({
       ...result,
@@ -112,6 +125,7 @@ app.post('/', async (c) => {
 // PUT /api/v1/categories/:id - Update category
 app.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const body = await c.req.json<UpdateCategoryRequest>();
@@ -130,6 +144,15 @@ app.put('/:id', async (c) => {
       values.push(body.type);
     }
     if (body.parent_id !== undefined) {
+      if (body.parent_id !== null) {
+        const parent = await c.env.DB.prepare(
+          'SELECT id FROM categories WHERE id = ? AND user_id = ?'
+        ).bind(body.parent_id, userId).first();
+
+        if (!parent) {
+          return c.json({ error: 'Parent category not found' }, 404);
+        }
+      }
       updates.push('parent_id = ?');
       values.push(body.parent_id);
     }
@@ -142,10 +165,10 @@ app.put('/:id', async (c) => {
       return c.json({ error: 'No fields to update' }, 400);
     }
 
-    values.push(id);
+    values.push(id, userId);
 
     const result = await c.env.DB.prepare(
-      `UPDATE categories SET ${updates.join(', ')} WHERE id = ? RETURNING *`
+      `UPDATE categories SET ${updates.join(', ')} WHERE id = ? AND user_id = ? RETURNING *`
     ).bind(...values).first<Category>();
 
     if (!result) {
@@ -164,11 +187,12 @@ app.put('/:id', async (c) => {
 // DELETE /api/v1/categories/:id - Delete category
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  const userId = c.get('userId');
   
   try {
     const result = await c.env.DB.prepare(
-      'DELETE FROM categories WHERE id = ? RETURNING id'
-    ).bind(id).first();
+      'DELETE FROM categories WHERE id = ? AND user_id = ? RETURNING id'
+    ).bind(id, userId).first();
 
     if (!result) {
       return c.json({ error: 'Category not found' }, 404);

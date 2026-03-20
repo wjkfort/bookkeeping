@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
-import type { Env, Summary } from '../types';
+import type { Env, HonoVariables, Summary } from '../types';
 import { getExchangeRate } from '../utils/currency';
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // GET /api/v1/summary - Get income/expense summary
 app.get('/', async (c) => {
   const target_currency = c.req.query('target_currency') || 'USD';
   const start_date = c.req.query('start_date');
   const end_date = c.req.query('end_date');
+  const userId = c.get('userId');
   
   try {
     let query = `
@@ -18,9 +19,9 @@ app.get('/', async (c) => {
         c.type
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
-      WHERE 1=1
+      WHERE t.user_id = ?
     `;
-    const params: any[] = [];
+    const params: any[] = [userId];
 
     if (start_date) {
       query += ' AND t.date >= ?';
