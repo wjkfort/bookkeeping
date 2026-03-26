@@ -163,7 +163,7 @@ const Items: React.FC = () => {
       key: "unit_price",
       render: (_, record) => {
         if (record.unit_price && record.unit) {
-          return `${formatCurrency(record.unit_price, "USD")}/${t(`units.${record.unit}`)}`;
+          return `${formatWithConversion(record.unit_price, record.currency)}/${t(`units.${record.unit}`)}`;
         }
         return "-";
       },
@@ -227,10 +227,10 @@ const Items: React.FC = () => {
                   <Statistic title={t("items.totalPurchases")} value={selectedItem.stats.total_purchases} />
                 </Col>
                 <Col span={8} style={{ textAlign: "center" }}>
-                  <Statistic title={t("items.totalSpent")} value={formatCurrency(selectedItem.stats.total_spent, "USD")} />
+                  <Statistic title={t("items.totalSpent")} value={formatCurrency(selectedItem.stats.total_spent)} />
                 </Col>
                 <Col span={8} style={{ textAlign: "center" }}>
-                  <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItem.stats.average_price, "USD")} />
+                  <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItem.stats.average_price)} />
                 </Col>
               </Row>
             </div>
@@ -258,10 +258,13 @@ const Items: React.FC = () => {
                   tooltip={{
                     title: (d) => d.date,
                     items: [
-                      (d) => ({
-                        name: t("transactions.unitPrice"),
-                        value: formatCurrency(d.price, "USD"),
-                      }),
+                      (d, idx) => {
+                        const transaction = selectedItem.transactions.filter((t) => t.unit_price !== null).reverse()[idx];
+                        return {
+                          name: t("transactions.unitPrice"),
+                          value: formatWithConversion(d.price, transaction?.currency || "USD"),
+                        };
+                      },
                     ],
                   }}
                   height={250}
