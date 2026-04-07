@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu, Button } from "antd";
-import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined } from "@ant-design/icons";
+import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined, ThunderboltOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import Dashboard from "./components/features/Dashboard";
 import Transactions from "./components/features/Transactions";
 import Categories from "./components/features/Categories";
 import Items from "./components/features/Items";
+import UtilityAddresses from "./components/features/UtilityAddresses";
+import UtilityReadings from "./components/features/UtilityReadings";
 import AIChat from "./components/features/ai/AIChat";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
@@ -62,6 +64,16 @@ function AppContent() {
       icon: <ShoppingOutlined />,
       label: <Link to="/items">{t("nav.items")}</Link>,
     },
+    {
+      key: "/utility-addresses",
+      icon: <EnvironmentOutlined />,
+      label: <Link to="/utility-addresses">{t("nav.utilityAddresses")}</Link>,
+    },
+    {
+      key: "/utility-readings",
+      icon: <ThunderboltOutlined />,
+      label: <Link to="/utility-readings">{t("nav.utilityReadings")}</Link>,
+    },
   ];
 
   // Don't show header on login/register pages
@@ -108,6 +120,8 @@ function AppContent() {
           <Route path="/transactions" element={<ProtectedRoute><Transactions key={`transactions-${refreshKey}`} /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
           <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
+          <Route path="/utility-addresses" element={<ProtectedRoute><UtilityAddresses /></ProtectedRoute>} />
+          <Route path="/utility-readings" element={<ProtectedRoute><UtilityReadings /></ProtectedRoute>} />
         </Routes>
         {!isAuthPage && isAuthenticated && <AIChat onTransactionCreated={handleTransactionCreated} />}
       </Content>

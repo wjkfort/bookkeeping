@@ -88,3 +88,35 @@ export interface ItemHistory {
     unit: string | null;
   };
 }
+
+export interface UtilityReading {
+  id: number;
+  user_id: number;
+  address_id: number;
+  address_name?: string;
+  address_full?: string;
+  type: 'water' | 'electricity';
+  balance: number;
+  record_time: string; // YYYY-MM
+  currency: string;
+  created_at: string;
+}
+
+export interface UtilityReadingsSummary {
+  address_id: number;
+  address_name: string;
+  address_full: string;
+  type: 'water' | 'electricity';
+  currency: string;
+  currentMonth: UtilityReading | null;
+  lastMonth: UtilityReading | null;
+  lastMonthExpense: number; // current balance - last month balance (this month's usage)
+}
+
+export interface UtilityAddress {
+  id: number;
+  user_id: number;
+  name: string;
+  address: string;
+  created_at: string;
+}

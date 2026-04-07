@@ -1,0 +1,24 @@
+.utility-readings-page {
+  padding: 24px;
+}
+
+.utility-readings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.utility-readings-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.utility-readings-filter-card {
+  margin-bottom: 16px;
+}
+
+.utility-readings-table-card {
+  margin-bottom: 16px;
+}

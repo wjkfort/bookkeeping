@@ -1,383 +1,654 @@
 /* Dashboard Styles - Bold, warm, approachable */
 
 .dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* Header */
 .dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 40px;
-  padding-bottom: 24px;
-  border-bottom: 2px solid #f5f5f4;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #f5f5f4;
 }
 
 .dashboard-title {
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, #f4623d 0%, #e89b0b 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.02em;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(135deg, #f4623d 0%, #e89b0b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
 }
 
 .dashboard-subtitle {
-  font-size: 1.125rem;
-  color: #78716c;
-  margin: 8px 0 0 0;
-  font-weight: 500;
+    font-size: 1.125rem;
+    color: #78716c;
+    margin: 8px 0 0 0;
+    font-weight: 500;
+}
+
+/* ========================================
+   Necessary Output - Utility Icons
+   Shared abstraction for water, elec, etc.
+   ======================================== */
+
+/* Container */
+.necessary-output-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 32px;
+    width: 100%;
+}
+
+.necessary-output-title {
+    display: flex;
+    align-items: center;
+}
+
+.necessary-output-address {
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #78716c;
+    white-space: nowrap;
+}
+
+.necessary-output-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 100px;
+}
+
+/* Shared base — every utility icon gets these */
+.utility-icon {
+    position: relative;
+    cursor: pointer;
+    animation: breathe 3s ease-in-out infinite;
+    transition: filter 0.3s ease;
+}
+
+.utility-icon-value {
+    position: absolute;
+    bottom: 16%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Shared ripple ring */
+.utility-ripple-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.utility-icon.ripple .utility-ripple-ring {
+    animation: ripple-out 0.6s ease-out;
+}
+
+/* --- Water Droplet Variant --- */
+.water-droplet {
+    width: 76px;
+    height: 96px;
+    filter: drop-shadow(0 4px 14px rgba(14, 165, 233, 0.4));
+}
+
+.water-droplet:hover {
+    filter: drop-shadow(0 6px 22px rgba(14, 165, 233, 0.6));
+}
+
+.water-droplet .utility-icon-value {
+    text-shadow: 0 1px 3px rgba(2, 132, 199, 0.5);
+}
+
+.water-droplet .utility-ripple-ring {
+    border-color: rgba(56, 189, 248, 0.6);
+}
+
+/* Teardrop shape */
+.water-droplet-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+    background: linear-gradient(180deg, #bae6fd 0%, #e0f2fe 100%);
+    overflow: hidden;
+    box-shadow: inset 0 -2px 6px rgba(2, 132, 199, 0.15);
+}
+
+/* Liquid fill */
+.water-droplet-liquid {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 65%;
+    background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+}
+
+/* CSS wave */
+.water-wave {
+    position: absolute;
+    top: -8px;
+    left: -50%;
+    width: 200%;
+    height: 16px;
+    border-radius: 40%;
+}
+
+.water-wave-1 {
+    background: rgba(125, 211, 252, 0.7);
+    animation: wave-slide 3s ease-in-out infinite;
+}
+
+.water-wave-2 {
+    background: rgba(14, 165, 233, 0.4);
+    top: -5px;
+    animation: wave-slide 3.5s ease-in-out infinite reverse;
+}
+
+@keyframes wave-slide {
+    0%,
+    100% {
+        transform: translateX(0) rotate(0deg);
+    }
+    50% {
+        transform: translateX(25%) rotate(3deg);
+    }
+}
+
+/* Glass highlight */
+.water-droplet-highlight {
+    position: absolute;
+    top: 18%;
+    left: 18%;
+    width: 22%;
+    height: 28%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 100%);
+    border-radius: 50%;
+    transform: rotate(-20deg);
+    pointer-events: none;
+}
+
+/* --- Electricity Bolt Variant --- */
+.elec-bolt {
+    width: 56px;
+    height: 96px;
+    filter: drop-shadow(0 4px 14px rgba(234, 179, 8, 0.4));
+}
+
+.elec-bolt:hover {
+    filter: drop-shadow(0 6px 22px rgba(234, 179, 8, 0.65));
+}
+
+.elec-bolt .utility-icon-value {
+    color: #78350f;
+    text-shadow: 0 1px 2px rgba(251, 191, 36, 0.4);
+    bottom: 12%;
+}
+
+.elec-bolt .utility-ripple-ring {
+    border-color: rgba(251, 191, 36, 0.6);
+}
+
+/* Lightning bolt shape */
+.elec-bolt-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #fde68a 0%, #fbbf24 40%, #f59e0b 100%);
+    clip-path: polygon(55% 0%, 25% 42%, 45% 42%, 20% 100%, 80% 50%, 55% 50%, 75% 0%);
+    overflow: hidden;
+}
+
+.elec-bolt-highlight {
+    position: absolute;
+    top: 10%;
+    left: 15%;
+    width: 30%;
+    height: 35%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
+    border-radius: 50%;
+    transform: rotate(-15deg);
+    pointer-events: none;
+}
+
+/* --- Shared Animations --- */
+@keyframes breathe {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes ripple-out {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 0.7;
+    }
+    100% {
+        width: 130px;
+        height: 130px;
+        opacity: 0;
+    }
+}
+
+/* --- Shared Popover --- */
+.utility-popover-content {
+    padding: 4px 0;
+}
+
+.utility-popover-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.utility-popover-value {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.utility-popover-value--water {
+    color: #0369a1;
+}
+
+.utility-popover-value--elec {
+    color: #b45309;
+}
+
+/* --- Responsive --- */
+@media (max-width: 480px) {
+    .water-droplet {
+        width: 60px;
+        height: 76px;
+    }
+
+    .elec-bolt {
+        width: 44px;
+        height: 76px;
+    }
+
+    .utility-icon-value {
+        font-size: 0.6rem;
+    }
 }
 
 /* Hero Stats - No cards, pure design */
 .hero-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
-  margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
 }
 
 .stat-card {
-  position: relative;
-  padding: 28px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
+    position: relative;
+    padding: 28px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
 }
 
 .stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  opacity: 0.08;
-  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.08;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08);
 }
 
 .stat-card:hover::before {
-  opacity: 0.12;
+    opacity: 0.12;
 }
 
 /* Income stat - softer green */
 .stat-income {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  border: 1px solid #bbf7d0;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #bbf7d0;
 }
 
 .stat-income::before {
-  background: #20b55a;
+    background: #20b55a;
 }
 
 .stat-income .stat-icon {
-  color: #16934a;
+    color: #16934a;
 }
 
 .stat-income .stat-value {
-  color: #15703d;
+    color: #15703d;
 }
 
 /* Expense stat - softer rose */
 .stat-expense {
-  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
-  border: 1px solid #fecdd3;
+    background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+    border: 1px solid #fecdd3;
 }
 
 .stat-expense::before {
-  background: #e63f5a;
+    background: #e63f5a;
 }
 
 .stat-expense .stat-icon {
-  color: #d11d48;
+    color: #d11d48;
 }
 
 .stat-expense .stat-value {
-  color: #ae123c;
+    color: #ae123c;
 }
 
 /* Balance stat - softer terracotta */
 .stat-balance {
-  background: linear-gradient(135deg, #fff5f2 0%, #ffe8e0 100%);
-  border: 1px solid #ffd4c7;
+    background: linear-gradient(135deg, #fff5f2 0%, #ffe8e0 100%);
+    border: 1px solid #ffd4c7;
 }
 
 .stat-balance::before {
-  background: #f4623d;
+    background: #f4623d;
 }
 
 .stat-balance .stat-icon {
-  color: #e04e1f;
+    color: #e04e1f;
 }
 
 .stat-balance .stat-value {
-  color: #c13a0f;
+    color: #c13a0f;
 }
 
 .stat-icon {
-  font-size: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  flex-shrink: 0;
+    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
 }
 
 .stat-content {
-  flex: 1;
-  min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 
 .stat-label {
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #78716c;
-  margin-bottom: 8px;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #78716c;
+    margin-bottom: 8px;
 }
 
 .stat-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 2.25rem;
-  font-weight: 600;
-  line-height: 1;
-  margin-bottom: 4px;
-  letter-spacing: -0.02em;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 2.25rem;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
 }
 
 .stat-currency {
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #a8a29e;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #a8a29e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 /* Chart Cards */
 .chart-card {
-  border-radius: 20px;
-  border: 2px solid #f5f5f4;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 20px;
+    border: 2px solid #f5f5f4;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chart-card:hover {
-  border-color: rgba(255, 107, 61, 0.2);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 107, 61, 0.2);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 .chart-card .ant-card-head {
-  border-bottom: 2px solid #f5f5f4;
-  padding: 24px 32px;
+    border-bottom: 2px solid #f5f5f4;
+    padding: 24px 32px;
 }
 
 .chart-card .ant-card-body {
-  padding: 32px;
+    padding: 32px;
 }
 
 .chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 }
 
 .chart-title {
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #292524;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #292524;
 }
 
 .chart-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.875rem;
-  font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
 }
 
 .chart-toggle span {
-  color: #a8a29e;
-  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    color: #a8a29e;
+    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .chart-toggle span.active {
-  color: #ff6b3d;
+    color: #ff6b3d;
 }
 
 .chart-toggle .ant-switch-checked {
-  background: #f43f5e;
+    background: #f43f5e;
 }
 
 .chart-toggle .ant-switch {
-  background: #22c55e;
+    background: #22c55e;
 }
 
 /* Transactions Card */
 .transactions-card {
-  border-radius: 20px;
-  border: 2px solid #f5f5f4;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    border-radius: 20px;
+    border: 2px solid #f5f5f4;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
 .transactions-card .ant-card-head {
-  border-bottom: 2px solid #f5f5f4;
-  padding: 24px 32px;
+    border-bottom: 2px solid #f5f5f4;
+    padding: 24px 32px;
 }
 
 .transactions-card .ant-card-body {
-  padding: 0;
+    padding: 0;
 }
 
 .card-title {
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #292524;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #292524;
 }
 
 /* Empty State */
 .empty-state {
-  text-align: center;
-  padding: 80px 24px;
-  color: #a8a29e;
+    text-align: center;
+    padding: 80px 24px;
+    color: #a8a29e;
 }
 
 .empty-state p {
-  font-size: 1.125rem;
-  margin: 0;
+    font-size: 1.125rem;
+    margin: 0;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .dashboard-header {
-    flex-direction: column;
-    gap: 20px;
-    align-items: stretch;
-  }
+    .dashboard-header {
+        flex-direction: column;
+        gap: 20px;
+        align-items: stretch;
+    }
 
-  .dashboard-title {
-    font-size: 2rem;
-  }
+    .dashboard-title {
+        font-size: 2rem;
+    }
 
-  .hero-stats {
-    grid-template-columns: 1fr;
-  }
+    .hero-stats {
+        grid-template-columns: 1fr;
+    }
 
-  .stat-card {
-    padding: 24px;
-  }
+    .stat-card {
+        padding: 24px;
+    }
 
-  .stat-icon {
-    width: 64px;
-    height: 64px;
-    font-size: 36px;
-  }
+    .stat-icon {
+        width: 64px;
+        height: 64px;
+        font-size: 36px;
+    }
 
-  .stat-value {
-    font-size: 2rem;
-  }
+    .stat-value {
+        font-size: 2rem;
+    }
 
-  .chart-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  
-  .chart-card .ant-card-head {
-    padding: 20px 24px;
-  }
-  
-  .chart-card .ant-card-body {
-    padding: 24px;
-  }
+    .chart-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .chart-card .ant-card-head {
+        padding: 20px 24px;
+    }
+
+    .chart-card .ant-card-body {
+        padding: 24px;
+    }
 }
 
 @media (max-width: 480px) {
-  .dashboard-title {
-    font-size: 1.75rem;
-  }
-  
-  .stat-value {
-    font-size: 1.75rem;
-  }
-  
-  .stat-icon {
-    width: 56px;
-    height: 56px;
-    font-size: 32px;
-  }
+    .dashboard-title {
+        font-size: 1.75rem;
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+    }
+
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        font-size: 32px;
+    }
 }
 
 /* Radio button group styling */
 .ant-radio-group {
-  display: flex;
-  gap: 4px;
+    display: flex;
+    gap: 4px;
 }
 
 .ant-radio-button-wrapper {
-  border-radius: 8px !important;
-  border: 2px solid #e7e5e4 !important;
-  font-weight: 600;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 8px !important;
+    border: 2px solid #e7e5e4 !important;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ant-radio-button-wrapper:hover {
-  color: #ff6b3d;
-  border-color: rgba(255, 107, 61, 0.3) !important;
+    color: #ff6b3d;
+    border-color: rgba(255, 107, 61, 0.3) !important;
 }
 
 .ant-radio-button-wrapper-checked {
-  background: linear-gradient(135deg, #ff6b3d 0%, #f04e1f 100%) !important;
-  border-color: #ff6b3d !important;
-  color: white !important;
+    background: linear-gradient(135deg, #ff6b3d 0%, #f04e1f 100%) !important;
+    border-color: #ff6b3d !important;
+    color: white !important;
 }
 
 .ant-radio-button-wrapper-checked:hover {
-  color: white !important;
+    color: white !important;
 }
 
 .ant-radio-button-wrapper::before {
-  display: none;
+    display: none;
 }
 
 /* Chart improvements */
 .recharts-pie-label-text {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  fill: #292524;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    fill: #292524;
 }
 
 .recharts-legend-item-text {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 500;
-  color: #57534e !important;
+    font-family: "Inter", system-ui, sans-serif;
+    font-weight: 500;
+    color: #57534e !important;
 }
 
 .recharts-cartesian-axis-tick-value {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 12px;
-  fill: #78716c;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 12px;
+    fill: #78716c;
 }

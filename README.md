@@ -19,6 +19,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - Dashboard with Charts
 - Real-time Exchange Rates
 - **Item Purchase History Tracking** - Track recurring purchases and view purchase history
+- **Utility Readings Management** - Track monthly water/electricity meter readings and expenses
 
 ## Documentation
 
@@ -256,6 +257,38 @@ _No known issues at this time._
 ### Transaction Table Total Amount ✅ Added
 
 **Feature**: Transaction tables now display a total amount row at the bottom, showing the sum of all displayed transactions in the current currency.
+
+### Utility Readings Management ✅ Implemented
+
+**Feature**: Track monthly water and electricity meter readings with expense calculation per billing period.
+
+**What's New**:
+- **Utility Addresses**: Manage multiple property addresses (e.g., "Home", "Office")
+- **Monthly Readings**: Record water and electricity meter readings per address
+- **Expense Calculation**: Automatically calculates usage = last month balance - current month balance
+- **Dashboard Widget**: Visual icons showing current month utility expenses with popover details
+- **Per-User Data Isolation**: Each user's data is private and isolated
+
+**How to Use**:
+1. Go to "Utility Addresses" page to add your properties
+2. Go to "Utilities" page to record monthly meter readings
+3. View expense on Dashboard - click the water/electricity icons for details
+
+**Technical Implementation**:
+- `utility_addresses` table: stores address name and full address per user
+- `utility_readings` table: stores monthly balance per address_id + type (water/electricity)
+- Foreign key relationship: `address_id` references `utility_addresses(id)`
+- Summary endpoint calculates: `lastMonthExpense = lastBalance - currentBalance`
+- Frontend: UtilityAddresses.tsx, UtilityReadings.tsx components with full CRUD
+
+**Database Setup**:
+```bash
+cd backend-ts
+npx wrangler d1 execute bookkeeping-db --local --file=./migrations/add_utility_addresses_table.sql
+npx wrangler d1 execute bookkeeping-db --local --file=./migrations/add_utility_readings_table.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_utility_addresses_table.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_utility_readings_table.sql
+```
 
 ## Planned Features
 

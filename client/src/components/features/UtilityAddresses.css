@@ -1,0 +1,20 @@
+.utility-addresses-page {
+  padding: 24px;
+}
+
+.utility-addresses-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.utility-addresses-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.utility-addresses-table-card {
+  margin-bottom: 16px;
+}

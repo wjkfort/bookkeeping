@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal, App } from "antd";
-import { ArrowUpOutlined, ArrowDownOutlined, WalletOutlined, ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
+import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal, App, Popover } from "antd";
+import { WalletOutlined, ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from "@ant-design/plots";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getSummary, getTransactions, getCategories, getItems, getItemHistory } from "../../api";
-import { Summary, Transaction, Category, Item, ItemHistory } from "../../types";
+import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses } from "../../api";
+import { Summary, Transaction, Category, Item, ItemHistory, UtilityReadingsSummary, UtilityAddress } from "../../types";
 import TransactionTable from "./TransactionTable";
 import AIInsights from "./ai/AIInsights";
 import dayjs, { Dayjs } from "dayjs";
@@ -31,24 +31,26 @@ const Dashboard: React.FC = () => {
   const [isOverall, setIsOverall] = useState(false);
   const [itemHistoryModalVisible, setItemHistoryModalVisible] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
-
-  // Helper function to get translated category name
-  const getCategoryName = (categoryId: number): string => {
-    const category = categories.find((cat) => cat.id === categoryId);
-    if (!category) return "";
-
-    if (category.translations && category.translations[i18n.language]) {
-      return category.translations[i18n.language];
-    }
-    if (category.translations && category.translations["en"]) {
-      return category.translations["en"];
-    }
-    return category.name;
-  };
+  const [utilitySummaries, setUtilitySummaries] = useState<UtilityReadingsSummary[]>([]);
+  const [utilityAddresses, setUtilityAddresses] = useState<UtilityAddress[]>([]);
 
   useEffect(() => {
     loadData();
   }, [currencyCode, i18n.language, barChartRange, selectedMonth, isOverall]);
+
+  useEffect(() => {
+    loadUtilityData();
+  }, []);
+
+  const loadUtilityData = async () => {
+    try {
+      const [addressesRes, summaryRes] = await Promise.all([getUtilityAddresses(), getUtilityReadingsSummary()]);
+      setUtilityAddresses(addressesRes.data);
+      setUtilitySummaries(summaryRes.data);
+    } catch (error) {
+      console.error("Error loading utility data:", error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -263,7 +265,6 @@ const Dashboard: React.FC = () => {
   const filteredMonthlyData = monthlyData.filter((item) => (showExpense ? item.type === "expense" : item.type === "income"));
 
   const isViewingSpecificMonth = !isOverall && selectedMonth && !selectedMonth.isSame(dayjs(), "month");
-  const effectiveBarChartRange = isViewingSpecificMonth ? "month" : barChartRange;
 
   const getBarChartTitle = () => {
     if (isViewingSpecificMonth) {
@@ -305,7 +306,65 @@ const Dashboard: React.FC = () => {
         </Space>
       </div>
 
-      {/* Hero Stats - No cards, just beautiful typography and color */}
+      {/* Utility Readings - Water & Electricity */}
+      {utilitySummaries.length > 0 && (
+        <div className="necessary-output-wrapper">
+          <div className="necessary-output-title">
+            <span className="necessary-output-address">🏠 {utilityAddresses[0]?.name || t("dashboard.utilities")}</span>
+          </div>
+          <div className="necessary-output-icons">
+            {utilitySummaries.map((summary) => (
+              <Popover
+                key={`${summary.address_id}-${summary.type}`}
+                trigger="click"
+                placement="rightTop"
+                styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
+                content={
+                  <div className="utility-popover-content">
+                    <div className="utility-popover-label">{summary.type === "water" ? t("dashboard.lastMonthWaterExpense") || "This Month Water" : t("dashboard.lastMonthElecExpense") || "This Month Electricity"}</div>
+                    <div className={`utility-popover-value ${summary.type === "water" ? "utility-popover-value--water" : "utility-popover-value--elec"}`}>
+                      {summary.currency === "CNY" ? "¥" : "$"}
+                      {summary.lastMonthExpense.toFixed(2)}
+                    </div>
+                  </div>
+                }
+              >
+                <div
+                  className={`utility-icon ${summary.type === "water" ? "water-droplet" : "elec-bolt"}`}
+                  onClick={(e) => {
+                    e.currentTarget.classList.add("ripple");
+                    setTimeout(() => e.currentTarget.classList.remove("ripple"), 600);
+                  }}
+                >
+                  {summary.type === "water" ? (
+                    <>
+                      <div className="water-droplet-body">
+                        <div className="water-droplet-liquid">
+                          <div className="water-wave water-wave-1" />
+                          <div className="water-wave water-wave-2" />
+                        </div>
+                        <div className="water-droplet-highlight" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="elec-bolt-body">
+                        <div className="elec-bolt-highlight" />
+                      </div>
+                    </>
+                  )}
+                  <span className="utility-icon-value">
+                    {summary.currency === "CNY" ? "¥" : "$"}
+                    {summary.currentMonth?.balance?.toFixed(2)}
+                  </span>
+                  <span className="utility-ripple-ring" />
+                </div>
+              </Popover>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="hero-stats">
         <div className="stat-card stat-income">
           <div className="stat-icon">
