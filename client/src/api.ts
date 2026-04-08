@@ -213,4 +213,12 @@ export const updateSubscription = (id: number, data: {
 
 export const deleteSubscription = (id: number): Promise<AxiosResponse<void>> => api.delete(`/subscriptions/${id}`);
 
+// Proxy
+export const proxyImage = (imageUrl: string): string => {
+  const baseUrl = import.meta.env.PROD
+    ? "https://bookkeeping-backend.stringwjk.workers.dev/api/v1"
+    : "http://localhost:8787/api/v1";
+  return `${baseUrl}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
+};
+
 export default api;

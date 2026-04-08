@@ -14,6 +14,7 @@ import utilityAddressesRouter from "./api/utility-addresses";
 import utilityTypesRouter from "./api/utility-types";
 import { authMiddleware } from "./middleware/auth";
 import subscriptionsRouter from "./api/subscriptions";
+import proxyRouter from "./api/proxy";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -50,6 +51,7 @@ const api = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
 // Public routes (no auth required)
 api.route("/auth", authRouter);
+api.route("/proxy", proxyRouter);
 
 // Protected routes (auth required)
 api.use("/categories/*", authMiddleware);

@@ -5,7 +5,7 @@ import { WalletOutlined, ArrowLeftOutlined, LineChartOutlined, RiseOutlined, Fal
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from "@ant-design/plots";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses, getSubscriptions, deleteSubscription } from "../../api";
+import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses, getSubscriptions, deleteSubscription, proxyImage } from "../../api";
 import { Summary, Transaction, Category, Item, ItemHistory, UtilityReadingsSummary, UtilityAddress, Subscription } from "../../types";
 import TransactionTable from "./TransactionTable";
 import AIInsights from "./ai/AIInsights";
@@ -517,8 +517,15 @@ const Dashboard: React.FC = () => {
                     }
                   >
                     <div className={`subscription-item ${urgent ? "urgent" : warning ? "warning" : ""}`}>
-                      {sub.icon && sub.icon.startsWith("http") ? (
-                        <img src={sub.icon} alt={sub.name} className="subscription-item-img" />
+                      {sub.icon && (sub.icon.startsWith("http") || sub.icon.startsWith("//")) ? (
+                        <img
+                          src={proxyImage(sub.icon.startsWith("//") ? "https:" + sub.icon : sub.icon)}
+                          alt={sub.name}
+                          className="subscription-item-img"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                       ) : (
                         <span className="subscription-item-icon">{sub.icon || "📦"}</span>
                       )}
