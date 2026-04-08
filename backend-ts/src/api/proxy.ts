@@ -9,6 +9,15 @@ proxyRouter.use('*', cors({
   allowMethods: ['GET', 'OPTIONS'],
 }));
 
+// Transparent 1x1 PNG (base64 decoded)
+const TRANSPARENT_PIXEL = new Uint8Array([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+  0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+  0x42, 0x60, 0x82
+]);
+
 // Proxy image endpoint
 proxyRouter.get('/image', async (c) => {
   const url = c.req.query('url');
@@ -28,13 +37,12 @@ proxyRouter.get('/image', async (c) => {
     return c.json({ error: 'Blocked URL' }, 403);
   }
 
-  const fetchOptions = [
+  const fetchOptionsList = [
     {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
         'Referer': 'https://www.google.com/',
       },
     },
@@ -47,56 +55,50 @@ proxyRouter.get('/image', async (c) => {
     },
   ];
 
-  let lastError: Error | null = null;
+  let lastError: string = 'Unknown error';
   let lastStatus: number | null = null;
 
-  // Try with different fetch options
-  for (let attempt = 0; attempt < fetchOptions.length; attempt++) {
+  for (let attempt = 0; attempt < fetchOptionsList.length; attempt++) {
     try {
-      const response = await fetch(url, fetchOptions[attempt]);
+      const response = await fetch(url, fetchOptionsList[attempt]);
 
-      // If fetch succeeded but non-OK status, log it
       if (!response.ok) {
         lastStatus = response.status;
-        console.log(`Proxy attempt ${attempt + 1} for ${url}: status ${response.status}`);
-        continue; // Try next option
+        lastError = `HTTP ${response.status}`;
+        continue;
       }
 
-      // Check if response is actually an image
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.startsWith('image/')) {
-        console.log(`Proxy: non-image content-type for ${url}: ${contentType}`);
+      // Read body safely
+      let buffer: ArrayBuffer;
+      try {
+        buffer = await response.arrayBuffer();
+      } catch (e) {
+        lastError = 'Failed to read response body';
+        continue;
       }
 
-      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get('content-type') || 'image/png';
 
       return new Response(buffer, {
         headers: {
-          'Content-Type': contentType || 'image/png',
+          'Content-Type': contentType,
           'Cache-Control': 'public, max-age=3600',
           'X-Content-Type-Options': 'nosniff',
         },
       });
-    } catch (error) {
-      lastError = error as Error;
-      console.error(`Proxy attempt ${attempt + 1} error for ${url}:`, lastError.message);
+    } catch (e) {
+      lastError = String((e as Error).message || e);
+      console.error(`Proxy attempt ${attempt + 1} failed for ${url}:`, lastError);
     }
   }
 
-  // All attempts failed - return 200 with minimal transparent pixel as fallback
-  // This prevents broken images from showing errors in the UI
-  console.error(`Proxy all attempts failed for ${url}: status=${lastStatus}, error=${lastError?.message}`);
+  // All attempts failed - return transparent pixel as fallback
+  console.error(`Proxy all attempts failed for ${url}: status=${lastStatus}, error=${lastError}`);
 
-  // Return 1x1 transparent PNG
-  const transparentPixel = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
-    'base64'
-  );
-
-  return new Response(transparentPixel, {
+  return new Response(TRANSPARENT_PIXEL, {
     headers: {
       'Content-Type': 'image/png',
-      'X-Proxy-Error': `failed:${lastStatus || lastError?.message}`,
+      'X-Proxy-Error': `failed:${lastStatus || lastError}`,
     },
   });
 });
