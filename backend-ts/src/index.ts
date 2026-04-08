@@ -13,6 +13,7 @@ import utilityReadingsRouter from "./api/utility-readings";
 import utilityAddressesRouter from "./api/utility-addresses";
 import utilityTypesRouter from "./api/utility-types";
 import { authMiddleware } from "./middleware/auth";
+import subscriptionsRouter from "./api/subscriptions";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -59,6 +60,7 @@ api.use("/ai/*", authMiddleware);
 api.use("/utility-readings/*", authMiddleware);
 api.use("/utility-addresses/*", authMiddleware);
 api.use("/utility-types/*", authMiddleware);
+api.use("/subscriptions/*", authMiddleware);
 
 api.route("/categories", categoriesRouter);
 api.route("/transactions", transactionsRouter);
@@ -70,6 +72,7 @@ api.route("/ai", aiRouter);
 api.route("/utility-readings", utilityReadingsRouter);
 api.route("/utility-addresses", utilityAddressesRouter);
 api.route("/utility-types", utilityTypesRouter);
+api.route("/subscriptions", subscriptionsRouter);
 
 app.route("/api/v1", api);
 

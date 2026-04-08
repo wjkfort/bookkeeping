@@ -36,7 +36,10 @@
     "lastMonthWaterExpense": "Last Month Water",
     "lastMonthElecExpense": "Last Month Electricity",
     "lastMonthExpense": "Last Month {{type}}",
-    "recharges": "Recharges"
+    "recharges": "Recharges",
+    "nextBilling": "Next billing",
+    "daysRemaining": "days remaining",
+    "noSubscriptions": "No subscriptions yet"
   },
   "transactions": {
     "title": "Transactions",
@@ -141,7 +144,28 @@
     "no": "No",
     "cancel": "Cancel",
     "edit": "Edit",
-    "save": "Save"
+    "save": "Save",
+    "create": "Create",
+    "update": "Update",
+    "delete": "Delete"
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "name": "Name",
+    "icon": "Icon (optional)",
+    "endDate": "End Date",
+    "cycle": "Cycle (days)",
+    "namePlaceholder": "e.g., Netflix, Spotify",
+    "addTitle": "Add Subscription",
+    "editTitle": "Edit Subscription",
+    "nameRequired": "Name is required",
+    "endDateRequired": "Date is required",
+    "createSuccess": "Subscription created",
+    "updateSuccess": "Subscription updated",
+    "deleteSuccess": "Subscription deleted",
+    "saveError": "Failed to save subscription",
+    "deleteError": "Failed to delete subscription",
+    "noSubscriptions": "No subscriptions yet"
   },
   "items": {
     "title": "Item Purchase History",

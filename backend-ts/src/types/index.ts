@@ -188,3 +188,17 @@ export interface UtilityReadingsSummary {
   lastMonthExpense: number;
   recharges: number;
 }
+
+export interface Subscription {
+  id: number;
+  user_id: number;
+  name: string;
+  icon: string | null;
+  amount: number;
+  currency: string;
+  end_date: string;
+  cycle: number;
+  category_id: number | null;
+  category_name?: string | null;
+  created_at: string;
+}

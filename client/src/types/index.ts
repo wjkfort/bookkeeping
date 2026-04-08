@@ -135,3 +135,17 @@ export interface UtilityAddress {
   address: string;
   created_at: string;
 }
+
+export interface Subscription {
+  id: number;
+  user_id: number;
+  name: string;
+  icon: string | null;
+  amount: number;
+  currency: string;
+  end_date: string;
+  cycle: number;
+  category_id: number | null;
+  category_name?: string | null;
+  created_at: string;
+}

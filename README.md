@@ -20,6 +20,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - Real-time Exchange Rates
 - Item Purchase History Tracking - Track recurring purchases and view purchase history
 - Utility Readings Management - Track monthly water/electricity meter readings and expenses
+- Subscription Management - Track recurring subscription payments with billing cycle visualization
 
 ## Documentation
 
@@ -30,6 +31,7 @@ A full-stack bookkeeping application with multi-language support and automatic c
 - [Deployment Guide](docs/cloudflare/DEPLOYMENT_GUIDE.md) - Complete deployment instructions
 - [Local Development](docs/cloudflare/LOCAL_DEVELOPMENT.md) - Quick local testing guide
 - [Utility Readings Management](docs/UTILITY_READINGS.md) - Track monthly utility meter readings and expenses
+- [Subscription Management](docs/SUBSCRIPTIONS.md) - Track recurring subscription payments
 
 ### Original Documentation
 - [Hierarchical Categories](docs/HIERARCHICAL_CATEGORIES.md)

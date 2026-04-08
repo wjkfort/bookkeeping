@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory, UtilityReading, UtilityReadingsSummary, UtilityAddress, UtilityType } from "./types";
+import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory, UtilityReading, UtilityReadingsSummary, UtilityAddress, UtilityType, Subscription } from "./types";
 
 // Use environment variable in production, localhost in development
 const API_BASE_URL = import.meta.env.PROD
@@ -185,5 +185,32 @@ export const createUtilityType = (data: { name: string; icon?: string; category_
 export const updateUtilityType = (id: number, data: { name?: string; icon?: string; category_id?: number | null }): Promise<AxiosResponse<UtilityType>> => api.put(`/utility-types/${id}`, data);
 
 export const deleteUtilityType = (id: number): Promise<AxiosResponse<void>> => api.delete(`/utility-types/${id}`);
+
+// Subscriptions
+export const getSubscriptions = (): Promise<AxiosResponse<Subscription[]>> => api.get("/subscriptions");
+
+export const getSubscription = (id: number): Promise<AxiosResponse<Subscription>> => api.get(`/subscriptions/${id}`);
+
+export const createSubscription = (data: {
+  name: string;
+  icon?: string;
+  amount?: number;
+  currency?: string;
+  end_date: string;
+  cycle?: number;
+  category_id?: number | null;
+}): Promise<AxiosResponse<Subscription>> => api.post("/subscriptions", data);
+
+export const updateSubscription = (id: number, data: {
+  name?: string;
+  icon?: string | null;
+  amount?: number;
+  currency?: string;
+  end_date?: string;
+  cycle?: number;
+  category_id?: number | null;
+}): Promise<AxiosResponse<Subscription>> => api.put(`/subscriptions/${id}`, data);
+
+export const deleteSubscription = (id: number): Promise<AxiosResponse<void>> => api.delete(`/subscriptions/${id}`);
 
 export default api;

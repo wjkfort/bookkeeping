@@ -46,8 +46,10 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
-    margin-bottom: 32px;
-    width: 100%;
+    margin-bottom: 0;
+    width: auto;
+    flex-shrink: 0;
+    align-self: stretch;
 }
 
 .necessary-output-title {
@@ -384,7 +386,8 @@
 }
 
 @keyframes satellite-pulse {
-    0%, 100% {
+    0%,
+    100% {
         opacity: 0.5;
         transform: translate(-50%, -50%) rotate(0deg);
     }
@@ -877,4 +880,206 @@
     font-family: "Inter", system-ui, sans-serif;
     font-size: 12px;
     fill: #78716c;
+}
+
+/* ========================================
+   Top Info Row - Utilities & Subscriptions
+   ======================================== */
+
+.top-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 40px;
+    margin-bottom: 32px;
+    width: 100%;
+}
+
+.top-info-row .necessary-output-wrapper {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Subscription Management
+   ======================================== */
+
+.subscription-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.subscription-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.subscription-title {
+    display: flex;
+    align-items: center;
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #78716c;
+}
+
+.subscription-empty {
+    padding: 16px 14px;
+    border-radius: 10px;
+    background: #fafaf9;
+    border: 1.5px dashed #e7e5e4;
+    color: #a8a29e;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.subscription-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 200px;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: #d6d3d1 transparent;
+}
+
+.subscription-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.subscription-scroll::-webkit-scrollbar-thumb {
+    background: #d6d3d1;
+    border-radius: 4px;
+}
+
+.subscription-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.subscription-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #fafaf9;
+    border: 1.5px solid #f5f5f4;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+}
+
+.subscription-item:hover {
+    border-color: #d6d3d1;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.subscription-item.warning {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.subscription-item.urgent {
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.subscription-item-icon {
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.subscription-item-img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.subscription-item .ant-progress {
+    flex: 1;
+    min-width: 80px;
+}
+
+.subscription-item .ant-progress-inner {
+    border-radius: 6px !important;
+}
+
+.subscription-item .ant-progress-bg {
+    border-radius: 6px !important;
+    height: 6px !important;
+}
+
+.subscription-item .ant-progress-outer {
+    padding-right: 0 !important;
+}
+
+/* Popover */
+.subscription-popover-content {
+    padding: 4px 0;
+    min-width: 140px;
+}
+
+.subscription-popover-name {
+    font-family: "Outfit", system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #292524;
+    margin-bottom: 4px;
+}
+
+.subscription-popover-amount {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f4623d;
+    margin-bottom: 6px;
+}
+
+.subscription-popover-end {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    color: #a8a29e;
+    margin-bottom: 6px;
+}
+
+.subscription-popover-remaining {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #78716c;
+}
+
+.subscription-popover-remaining.warning {
+    color: #d97706;
+}
+
+.subscription-popover-remaining.urgent {
+    color: #ef4444;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .top-info-row {
+        flex-direction: column;
+        gap: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .subscription-item {
+        padding: 6px 10px;
+        gap: 8px;
+    }
+
+    .subscription-item-icon {
+        font-size: 0.95rem;
+    }
 }

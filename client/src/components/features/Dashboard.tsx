@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal, App, Popover } from "antd";
+import { Card, Row, Col, Table, Spin, Statistic, Switch, Radio, DatePicker, Button, Space, Modal, App, Popover, Progress } from "antd";
 import { WalletOutlined, ArrowLeftOutlined, LineChartOutlined, RiseOutlined, FallOutlined } from "@ant-design/icons";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Line } from "@ant-design/plots";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses } from "../../api";
-import { Summary, Transaction, Category, Item, ItemHistory, UtilityReadingsSummary, UtilityAddress } from "../../types";
+import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses, getSubscriptions, deleteSubscription } from "../../api";
+import { Summary, Transaction, Category, Item, ItemHistory, UtilityReadingsSummary, UtilityAddress, Subscription } from "../../types";
 import TransactionTable from "./TransactionTable";
 import AIInsights from "./ai/AIInsights";
+import SubscriptionModal from "./SubscriptionModal";
 import dayjs, { Dayjs } from "dayjs";
 import "./Dashboard.css";
 
@@ -33,6 +34,9 @@ const Dashboard: React.FC = () => {
   const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
   const [utilitySummaries, setUtilitySummaries] = useState<UtilityReadingsSummary[]>([]);
   const [utilityAddresses, setUtilityAddresses] = useState<UtilityAddress[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
 
   useEffect(() => {
     loadData();
@@ -41,6 +45,30 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     loadUtilityData();
   }, []);
+
+  useEffect(() => {
+    loadSubscriptions();
+  }, []);
+
+  const loadSubscriptions = async () => {
+    try {
+      const res = await getSubscriptions();
+      setSubscriptions(res.data);
+    } catch (error) {
+      console.error("Error loading subscriptions:", error);
+    }
+  };
+
+  const handleDeleteSubscription = async (id: number) => {
+    try {
+      await deleteSubscription(id);
+      message.success(t("subscriptions.deleteSuccess") || "Subscription deleted");
+      loadSubscriptions();
+    } catch (error) {
+      console.error("Error deleting subscription:", error);
+      message.error(t("subscriptions.deleteError") || "Failed to delete subscription");
+    }
+  };
 
   const loadUtilityData = async () => {
     try {
@@ -338,96 +366,176 @@ const Dashboard: React.FC = () => {
         </Space>
       </div>
 
-      {/* Utility Readings */}
-      {utilitySummaries.length > 0 && (
-        <div className="necessary-output-wrapper">
-          <div className="necessary-output-title">
-            <span className="necessary-output-address">🏠 {utilityAddresses[0]?.name || t("dashboard.utilities")}</span>
-          </div>
-          <div className="necessary-output-icons">
-            {utilitySummaries.map((summary) => {
-              const iconClass = getUtilityIconClass(summary.type_icon);
-              const isWater = summary.type_icon === "water";
-              const isElec = summary.type_icon === "electricity";
-              const isDrinkingWater = summary.type_icon === "drinking-water";
-              const isWifi = summary.type_icon === "wifi" || summary.type_icon === "internet";
-              return (
-                <Popover
-                  key={`${summary.address_id}-${summary.type_id}`}
-                  trigger="click"
-                  placement="rightTop"
-                  styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
-                  content={
-                    <div className="utility-popover-content">
-                      <div className="utility-popover-label">{t("dashboard.lastMonthExpense", { type: summary.type_name }) || `Last Month ${summary.type_name}`}</div>
-                      <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
-                        {summary.currency === "CNY" ? "¥" : "$"}
-                        {summary.lastMonthExpense.toFixed(2)}
+      {/* Utility Readings & Subscriptions Row */}
+      <div className="top-info-row">
+        {utilitySummaries.length > 0 && (
+          <div className="necessary-output-wrapper">
+            <div className="necessary-output-title">
+              <span className="necessary-output-address">🏠 {utilityAddresses[0]?.name || t("dashboard.utilities")}</span>
+            </div>
+            <div className="necessary-output-icons">
+              {utilitySummaries.map((summary) => {
+                const iconClass = getUtilityIconClass(summary.type_icon);
+                const isWater = summary.type_icon === "water";
+                const isElec = summary.type_icon === "electricity";
+                const isDrinkingWater = summary.type_icon === "drinking-water";
+                const isWifi = summary.type_icon === "wifi" || summary.type_icon === "internet";
+                return (
+                  <Popover
+                    key={`${summary.address_id}-${summary.type_id}`}
+                    trigger="click"
+                    placement="rightTop"
+                    styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
+                    content={
+                      <div className="utility-popover-content">
+                        <div className="utility-popover-label">{t("dashboard.lastMonthExpense", { type: summary.type_name }) || `Last Month ${summary.type_name}`}</div>
+                        <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
+                          {summary.currency === "CNY" ? "¥" : "$"}
+                          {summary.lastMonthExpense.toFixed(2)}
+                        </div>
+                        {summary.recharges > 0 && (
+                          <>
+                            <div className="utility-popover-label" style={{ marginTop: 8 }}>
+                              {t("dashboard.recharges")}
+                            </div>
+                            <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
+                              +{summary.currency === "CNY" ? "¥" : "$"}
+                              {summary.recharges.toFixed(2)}
+                            </div>
+                          </>
+                        )}
                       </div>
-                      {summary.recharges > 0 && (
-                        <>
-                          <div className="utility-popover-label" style={{ marginTop: 8 }}>
-                            {t("dashboard.recharges")}
-                          </div>
-                          <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
-                            +{summary.currency === "CNY" ? "¥" : "$"}
-                            {summary.recharges.toFixed(2)}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  }
-                >
-                  <div
-                    className={`utility-icon ${iconClass}`}
-                    onClick={(e) => {
-                      e.currentTarget.classList.add("ripple");
-                      setTimeout(() => e.currentTarget.classList.remove("ripple"), 600);
-                    }}
+                    }
                   >
-                    {isWater ? (
-                      <div className="water-droplet-body">
-                        <div className="water-droplet-liquid">
-                          <div className="water-wave water-wave-1" />
-                          <div className="water-wave water-wave-2" />
+                    <div
+                      className={`utility-icon ${iconClass}`}
+                      onClick={(e) => {
+                        e.currentTarget.classList.add("ripple");
+                        setTimeout(() => e.currentTarget.classList.remove("ripple"), 600);
+                      }}
+                    >
+                      {isWater ? (
+                        <div className="water-droplet-body">
+                          <div className="water-droplet-liquid">
+                            <div className="water-wave water-wave-1" />
+                            <div className="water-wave water-wave-2" />
+                          </div>
+                          <div className="water-droplet-highlight" />
                         </div>
-                        <div className="water-droplet-highlight" />
-                      </div>
-                    ) : isElec ? (
-                      <div className="elec-bolt-body">
-                        <div className="elec-bolt-highlight" />
-                      </div>
-                    ) : isDrinkingWater ? (
-                      <div className="drinking-water-body">
-                        <div className="drinking-water-cap" />
-                        <div className="drinking-water-label">H2O</div>
-                      </div>
-                    ) : isWifi ? (
-                      <div className="wifi-router-body">
-                        <div className="satellite-dish">
-                          <div className="satellite-arc" />
-                          <div className="satellite-arc" />
-                          <div className="satellite-arc" />
-                          <div className="satellite-dot" />
+                      ) : isElec ? (
+                        <div className="elec-bolt-body">
+                          <div className="elec-bolt-highlight" />
                         </div>
+                      ) : isDrinkingWater ? (
+                        <div className="drinking-water-body">
+                          <div className="drinking-water-cap" />
+                          <div className="drinking-water-label">H2O</div>
+                        </div>
+                      ) : isWifi ? (
+                        <div className="wifi-router-body">
+                          <div className="satellite-dish">
+                            <div className="satellite-arc" />
+                            <div className="satellite-arc" />
+                            <div className="satellite-arc" />
+                            <div className="satellite-dot" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="utility-generic-body">
+                          <span className="utility-generic-emoji">{getIconEmoji(summary.type_icon)}</span>
+                        </div>
+                      )}
+                      <span className="utility-icon-value">
+                        {summary.currency === "CNY" ? "¥" : "$"}
+                        {summary.currentMonth?.balance?.toFixed(2)}
+                      </span>
+                      <span className="utility-ripple-ring" />
+                    </div>
+                  </Popover>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Management */}
+        <div className="subscription-section">
+          <div className="subscription-header">
+            <div className="subscription-title">
+              <span>📅 {t("subscriptions.title")}</span>
+            </div>
+            <Button
+              type="text"
+              size="small"
+              onClick={() => {
+                setEditingSubscription(null);
+                setSubscriptionModalVisible(true);
+              }}
+            >
+              +
+            </Button>
+          </div>
+          <div className="subscription-scroll">
+            {subscriptions.length === 0 ? (
+              <div className="subscription-empty">
+                <span>{t("dashboard.noSubscriptions") || "No subscriptions yet"}</span>
+              </div>
+            ) : (
+              subscriptions.map((sub) => {
+                const remaining = dayjs(sub.end_date).diff(dayjs(), "day");
+                const percent = Math.max(0, Math.min(100, Math.round((remaining / sub.cycle) * 100)));
+                const urgent = remaining <= 5;
+                const warning = remaining <= 10;
+                const strokeColor = urgent ? "#ef4444" : warning ? "#f59e0b" : "#22c55e";
+                return (
+                  <Popover
+                    key={sub.id}
+                    trigger="hover"
+                    placement="bottom"
+                    styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
+                    content={
+                      <div className="subscription-popover-content">
+                        <div className="subscription-popover-name">{sub.name}</div>
+                        <div className="subscription-popover-end">
+                          {t("dashboard.nextBilling") || "Next billing"}: {dayjs(sub.end_date).format("YYYY-MM-DD")}
+                        </div>
+                        <div className={`subscription-popover-remaining ${urgent ? "urgent" : warning ? "warning" : ""}`}>
+                          {remaining} {t("dashboard.daysRemaining") || "days remaining"}
+                        </div>
+                        <Space style={{ marginTop: 8 }}>
+                          <Button size="small" onClick={() => {
+                            setEditingSubscription(sub);
+                            setSubscriptionModalVisible(true);
+                          }}>
+                            {t("common.edit") || "Edit"}
+                          </Button>
+                          <Button size="small" danger onClick={() => handleDeleteSubscription(sub.id)}>
+                            {t("common.delete") || "Delete"}
+                          </Button>
+                        </Space>
                       </div>
-                    ) : (
-                      <div className="utility-generic-body">
-                        <span className="utility-generic-emoji">{getIconEmoji(summary.type_icon)}</span>
-                      </div>
-                    )}
-                    <span className="utility-icon-value">
-                      {summary.currency === "CNY" ? "¥" : "$"}
-                      {summary.currentMonth?.balance?.toFixed(2)}
-                    </span>
-                    <span className="utility-ripple-ring" />
-                  </div>
-                </Popover>
-              );
-            })}
+                    }
+                  >
+                    <div className={`subscription-item ${urgent ? "urgent" : warning ? "warning" : ""}`}>
+                      {sub.icon && sub.icon.startsWith("http") ? (
+                        <img src={sub.icon} alt={sub.name} className="subscription-item-img" />
+                      ) : (
+                        <span className="subscription-item-icon">{sub.icon || "📦"}</span>
+                      )}
+                      <Progress
+                        percent={percent}
+                        size="small"
+                        strokeColor={strokeColor}
+                        showInfo={false}
+                      />
+                    </div>
+                  </Popover>
+                );
+              })
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       <div className="hero-stats">
         <div className="stat-card stat-income">
@@ -633,6 +741,14 @@ const Dashboard: React.FC = () => {
           </>
         )}
       </Modal>
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        open={subscriptionModalVisible}
+        subscription={editingSubscription}
+        onClose={() => setSubscriptionModalVisible(false)}
+        onSave={loadSubscriptions}
+      />
     </div>
   );
 };

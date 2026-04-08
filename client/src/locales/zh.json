@@ -36,7 +36,10 @@
     "lastMonthWaterExpense": "上月水费",
     "lastMonthElecExpense": "上月电费",
     "lastMonthExpense": "上月{{type}}费",
-    "recharges": "充值"
+    "recharges": "充值",
+    "nextBilling": "下次扣款",
+    "daysRemaining": "天剩余",
+    "noSubscriptions": "暂无订阅"
   },
   "transactions": {
     "title": "交易记录",
@@ -141,7 +144,30 @@
     "no": "否",
     "cancel": "取消",
     "edit": "编辑",
-    "save": "保存"
+    "save": "保存",
+    "create": "创建",
+    "update": "更新",
+    "delete": "删除"
+  },
+  "subscriptions": {
+    "title": "订阅管理",
+    "name": "名称",
+    "icon": "图标",
+    "endDate": "到期日期",
+    "cycle": "周期（天）",
+    "nextBilling": "下次扣款日期",
+    "selectIcon": "选择图标",
+    "namePlaceholder": "例如：Netflix、Spotify",
+    "addTitle": "添加订阅",
+    "editTitle": "编辑订阅",
+    "nameRequired": "请输入名称",
+    "endDateRequired": "请选择日期",
+    "createSuccess": "订阅创建成功",
+    "updateSuccess": "订阅更新成功",
+    "deleteSuccess": "订阅删除成功",
+    "saveError": "保存订阅失败",
+    "deleteError": "删除订阅失败",
+    "noSubscriptions": "暂无订阅"
   },
   "items": {
     "title": "物品购买历史",
