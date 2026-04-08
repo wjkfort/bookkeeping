@@ -1,6 +1,31 @@
 -- Complete database schema for Cloudflare D1
 -- Combines all migrations into a single schema file
 
+-- Users table for authentication
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    username TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- AI Conversations table for chat history
+CREATE TABLE IF NOT EXISTS ai_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('user', 'assistant')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_id ON ai_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_created_at ON ai_conversations(created_at);
+
 -- Categories table
 CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,3 +89,46 @@ CREATE TABLE IF NOT EXISTS items (
 
 CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
 CREATE INDEX IF NOT EXISTS idx_items_user_id ON items(user_id);
+
+-- Utility addresses table
+CREATE TABLE IF NOT EXISTS utility_addresses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_utility_addresses_user_id ON utility_addresses(user_id);
+
+-- Utility types table for user-defined utility categories (water, electricity, gas, etc.)
+CREATE TABLE IF NOT EXISTS utility_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    icon TEXT,
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_utility_types_user_id ON utility_types(user_id);
+
+-- Utility readings table for tracking monthly utility bills
+CREATE TABLE IF NOT EXISTS utility_readings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    address_id INTEGER NOT NULL REFERENCES utility_addresses(id) ON DELETE CASCADE,
+    type_id INTEGER NOT NULL REFERENCES utility_types(id) ON DELETE CASCADE,
+    balance REAL NOT NULL DEFAULT 0,
+    record_time TEXT NOT NULL, -- YYYY-MM
+    currency TEXT NOT NULL DEFAULT 'CNY',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(address_id, type_id, record_time)
+);
+
+CREATE INDEX IF NOT EXISTS idx_utility_readings_user_id ON utility_readings(user_id);
+CREATE INDEX IF NOT EXISTS idx_utility_readings_address_id ON utility_readings(address_id);
+CREATE INDEX IF NOT EXISTS idx_utility_readings_record_time ON utility_readings(record_time);
+CREATE INDEX IF NOT EXISTS idx_utility_readings_type_id ON utility_readings(type_id);

@@ -109,7 +109,7 @@ Once local development works:
 
 ```bash
 # Go back to Python version
-git checkout python-fastapi-original
+git checkout main
 
 # Start Python backend
 cd backend

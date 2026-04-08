@@ -11,6 +11,7 @@ import authRouter from "./api/auth";
 import aiRouter from "./api/ai";
 import utilityReadingsRouter from "./api/utility-readings";
 import utilityAddressesRouter from "./api/utility-addresses";
+import utilityTypesRouter from "./api/utility-types";
 import { authMiddleware } from "./middleware/auth";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
@@ -57,6 +58,7 @@ api.use("/items/*", authMiddleware);
 api.use("/ai/*", authMiddleware);
 api.use("/utility-readings/*", authMiddleware);
 api.use("/utility-addresses/*", authMiddleware);
+api.use("/utility-types/*", authMiddleware);
 
 api.route("/categories", categoriesRouter);
 api.route("/transactions", transactionsRouter);
@@ -67,6 +69,7 @@ api.route("/items", itemsRouter);
 api.route("/ai", aiRouter);
 api.route("/utility-readings", utilityReadingsRouter);
 api.route("/utility-addresses", utilityAddressesRouter);
+api.route("/utility-types", utilityTypesRouter);
 
 app.route("/api/v1", api);
 

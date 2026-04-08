@@ -7,6 +7,7 @@
     "items": "物品记录",
     "utilityAddresses": "地址管理",
     "utilityReadings": "水电读数",
+    "utilityTypes": "工具类型",
     "logout": "退出登录"
   },
   "currency": {
@@ -33,7 +34,9 @@
     "overall": "全部",
     "utilities": "水电",
     "lastMonthWaterExpense": "上月水费",
-    "lastMonthElecExpense": "上月电费"
+    "lastMonthElecExpense": "上月电费",
+    "lastMonthExpense": "上月{{type}}费",
+    "recharges": "充值"
   },
   "transactions": {
     "title": "交易记录",
@@ -210,6 +213,9 @@
     "deleteBtn": "删除",
     "all": "全部",
     "selectAddress": "选择地址",
+    "allTypes": "所有类型",
+    "selectType": "选择类型",
+    "typeRequired": "请选择类型",
     "errorLoading": "加载水电读数失败",
     "errorCreating": "创建水电读数失败",
     "errorUpdating": "更新水电读数失败",
@@ -222,6 +228,32 @@
     "addressPlaceholder": "例如：家、公司",
     "recordTimeRequired": "请输入记录时间 (YYYY-MM)",
     "balanceRequired": "请输入读数",
+    "add": "添加",
+    "update": "更新"
+  },
+  "utilityTypes": {
+    "title": "工具类型",
+    "name": "名称",
+    "icon": "图标",
+    "bindCategory": "绑定分类",
+    "actions": "操作",
+    "addNew": "添加类型",
+    "editTitle": "编辑类型",
+    "deleteBtn": "删除",
+    "deleteTitle": "删除工具类型",
+    "deleteConfirm": "确定要删除这个工具类型吗？",
+    "errorLoading": "加载工具类型失败",
+    "errorCreating": "创建工具类型失败",
+    "errorUpdating": "更新工具类型失败",
+    "errorDeleting": "删除工具类型失败",
+    "successCreating": "工具类型创建成功",
+    "successUpdating": "工具类型更新成功",
+    "successDeleting": "工具类型删除成功",
+    "noTypes": "暂无工具类型",
+    "nameRequired": "请输入类型名称",
+    "namePlaceholder": "例如：水、电、燃气",
+    "iconPlaceholder": "选择图标",
+    "selectCategory": "选择绑定的分类",
     "add": "添加",
     "update": "更新"
   },

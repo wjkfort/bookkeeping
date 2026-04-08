@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, Table, Button, Form, Input, Select, Space, Modal, message, Segmented, Tag, DatePicker } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { getUtilityAddresses, getUtilityReadings, createUtilityReading, updateUtilityReading, deleteUtilityReading } from "../../api";
-import { UtilityReading, UtilityAddress } from "../../types";
+import { getUtilityAddresses, getUtilityTypes, getUtilityReadings, createUtilityReading, updateUtilityReading, deleteUtilityReading } from "../../api";
+import { UtilityReading, UtilityAddress, UtilityType } from "../../types";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
@@ -13,14 +13,27 @@ import "./UtilityReadings.css";
 
 const { Option } = Select;
 
+const UTILITY_ICONS: Record<string, string> = {
+  water: "💧",
+  electricity: "⚡",
+  gas: "🔥",
+  internet: "🌐",
+  waste: "🗑️",
+  tv: "📺",
+  rent: "🏠",
+  "drinking-water": "🚰",
+  wifi: "📡",
+};
+
 const UtilityReadings: React.FC = () => {
   const { t } = useTranslation();
   const [addresses, setAddresses] = useState<UtilityAddress[]>([]);
+  const [utilityTypes, setUtilityTypes] = useState<UtilityType[]>([]);
   const [readings, setReadings] = useState<UtilityReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingReading, setEditingReading] = useState<UtilityReading | null>(null);
-  const [typeFilter, setTypeFilter] = useState<"all" | "water" | "electricity">("all");
+  const [typeFilter, setTypeFilter] = useState<number | "all">("all");
   const [addressFilter, setAddressFilter] = useState<number | "all">("all");
   const [form] = Form.useForm();
 
@@ -39,11 +52,13 @@ const UtilityReadings: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [addressesRes, readingsRes] = await Promise.all([
+      const [addressesRes, typesRes, readingsRes] = await Promise.all([
         getUtilityAddresses(),
+        getUtilityTypes(),
         getUtilityReadings(),
       ]);
       setAddresses(addressesRes.data);
+      setUtilityTypes(typesRes.data);
       setReadings(readingsRes.data);
     } catch (error) {
       console.error("Error loading utility data:", error);
@@ -63,6 +78,11 @@ const UtilityReadings: React.FC = () => {
     }
   };
 
+  const getIconEmoji = (iconValue: string | null | undefined) => {
+    if (!iconValue) return "🏠";
+    return UTILITY_ICONS[iconValue] || iconValue;
+  };
+
   const handleSubmit = async (values: any) => {
     try {
       const recordTime = values.record_time ? dayjs(values.record_time).format("YYYY-MM") : undefined;
@@ -75,7 +95,7 @@ const UtilityReadings: React.FC = () => {
       } else {
         await createUtilityReading({
           address_id: values.address_id,
-          type: values.type,
+          type_id: values.type_id,
           balance: values.balance,
           record_time: recordTime!,
           currency: values.currency,
@@ -96,7 +116,7 @@ const UtilityReadings: React.FC = () => {
     setEditingReading(reading);
     form.setFieldsValue({
       address_id: reading.address_id,
-      type: reading.type,
+      type_id: reading.type_id,
       balance: reading.balance,
       record_time: dayjs(reading.record_time, "YYYY-MM"),
       currency: reading.currency,
@@ -134,14 +154,15 @@ const UtilityReadings: React.FC = () => {
     },
     {
       title: t("utilityReadings.type"),
-      dataIndex: "type",
-      key: "type",
-      render: (type: "water" | "electricity") => <Tag color={type === "water" ? "blue" : "orange"}>{t(`utilityReadings.${type}`)}</Tag>,
-      filters: [
-        { text: t("utilityReadings.water"), value: "water" },
-        { text: t("utilityReadings.electricity"), value: "electricity" },
-      ],
-      onFilter: (value, record) => record.type === value,
+      dataIndex: "type_name",
+      key: "type_name",
+      render: (typeName: string, record) => (
+        <Tag color="blue">
+          {getIconEmoji(record.type_icon)} {typeName}
+        </Tag>
+      ),
+      filters: utilityTypes.map((ut) => ({ text: ut.name, value: ut.id })),
+      onFilter: (value, record) => record.type_id === value,
     },
     {
       title: t("utilityReadings.recordTime"),
@@ -187,7 +208,7 @@ const UtilityReadings: React.FC = () => {
   ];
 
   const filteredReadings = readings.filter((r) => {
-    const typeMatch = typeFilter === "all" || r.type === typeFilter;
+    const typeMatch = typeFilter === "all" || r.type_id === typeFilter;
     const addressMatch = addressFilter === "all" || r.address_id === addressFilter;
     return typeMatch && addressMatch;
   });
@@ -203,15 +224,20 @@ const UtilityReadings: React.FC = () => {
 
       <Card className="utility-readings-filter-card" variant="borderless">
         <Space wrap>
-          <Segmented
+          <Select
             value={typeFilter}
-            onChange={(value) => setTypeFilter(value as "all" | "water" | "electricity")}
-            options={[
-              { label: t("utilityReadings.all"), value: "all" },
-              { label: t("utilityReadings.water"), value: "water" },
-              { label: t("utilityReadings.electricity"), value: "electricity" },
-            ]}
-          />
+            onChange={(val) => setTypeFilter(val as number | "all")}
+            style={{ minWidth: 150 }}
+            allowClear
+            placeholder={t("utilityReadings.allTypes")}
+          >
+            <Option value="all">{t("utilityReadings.all")}</Option>
+            {utilityTypes.map((ut) => (
+              <Option key={ut.id} value={ut.id}>
+                {getIconEmoji(ut.icon)} {ut.name}
+              </Option>
+            ))}
+          </Select>
           <Select
             value={addressFilter}
             onChange={(val) => setAddressFilter(val as number | "all")}
@@ -219,6 +245,7 @@ const UtilityReadings: React.FC = () => {
             allowClear
             placeholder={t("utilityReadings.selectAddress")}
           >
+            <Option value="all">{t("utilityReadings.all")}</Option>
             {addresses.map((addr) => (
               <Option key={addr.id} value={addr.id}>
                 {addr.name}
@@ -255,10 +282,13 @@ const UtilityReadings: React.FC = () => {
                 </Select>
               </Form.Item>
 
-              <Form.Item name="type" label={t("utilityReadings.type")} rules={[{ required: true }]}>
-                <Select>
-                  <Option value="water">{t("utilityReadings.water")}</Option>
-                  <Option value="electricity">{t("utilityReadings.electricity")}</Option>
+              <Form.Item name="type_id" label={t("utilityReadings.type")} rules={[{ required: true, message: t("utilityReadings.typeRequired") }]}>
+                <Select placeholder={t("utilityReadings.selectType")}>
+                  {utilityTypes.map((ut) => (
+                    <Option key={ut.id} value={ut.id}>
+                      {getIconEmoji(ut.icon)} {ut.name}
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
 

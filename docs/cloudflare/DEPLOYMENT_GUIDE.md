@@ -333,14 +333,14 @@ wrangler rollback
 
 ## Keeping Python Version
 
-Your original Python/FastAPI version is preserved in the `python-fastapi-original` branch:
+Your original Python/FastAPI version is preserved in the `main` branch:
 
 ```bash
 # Switch back to Python version
-git checkout python-fastapi-original
+git checkout main
 
 # Or compare implementations
-git diff python-fastapi-original cloudflare-deployment
+git diff main cloudflare-deployment
 ```
 
 The Python version is better for:

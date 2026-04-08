@@ -279,6 +279,38 @@ const Dashboard: React.FC = () => {
     return t("dashboard.currentMonthExpense");
   };
 
+  const getIconEmoji = (iconValue: string | null | undefined) => {
+    if (!iconValue) return "🏠";
+    const icons: Record<string, string> = {
+      water: "💧",
+      electricity: "⚡",
+      gas: "🔥",
+      internet: "🌐",
+      waste: "🗑️",
+      tv: "📺",
+      rent: "🏠",
+      "drinking-water": "🚰",
+      wifi: "📡",
+    };
+    return icons[iconValue] || iconValue;
+  };
+
+  const getUtilityIconClass = (icon: string | null): string => {
+    if (icon === "water") return "water-droplet";
+    if (icon === "electricity") return "elec-bolt";
+    if (icon === "drinking-water") return "drinking-water";
+    if (icon === "wifi" || icon === "internet") return "wifi-router";
+    return "utility-generic";
+  };
+
+  const getUtilityPopoverColor = (icon: string | null): string => {
+    if (icon === "water") return "utility-popover-value--water";
+    if (icon === "electricity") return "utility-popover-value--elec";
+    if (icon === "drinking-water") return "utility-popover-value--drinking-water";
+    if (icon === "wifi" || icon === "internet") return "utility-popover-value--wifi";
+    return "utility-popover-value--generic";
+  };
+
   return (
     <div className="dashboard">
       {/* Header */}
@@ -306,38 +338,54 @@ const Dashboard: React.FC = () => {
         </Space>
       </div>
 
-      {/* Utility Readings - Water & Electricity */}
+      {/* Utility Readings */}
       {utilitySummaries.length > 0 && (
         <div className="necessary-output-wrapper">
           <div className="necessary-output-title">
             <span className="necessary-output-address">🏠 {utilityAddresses[0]?.name || t("dashboard.utilities")}</span>
           </div>
           <div className="necessary-output-icons">
-            {utilitySummaries.map((summary) => (
-              <Popover
-                key={`${summary.address_id}-${summary.type}`}
-                trigger="click"
-                placement="rightTop"
-                styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
-                content={
-                  <div className="utility-popover-content">
-                    <div className="utility-popover-label">{summary.type === "water" ? t("dashboard.lastMonthWaterExpense") || "This Month Water" : t("dashboard.lastMonthElecExpense") || "This Month Electricity"}</div>
-                    <div className={`utility-popover-value ${summary.type === "water" ? "utility-popover-value--water" : "utility-popover-value--elec"}`}>
-                      {summary.currency === "CNY" ? "¥" : "$"}
-                      {summary.lastMonthExpense.toFixed(2)}
+            {utilitySummaries.map((summary) => {
+              const iconClass = getUtilityIconClass(summary.type_icon);
+              const isWater = summary.type_icon === "water";
+              const isElec = summary.type_icon === "electricity";
+              const isDrinkingWater = summary.type_icon === "drinking-water";
+              const isWifi = summary.type_icon === "wifi" || summary.type_icon === "internet";
+              return (
+                <Popover
+                  key={`${summary.address_id}-${summary.type_id}`}
+                  trigger="click"
+                  placement="rightTop"
+                  styles={{ root: { fontFamily: "'Outfit', system-ui, sans-serif" } }}
+                  content={
+                    <div className="utility-popover-content">
+                      <div className="utility-popover-label">{t("dashboard.lastMonthExpense", { type: summary.type_name }) || `Last Month ${summary.type_name}`}</div>
+                      <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
+                        {summary.currency === "CNY" ? "¥" : "$"}
+                        {summary.lastMonthExpense.toFixed(2)}
+                      </div>
+                      {summary.recharges > 0 && (
+                        <>
+                          <div className="utility-popover-label" style={{ marginTop: 8 }}>
+                            {t("dashboard.recharges")}
+                          </div>
+                          <div className={`utility-popover-value ${getUtilityPopoverColor(summary.type_icon)}`}>
+                            +{summary.currency === "CNY" ? "¥" : "$"}
+                            {summary.recharges.toFixed(2)}
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </div>
-                }
-              >
-                <div
-                  className={`utility-icon ${summary.type === "water" ? "water-droplet" : "elec-bolt"}`}
-                  onClick={(e) => {
-                    e.currentTarget.classList.add("ripple");
-                    setTimeout(() => e.currentTarget.classList.remove("ripple"), 600);
-                  }}
+                  }
                 >
-                  {summary.type === "water" ? (
-                    <>
+                  <div
+                    className={`utility-icon ${iconClass}`}
+                    onClick={(e) => {
+                      e.currentTarget.classList.add("ripple");
+                      setTimeout(() => e.currentTarget.classList.remove("ripple"), 600);
+                    }}
+                  >
+                    {isWater ? (
                       <div className="water-droplet-body">
                         <div className="water-droplet-liquid">
                           <div className="water-wave water-wave-1" />
@@ -345,22 +393,38 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div className="water-droplet-highlight" />
                       </div>
-                    </>
-                  ) : (
-                    <>
+                    ) : isElec ? (
                       <div className="elec-bolt-body">
                         <div className="elec-bolt-highlight" />
                       </div>
-                    </>
-                  )}
-                  <span className="utility-icon-value">
-                    {summary.currency === "CNY" ? "¥" : "$"}
-                    {summary.currentMonth?.balance?.toFixed(2)}
-                  </span>
-                  <span className="utility-ripple-ring" />
-                </div>
-              </Popover>
-            ))}
+                    ) : isDrinkingWater ? (
+                      <div className="drinking-water-body">
+                        <div className="drinking-water-cap" />
+                        <div className="drinking-water-label">H2O</div>
+                      </div>
+                    ) : isWifi ? (
+                      <div className="wifi-router-body">
+                        <div className="satellite-dish">
+                          <div className="satellite-arc" />
+                          <div className="satellite-arc" />
+                          <div className="satellite-arc" />
+                          <div className="satellite-dot" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="utility-generic-body">
+                        <span className="utility-generic-emoji">{getIconEmoji(summary.type_icon)}</span>
+                      </div>
+                    )}
+                    <span className="utility-icon-value">
+                      {summary.currency === "CNY" ? "¥" : "$"}
+                      {summary.currentMonth?.balance?.toFixed(2)}
+                    </span>
+                    <span className="utility-ripple-ring" />
+                  </div>
+                </Popover>
+              );
+            })}
           </div>
         </div>
       )}

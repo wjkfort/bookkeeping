@@ -236,6 +236,164 @@
     pointer-events: none;
 }
 
+/* --- Drinking Water Bottle Variant --- */
+.drinking-water {
+    width: 56px;
+    height: 96px;
+    filter: drop-shadow(0 4px 14px rgba(14, 165, 233, 0.35));
+}
+
+.drinking-water:hover {
+    filter: drop-shadow(0 6px 22px rgba(14, 165, 233, 0.55));
+}
+
+.drinking-water .utility-icon-value {
+    color: #0c4a6e;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    bottom: 10%;
+}
+
+.drinking-water .utility-ripple-ring {
+    border-color: rgba(56, 189, 248, 0.6);
+}
+
+.drinking-water-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(186, 230, 253, 0.9) 0%, rgba(224, 242, 254, 0.9) 100%);
+    border-radius: 8px 8px 20px 20px;
+    overflow: hidden;
+    border: 2px solid rgba(14, 165, 233, 0.3);
+}
+
+.drinking-water-cap {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 12px;
+    background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+    border-radius: 4px 4px 0 0;
+}
+
+.drinking-water-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #0369a1;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.drinking-water-label span {
+    display: block;
+    font-size: 0.5rem;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+/* --- Internet/Satellite Dish Variant --- */
+.wifi-router {
+    width: 80px;
+    height: 80px;
+    filter: drop-shadow(0 4px 14px rgba(139, 92, 246, 0.35));
+}
+
+.wifi-router:hover {
+    filter: drop-shadow(0 6px 22px rgba(139, 92, 246, 0.55));
+}
+
+.wifi-router .utility-icon-value {
+    color: #4c1d95;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+    bottom: 5%;
+}
+
+.wifi-router .utility-ripple-ring {
+    border-color: rgba(167, 139, 250, 0.6);
+}
+
+.wifi-router-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #e9d5ff 0%, #ddd6fe 100%);
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(139, 92, 246, 0.4);
+    box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.1);
+}
+
+.satellite-dish {
+    position: relative;
+    width: 70%;
+    height: 70%;
+}
+
+.satellite-arc {
+    position: absolute;
+    border: 4px solid transparent;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.satellite-arc:nth-child(1) {
+    width: 20px;
+    height: 20px;
+    border-top-color: #7c3aed;
+    border-right-color: #7c3aed;
+    animation: satellite-pulse 2s ease-in-out infinite;
+}
+
+.satellite-arc:nth-child(2) {
+    width: 40px;
+    height: 40px;
+    border-top-color: #a78bfa;
+    border-right-color: #a78bfa;
+    animation: satellite-pulse 2s ease-in-out infinite 0.2s;
+}
+
+.satellite-arc:nth-child(3) {
+    width: 60px;
+    height: 60px;
+    border-top-color: #c4b5fd;
+    border-right-color: #c4b5fd;
+    animation: satellite-pulse 2s ease-in-out infinite 0.4s;
+}
+
+.satellite-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(124, 58, 237, 0.6);
+}
+
+@keyframes satellite-pulse {
+    0%, 100% {
+        opacity: 0.5;
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(15deg);
+    }
+}
+
 /* --- Shared Animations --- */
 @keyframes breathe {
     0%,
@@ -288,6 +446,55 @@
     color: #b45309;
 }
 
+.utility-popover-value--generic {
+    color: #475569;
+}
+
+.utility-popover-value--drinking-water {
+    color: #0369a1;
+}
+
+.utility-popover-value--wifi {
+    color: #7c3aed;
+}
+
+/* --- Generic Utility Variant --- */
+.utility-generic {
+    width: 76px;
+    height: 96px;
+    filter: drop-shadow(0 4px 14px rgba(100, 116, 139, 0.35));
+}
+
+.utility-generic:hover {
+    filter: drop-shadow(0 6px 22px rgba(100, 116, 139, 0.55));
+}
+
+.utility-generic .utility-icon-value {
+    color: white;
+    text-shadow: 0 1px 3px rgba(71, 85, 105, 0.5);
+}
+
+.utility-generic .utility-ripple-ring {
+    border-color: rgba(148, 163, 184, 0.6);
+}
+
+.utility-generic-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 20%;
+    background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.utility-generic-emoji {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+
 /* --- Responsive --- */
 @media (max-width: 480px) {
     .water-droplet {
@@ -302,6 +509,25 @@
 
     .utility-icon-value {
         font-size: 0.6rem;
+    }
+
+    .utility-generic {
+        width: 60px;
+        height: 76px;
+    }
+
+    .utility-generic-emoji {
+        font-size: 1.6rem;
+    }
+
+    .drinking-water {
+        width: 44px;
+        height: 76px;
+    }
+
+    .wifi-router {
+        width: 64px;
+        height: 64px;
     }
 }
 

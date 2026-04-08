@@ -7,6 +7,7 @@
     "items": "Items",
     "utilityAddresses": "Utility Addresses",
     "utilityReadings": "Utilities",
+    "utilityTypes": "Utility Types",
     "logout": "Logout"
   },
   "currency": {
@@ -33,7 +34,9 @@
     "overall": "Overall",
     "utilities": "Utilities",
     "lastMonthWaterExpense": "Last Month Water",
-    "lastMonthElecExpense": "Last Month Electricity"
+    "lastMonthElecExpense": "Last Month Electricity",
+    "lastMonthExpense": "Last Month {{type}}",
+    "recharges": "Recharges"
   },
   "transactions": {
     "title": "Transactions",
@@ -210,6 +213,9 @@
     "deleteBtn": "Delete",
     "all": "All",
     "selectAddress": "Select Address",
+    "allTypes": "All Types",
+    "selectType": "Select Type",
+    "typeRequired": "Please select type",
     "errorLoading": "Error loading utility readings",
     "errorCreating": "Error creating utility reading",
     "errorUpdating": "Error updating utility reading",
@@ -222,6 +228,32 @@
     "addressPlaceholder": "e.g., Home, Office",
     "recordTimeRequired": "Please enter record time (YYYY-MM)",
     "balanceRequired": "Please enter balance",
+    "add": "Add",
+    "update": "Update"
+  },
+  "utilityTypes": {
+    "title": "Utility Types",
+    "name": "Name",
+    "icon": "Icon",
+    "bindCategory": "Bound Category",
+    "actions": "Actions",
+    "addNew": "Add Type",
+    "editTitle": "Edit Type",
+    "deleteBtn": "Delete",
+    "deleteTitle": "Delete Utility Type",
+    "deleteConfirm": "Are you sure you want to delete this utility type?",
+    "errorLoading": "Error loading utility types",
+    "errorCreating": "Error creating utility type",
+    "errorUpdating": "Error updating utility type",
+    "errorDeleting": "Error deleting utility type",
+    "successCreating": "Utility type created successfully",
+    "successUpdating": "Utility type updated successfully",
+    "successDeleting": "Utility type deleted successfully",
+    "noTypes": "No utility types yet",
+    "nameRequired": "Please enter type name",
+    "namePlaceholder": "e.g., Water, Electricity, Gas",
+    "iconPlaceholder": "Select an icon",
+    "selectCategory": "Select category to bind",
     "add": "Add",
     "update": "Update"
   },

@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu, Button } from "antd";
-import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined, ThunderboltOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined, ThunderboltOutlined, EnvironmentOutlined, ToolOutlined } from '@ant-design/icons';
 import Dashboard from "./components/features/Dashboard";
 import Transactions from "./components/features/Transactions";
 import Categories from "./components/features/Categories";
 import Items from "./components/features/Items";
 import UtilityAddresses from "./components/features/UtilityAddresses";
 import UtilityReadings from "./components/features/UtilityReadings";
+import UtilityTypes from "./components/features/UtilityTypes";
 import AIChat from "./components/features/ai/AIChat";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
@@ -74,6 +75,11 @@ function AppContent() {
       icon: <ThunderboltOutlined />,
       label: <Link to="/utility-readings">{t("nav.utilityReadings")}</Link>,
     },
+    {
+      key: "/utility-types",
+      icon: <ToolOutlined />,
+      label: <Link to="/utility-types">{t("nav.utilityTypes")}</Link>,
+    },
   ];
 
   // Don't show header on login/register pages
@@ -122,6 +128,7 @@ function AppContent() {
           <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
           <Route path="/utility-addresses" element={<ProtectedRoute><UtilityAddresses /></ProtectedRoute>} />
           <Route path="/utility-readings" element={<ProtectedRoute><UtilityReadings /></ProtectedRoute>} />
+          <Route path="/utility-types" element={<ProtectedRoute><UtilityTypes /></ProtectedRoute>} />
         </Routes>
         {!isAuthPage && isAuthenticated && <AIChat onTransactionCreated={handleTransactionCreated} />}
       </Content>

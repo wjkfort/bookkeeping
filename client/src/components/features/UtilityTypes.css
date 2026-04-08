@@ -1,0 +1,20 @@
+.utility-types-page {
+  padding: 24px;
+}
+
+.utility-types-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.utility-types-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.utility-types-table-card {
+  margin-bottom: 16px;
+}
