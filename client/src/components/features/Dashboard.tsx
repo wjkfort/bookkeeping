@@ -37,6 +37,14 @@ const Dashboard: React.FC = () => {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [revealedStats, setRevealedStats] = useState<Set<string>>(new Set());
+  const toggleStat = (key: string) => {
+    setRevealedStats(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   useEffect(() => {
     loadData();
@@ -551,35 +559,35 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="hero-stats">
-        <div className="stat-card stat-income">
+        <div className="stat-card stat-income" onClick={() => toggleStat('income')}>
           <div className="stat-icon">
             <RiseOutlined />
           </div>
           <div className="stat-content">
             <div className="stat-label">{t("dashboard.totalIncome")}</div>
-            <div className="stat-value amount">{summary.total_income.toFixed(2)}</div>
+            <div className="stat-value amount">{revealedStats.has('income') ? summary.total_income.toFixed(2) : '****'}</div>
             <div className="stat-currency">{currencyCode}</div>
           </div>
         </div>
 
-        <div className="stat-card stat-expense">
+        <div className="stat-card stat-expense" onClick={() => toggleStat('expense')}>
           <div className="stat-icon">
             <FallOutlined />
           </div>
           <div className="stat-content">
             <div className="stat-label">{t("dashboard.totalExpense")}</div>
-            <div className="stat-value amount">{summary.total_expense.toFixed(2)}</div>
+            <div className="stat-value amount">{revealedStats.has('expense') ? summary.total_expense.toFixed(2) : '****'}</div>
             <div className="stat-currency">{currencyCode}</div>
           </div>
         </div>
 
-        <div className="stat-card stat-balance">
+        <div className="stat-card stat-balance" onClick={() => toggleStat('balance')}>
           <div className="stat-icon">
             <WalletOutlined />
           </div>
           <div className="stat-content">
             <div className="stat-label">{t("dashboard.balance")}</div>
-            <div className="stat-value amount">{overallBalance.toFixed(2)}</div>
+            <div className="stat-value amount">{revealedStats.has('balance') ? overallBalance.toFixed(2) : '****'}</div>
             <div className="stat-currency">{currencyCode}</div>
           </div>
         </div>
