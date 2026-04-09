@@ -519,11 +519,17 @@ const Dashboard: React.FC = () => {
                     <div className={`subscription-item ${urgent ? "urgent" : warning ? "warning" : ""}`}>
                       {sub.icon && (sub.icon.startsWith("http") || sub.icon.startsWith("//")) ? (
                         <img
-                          src={proxyImage(sub.icon.startsWith("//") ? "https:" + sub.icon : sub.icon)}
+                          src={sub.icon.startsWith("//") ? "https:" + sub.icon : sub.icon}
                           alt={sub.name}
                           className="subscription-item-img"
                           onError={(e) => {
-                            e.currentTarget.style.display = 'none';
+                            const img = e.currentTarget;
+                            if (!img.dataset.retried) {
+                              img.dataset.retried = '1';
+                              img.src = proxyImage(sub.icon.startsWith("//") ? "https:" + sub.icon : sub.icon);
+                            } else {
+                              img.style.display = 'none';
+                            }
                           }}
                         />
                       ) : (
