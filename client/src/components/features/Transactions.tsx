@@ -7,7 +7,6 @@ import { useCurrency } from "../../hooks/useCurrency";
 import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from "../../api";
 import { Transaction, Category, TransactionFilters, Item, ItemHistory } from "../../types";
 import TransactionTable from "./TransactionTable";
-import AIQuickAdd from "./ai/AIQuickAdd";
 import dayjs from "dayjs";
 import Fuse from "fuse.js";
 import "./Transactions.css";
@@ -389,7 +388,6 @@ const Transactions: React.FC = () => {
       <div className="transactions-header">
         <h1 className="transactions-title">{t("transactions.title")}</h1>
         <Space className="transactions-actions">
-          <AIQuickAdd categories={categories} onSuccess={loadTransactions} />
           <Button
             type="primary"
             icon={<PlusOutlined />}

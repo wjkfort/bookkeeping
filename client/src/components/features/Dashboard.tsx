@@ -8,7 +8,6 @@ import { useCurrency } from "../../hooks/useCurrency";
 import { getSummary, getTransactions, getCategories, getItems, getItemHistory, getUtilityReadingsSummary, getUtilityAddresses, getSubscriptions, deleteSubscription, proxyImage } from "../../api";
 import { Summary, Transaction, Category, Item, ItemHistory, UtilityReadingsSummary, UtilityAddress, Subscription } from "../../types";
 import TransactionTable from "./TransactionTable";
-import AIInsights from "./ai/AIInsights";
 import SubscriptionModal from "./SubscriptionModal";
 import dayjs, { Dayjs } from "dayjs";
 import "./Dashboard.css";
@@ -654,11 +653,6 @@ const Dashboard: React.FC = () => {
           </Card>
         </Col>
       </Row>
-
-      {/* AI Insights */}
-      <div style={{ marginBottom: "32px" }}>
-        <AIInsights />
-      </div>
 
       {/* Recent Transactions */}
       <Card className="transactions-card" title={<span className="card-title">{t("dashboard.recentTransactions")}</span>} variant="borderless">

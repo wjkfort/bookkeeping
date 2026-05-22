@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ConfigProvider, Layout, Menu, Button } from "antd";
 import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined, ThunderboltOutlined, EnvironmentOutlined, ToolOutlined } from '@ant-design/icons';
@@ -10,7 +10,6 @@ import Items from "./components/features/Items";
 import UtilityAddresses from "./components/features/UtilityAddresses";
 import UtilityReadings from "./components/features/UtilityReadings";
 import UtilityTypes from "./components/features/UtilityTypes";
-import AIChat from "./components/features/ai/AIChat";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -26,7 +25,6 @@ const { Header, Content } = Layout;
 function AppContent() {
   const { t } = useTranslation();
   const location = useLocation();
-  const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState(location.pathname);
   const { isAuthenticated, logout, user } = useAuth();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -34,15 +32,6 @@ function AppContent() {
   useEffect(() => {
     setSelectedKey(location.pathname);
   }, [location.pathname]);
-
-  const handleTransactionCreated = () => {
-    // Trigger refresh by updating key
-    setRefreshKey(prev => prev + 1);
-    // If not on dashboard or transactions page, navigate there
-    if (location.pathname !== '/' && location.pathname !== '/transactions') {
-      navigate('/transactions');
-    }
-  };
 
   const menuItems = [
     {
@@ -130,7 +119,6 @@ function AppContent() {
           <Route path="/utility-readings" element={<ProtectedRoute><UtilityReadings /></ProtectedRoute>} />
           <Route path="/utility-types" element={<ProtectedRoute><UtilityTypes /></ProtectedRoute>} />
         </Routes>
-        {!isAuthPage && isAuthenticated && <AIChat onTransactionCreated={handleTransactionCreated} />}
       </Content>
     </Layout>
   );
