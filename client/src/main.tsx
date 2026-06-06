@@ -6,6 +6,7 @@ import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
 import "./i18n";
 import "@radix-ui/themes/styles.css";
+import "./theme/globalStyles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import * as ToastPrimitive from '@radix-ui/react-toast'
 import { Flex, Text, IconButton } from '@radix-ui/themes'
-import { Cross1Icon } from '@radix-ui/react-icons'
+import { Cross1Icon, CheckCircledIcon, CrossCircledIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 
 type ToastType = 'success' | 'error' | 'info'
 
@@ -21,6 +21,12 @@ const ToastCtx = createContext<ToastContextType | null>(null)
 
 let toastId = 0
 
+const typeConfig: Record<ToastType, { color: 'jade' | 'tomato' | 'indigo'; Icon: typeof CheckCircledIcon }> = {
+  success: { color: 'jade', Icon: CheckCircledIcon },
+  error: { color: 'tomato', Icon: CrossCircledIcon },
+  info: { color: 'indigo', Icon: InfoCircledIcon },
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -36,48 +42,47 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const error = useCallback((msg: string) => addToast(msg, 'error'), [addToast])
   const info = useCallback((msg: string) => addToast(msg, 'info'), [addToast])
 
-  const colorMap: Record<ToastType, 'green' | 'red' | 'blue'> = {
-    success: 'green',
-    error: 'red',
-    info: 'blue',
-  }
-
   return (
     <ToastCtx.Provider value={{ success, error, info }}>
       <ToastPrimitive.Provider swipeDirection="right" duration={4000}>
         {children}
-        {toasts.map(t => (
-          <ToastPrimitive.Root
-            key={t.id}
-            open
-            onOpenChange={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
-            asChild
-          >
-            <Flex
-              align="center"
-              gap="2"
-              style={{
-                background: `var(--${colorMap[t.type]}-3)`,
-                border: `1px solid var(--${colorMap[t.type]}-6)`,
-                borderRadius: 'var(--radius-3)',
-                padding: '12px 16px',
-                boxShadow: 'var(--shadow-3)',
-              }}
+        {toasts.map(t => {
+          const { color, Icon } = typeConfig[t.type]
+          return (
+            <ToastPrimitive.Root
+              key={t.id}
+              open
+              onOpenChange={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+              asChild
             >
-              <Text size="2">{t.message}</Text>
-              <ToastPrimitive.Close asChild>
-                <IconButton size="1" variant="ghost" color="gray">
-                  <Cross1Icon />
-                </IconButton>
-              </ToastPrimitive.Close>
-            </Flex>
-          </ToastPrimitive.Root>
-        ))}
+              <Flex
+                align="center"
+                gap="2"
+                style={{
+                  background: `var(--${color}-3)`,
+                  border: `1px solid var(--${color}-6)`,
+                  borderRadius: 'var(--radius-3)',
+                  padding: '12px 16px',
+                  boxShadow: 'var(--shadow-3)',
+                }}
+              >
+                <Icon style={{ color: `var(--${color}-9)`, flexShrink: 0 }} />
+                <Text size="2">{t.message}</Text>
+                <ToastPrimitive.Close asChild>
+                  <IconButton size="1" variant="ghost" color={color}>
+                    <Cross1Icon />
+                  </IconButton>
+                </ToastPrimitive.Close>
+              </Flex>
+            </ToastPrimitive.Root>
+          )
+        })}
         <ToastPrimitive.Viewport
           style={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            top: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
             display: 'flex',
             flexDirection: 'column',
             gap: 8,

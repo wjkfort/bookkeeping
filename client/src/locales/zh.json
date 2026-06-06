@@ -147,7 +147,8 @@
     "save": "保存",
     "create": "创建",
     "update": "更新",
-    "delete": "删除"
+    "delete": "删除",
+    "loading": "加载中..."
   },
   "subscriptions": {
     "title": "订阅管理",

@@ -1,40 +1,39 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Flex, IconButton } from '@radix-ui/themes';
+import { Flex, Button } from '@radix-ui/themes';
+
+const languages = [
+  { code: 'en', label: 'EN' },
+  { code: 'zh', label: '中文' },
+] as const;
 
 const LanguageSwitcher: React.FC = () => {
   const { i18n } = useTranslation();
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'zh' ? 'en' : 'zh';
-    i18n.changeLanguage(newLang);
-    localStorage.setItem('language', newLang);
-  };
-
   return (
-    <Flex gap="1">
-      <IconButton
-        size="2"
-        variant={i18n.language === 'en' ? 'solid' : 'soft'}
-        color="gray"
-        onClick={() => {
-          i18n.changeLanguage('en');
-          localStorage.setItem('language', 'en');
-        }}
-      >
-        EN
-      </IconButton>
-      <IconButton
-        size="2"
-        variant={i18n.language === 'zh' ? 'solid' : 'soft'}
-        color="gray"
-        onClick={() => {
-          i18n.changeLanguage('zh');
-          localStorage.setItem('language', 'zh');
-        }}
-      >
-        中文
-      </IconButton>
+    <Flex gap="0" style={{ borderRadius: 'var(--radius-2)', overflow: 'hidden' }}>
+      {languages.map((lang, i) => {
+        const isActive = i18n.language === lang.code;
+        return (
+          <Button
+            key={lang.code}
+            size="1"
+            variant={isActive ? 'solid' : 'soft'}
+            color="iris"
+            style={{
+              borderRadius: 0,
+              minWidth: i === 0 ? 36 : 40,
+              fontWeight: isActive ? 600 : 400,
+            }}
+            onClick={() => {
+              i18n.changeLanguage(lang.code);
+              localStorage.setItem('language', lang.code);
+            }}
+          >
+            {lang.label}
+          </Button>
+        );
+      })}
     </Flex>
   );
 };

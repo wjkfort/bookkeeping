@@ -648,7 +648,7 @@ const Dashboard: React.FC = () => {
           <div className="stat-icon">📈</div>
           <Flex direction="column" align="center" gap="1">
             <Text size="2" color="gray">{t("dashboard.totalIncome")}</Text>
-            <Heading size="7" className="amount">
+            <Heading size="7">
               {revealedStats.has("income") ? summary.total_income.toFixed(2) : "****"}
             </Heading>
             <Text size="1" color="gray">{currencyCode}</Text>
@@ -659,7 +659,7 @@ const Dashboard: React.FC = () => {
           <div className="stat-icon">📉</div>
           <Flex direction="column" align="center" gap="1">
             <Text size="2" color="gray">{t("dashboard.totalExpense")}</Text>
-            <Heading size="7" className="amount">
+            <Heading size="7">
               {revealedStats.has("expense") ? summary.total_expense.toFixed(2) : "****"}
             </Heading>
             <Text size="1" color="gray">{currencyCode}</Text>
@@ -670,7 +670,7 @@ const Dashboard: React.FC = () => {
           <div className="stat-icon">💰</div>
           <Flex direction="column" align="center" gap="1">
             <Text size="2" color="gray">{t("dashboard.balance")}</Text>
-            <Heading size="7" className="amount">
+            <Heading size="7">
               {revealedStats.has("balance") ? overallBalance.toFixed(2) : "****"}
             </Heading>
             <Text size="1" color="gray">{currencyCode}</Text>
@@ -934,7 +934,7 @@ const Dashboard: React.FC = () => {
                         <Table.Cell>{dayjs(txn.date).format("YYYY-MM-DD")}</Table.Cell>
                         <Table.Cell>{txn.description}</Table.Cell>
                         <Table.Cell>
-                          <span className="amount">
+                          <span>
                             {formatWithConversion(txn.amount, txn.currency)}
                           </span>
                         </Table.Cell>
