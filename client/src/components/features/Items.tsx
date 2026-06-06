@@ -1,27 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Table, Button, Space, message, Modal, Statistic, Row, Col, Input, Form } from "antd";
-import { EyeOutlined, ArrowLeftOutlined, SearchOutlined, LineChartOutlined, EditOutlined } from "@ant-design/icons";
-import { Line } from "@ant-design/plots";
+import {
+  Card,
+  Table,
+  Button,
+  Flex,
+  Dialog,
+  TextField,
+  Text,
+  Heading,
+  IconButton,
+} from "@radix-ui/themes";
+import { EyeOpenIcon, Pencil1Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { useCurrency } from "../../hooks/useCurrency";
 import { getItems, getItemHistory, updateItem } from "../../api";
 import { ItemWithStats, ItemHistory, Transaction } from "../../types";
-import type { ColumnsType } from "antd/es/table";
+import { useToast } from "../ui/Toast";
 import dayjs from "dayjs";
 import "./Items.css";
 
 const Items: React.FC = () => {
   const { t } = useTranslation();
+  const toast = useToast();
   const { formatCurrency, formatWithConversion } = useCurrency();
   const [items, setItems] = useState<ItemWithStats[]>([]);
   const [filteredItems, setFilteredItems] = useState<ItemWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<ItemHistory | null>(null);
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemWithStats | null>(null);
-  const [form] = Form.useForm();
+  const [formName, setFormName] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadItems();
@@ -35,7 +56,7 @@ const Items: React.FC = () => {
       setFilteredItems(response.data as ItemWithStats[]);
     } catch (error) {
       console.error("Error loading items:", error);
-      message.error(t("items.errorLoading"));
+      toast.error(t("items.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -46,7 +67,9 @@ const Items: React.FC = () => {
     if (!value.trim()) {
       setFilteredItems(items);
     } else {
-      const filtered = items.filter((item) => item.name.toLowerCase().includes(value.toLowerCase()));
+      const filtered = items.filter((item) =>
+        item.name.toLowerCase().includes(value.toLowerCase()),
+      );
       setFilteredItems(filtered);
     }
   };
@@ -55,249 +78,274 @@ const Items: React.FC = () => {
     try {
       const response = await getItemHistory(itemId);
       setSelectedItem(response.data);
-      setHistoryModalVisible(true);
+      setHistoryDialogOpen(true);
     } catch (error) {
       console.error("Error loading item history:", error);
-      message.error(t("items.errorLoadingHistory"));
+      toast.error(t("items.errorLoadingHistory"));
     }
   };
 
-  const handleEdit = (item: ItemWithStats) => {
+  const openEditDialog = (item: ItemWithStats) => {
     setEditingItem(item);
-    form.setFieldsValue({ name: item.name });
-    setEditModalVisible(true);
+    setFormName(item.name);
+    setEditDialogOpen(true);
   };
 
   const handleUpdateItem = async () => {
+    if (!editingItem || !formName.trim()) return;
+    setSaving(true);
     try {
-      const values = await form.validateFields();
-      if (!editingItem) return;
-
-      await updateItem(editingItem.id, { name: values.name });
-      message.success(t("items.updateSuccess"));
-      setEditModalVisible(false);
+      await updateItem(editingItem.id, { name: formName });
+      toast.success(t("items.updateSuccess"));
+      setEditDialogOpen(false);
       setEditingItem(null);
-      form.resetFields();
+      setFormName("");
       loadItems();
     } catch (error) {
       console.error("Error updating item:", error);
-      message.error(t("items.errorUpdating"));
+      toast.error(t("items.errorUpdating"));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const columns: ColumnsType<ItemWithStats> = [
-    {
-      title: t("items.name"),
-      dataIndex: "name",
-      key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name),
-    },
-    {
-      title: t("items.totalPurchases"),
-      dataIndex: "total_purchases",
-      key: "total_purchases",
-      sorter: (a, b) => a.total_purchases - b.total_purchases,
-    },
-    {
-      title: t("items.lastUnitPrice"),
-      key: "last_unit_price",
-      render: (_, record) => {
-        if (record.last_unit_price && record.unit) {
-          return `${formatCurrency(record.last_unit_price, "USD")}/${t(`units.${record.unit}`)}`;
-        }
-        return "-";
-      },
-      sorter: (a, b) => (a.last_unit_price || 0) - (b.last_unit_price || 0),
-    },
-    {
-      title: t("items.totalSpent"),
-      dataIndex: "total_spent",
-      key: "total_spent",
-      render: (value: number) => formatCurrency(value || 0, "USD"),
-      sorter: (a, b) => (a.total_spent || 0) - (b.total_spent || 0),
-    },
-    {
-      title: t("items.averagePrice"),
-      dataIndex: "average_price",
-      key: "average_price",
-      render: (value: number) => formatCurrency(value || 0, "USD"),
-      sorter: (a, b) => (a.average_price || 0) - (b.average_price || 0),
-    },
-    {
-      title: t("items.lastPurchase"),
-      dataIndex: "last_purchase_date",
-      key: "last_purchase_date",
-      render: (date: string) => (date ? dayjs(date).format("YYYY-MM-DD") : "-"),
-      sorter: (a, b) => (a.last_purchase_date || "").localeCompare(b.last_purchase_date || ""),
-    },
-    {
-      title: t("transactions.actions"),
-      key: "actions",
-      render: (_, record) => (
-        <Space>
-          <Button icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            {t("common.edit")}
-          </Button>
-          <Button type="primary" icon={<EyeOutlined />} onClick={() => handleViewHistory(record.id)} disabled={record.total_purchases === 0}>
-            {t("items.viewHistory")}
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
-  const transactionColumns: ColumnsType<Transaction> = [
-    {
-      title: t("transactions.date"),
-      dataIndex: "date",
-      key: "date",
-      render: (date: string) => dayjs(date).format("YYYY-MM-DD"),
-    },
-    {
-      title: t("transactions.description"),
-      dataIndex: "description",
-      key: "description",
-    },
-    {
-      title: t("transactions.unitPrice"),
-      key: "unit_price",
-      render: (_, record) => {
-        if (record.unit_price && record.unit) {
-          return `${formatWithConversion(record.unit_price, record.currency)}/${t(`units.${record.unit}`)}`;
-        }
-        return "-";
-      },
-    },
-    {
-      title: t("transactions.quantity"),
-      key: "quantity",
-      render: (_, record) => {
-        if (record.quantity && record.unit) {
-          return `${record.quantity} ${t(`units.${record.unit}`)}`;
-        }
-        return "-";
-      },
-    },
-    {
-      title: t("transactions.amount"),
-      key: "amount",
-      render: (_, record) => <span>{formatWithConversion(record.amount, record.currency)}</span>,
-    },
-  ];
-
   return (
-    <div className="items-page">
-      <div className="items-header">
-        <h1 className="items-title">{t("items.title")}</h1>
-      </div>
+    <Flex direction="column" gap="4">
+      <Flex justify="between" align="center">
+        <Heading size="6">{t("items.title")}</Heading>
+      </Flex>
 
-      <Card className="items-search-card" bordered={false}>
-        <Input 
-          placeholder={t("items.searchPlaceholder")} 
-          prefix={<SearchOutlined />} 
-          value={searchText} 
-          onChange={(e) => handleSearch(e.target.value)} 
-          allowClear 
-          style={{ width: "100%", maxWidth: "400px" }} 
-          size="large"
-        />
+      <Card>
+        <TextField.Root
+          placeholder={t("items.searchPlaceholder")}
+          value={searchText}
+          onChange={(e) => handleSearch((e.target as HTMLInputElement).value)}
+        >
+          <TextField.Slot>
+            <MagnifyingGlassIcon />
+          </TextField.Slot>
+        </TextField.Root>
       </Card>
 
-      <Card className="items-table-card" bordered={false}>
-        <Table columns={columns} dataSource={filteredItems} rowKey="id" loading={loading} locale={{ emptyText: t("items.noItems") }} />
-      </Card>
-
-      <Modal
-        title={
-          <Space>
-            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setHistoryModalVisible(false)} />
-            {selectedItem?.item.name} - {t("items.historyTitle")}
-          </Space>
-        }
-        open={historyModalVisible}
-        onCancel={() => setHistoryModalVisible(false)}
-        footer={null}
-        width={1000}
-      >
-        {selectedItem && (
-          <>
-            <div className="item-history-stats">
-              <Row gutter={16}>
-                <Col span={8} style={{ textAlign: "center" }}>
-                  <Statistic title={t("items.totalPurchases")} value={selectedItem.stats.total_purchases} />
-                </Col>
-                <Col span={8} style={{ textAlign: "center" }}>
-                  <Statistic title={t("items.totalSpent")} value={formatCurrency(selectedItem.stats.total_spent)} />
-                </Col>
-                <Col span={8} style={{ textAlign: "center" }}>
-                  <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItem.stats.average_price)} />
-                </Col>
-              </Row>
-            </div>
-
-            {selectedItem.transactions.filter((t) => t.unit_price !== null).length > 1 && (
-              <Card 
-                title={<><LineChartOutlined /> {t("items.unitPriceTrend")}</>}
-                style={{ marginBottom: "16px" }}
-                bordered={false}
-              >
-                <Line
-                  data={selectedItem.transactions
-                    .filter((t) => t.unit_price !== null)
-                    .map((t) => ({
-                      date: t.date,
-                      price: t.unit_price,
-                    }))
-                    .reverse()}
-                  xField="date"
-                  yField="price"
-                  point={{
-                    size: 5,
-                    shape: "circle",
-                  }}
-                  tooltip={{
-                    title: (d) => d.date,
-                    items: [
-                      (d, idx) => {
-                        const transaction = selectedItem.transactions.filter((t) => t.unit_price !== null).reverse()[idx];
-                        return {
-                          name: t("transactions.unitPrice"),
-                          value: formatWithConversion(d.price, transaction?.currency || "USD"),
-                        };
-                      },
-                    ],
-                  }}
-                  height={250}
-                />
-              </Card>
+      <Card>
+        <Table.Root variant="surface">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeaderCell>{t("items.name")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("items.totalPurchases")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("items.lastUnitPrice")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("items.totalSpent")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("items.averagePrice")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("items.lastPurchase")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("transactions.actions")}</Table.ColumnHeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {loading ? (
+              <Table.Row>
+                <Table.Cell colSpan={7}>
+                  <Text align="center" color="gray">...</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : filteredItems.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan={7}>
+                  <Text align="center" color="gray">{t("items.noItems")}</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : (
+              filteredItems.map((item) => (
+                <Table.Row key={item.id}>
+                  <Table.Cell>{item.name}</Table.Cell>
+                  <Table.Cell>{item.total_purchases}</Table.Cell>
+                  <Table.Cell>
+                    {item.last_unit_price && item.unit
+                      ? `${formatCurrency(item.last_unit_price, "USD")}/${t(`units.${item.unit}`)}`
+                      : "-"}
+                  </Table.Cell>
+                  <Table.Cell>{formatCurrency(item.total_spent || 0, "USD")}</Table.Cell>
+                  <Table.Cell>{formatCurrency(item.average_price || 0, "USD")}</Table.Cell>
+                  <Table.Cell>
+                    {item.last_purchase_date
+                      ? dayjs(item.last_purchase_date).format("YYYY-MM-DD")
+                      : "-"}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Flex gap="2">
+                      <IconButton variant="soft" color="blue" onClick={() => openEditDialog(item)}>
+                        <Pencil1Icon />
+                      </IconButton>
+                      <IconButton
+                        variant="soft"
+                        onClick={() => handleViewHistory(item.id)}
+                        disabled={item.total_purchases === 0}
+                      >
+                        <EyeOpenIcon />
+                      </IconButton>
+                    </Flex>
+                  </Table.Cell>
+                </Table.Row>
+              ))
             )}
+          </Table.Body>
+        </Table.Root>
+      </Card>
 
-            <Card title={t("items.transactions")} bordered={false}>
-              <Table columns={transactionColumns} dataSource={selectedItem.transactions} rowKey="id" pagination={{ pageSize: 10 }} locale={{ emptyText: t("transactions.noTransactions") }} />
-            </Card>
-          </>
-        )}
-      </Modal>
-
-      <Modal
-        title={t("items.editItem")}
-        open={editModalVisible}
-        onOk={handleUpdateItem}
-        onCancel={() => {
-          setEditModalVisible(false);
-          setEditingItem(null);
-          form.resetFields();
+      {/* Edit Dialog */}
+      <Dialog.Root
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) { setEditDialogOpen(false); setEditingItem(null); setFormName(""); }
         }}
-        okText={t("common.save")}
-        cancelText={t("common.cancel")}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label={t("items.name")} rules={[{ required: true, message: t("items.nameRequired") }]}>
-            <Input />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>{t("items.editItem")}</Dialog.Title>
+          <Flex direction="column" gap="3" mt="4">
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("items.name")}
+              </Text>
+              <TextField.Root
+                value={formName}
+                onChange={(e) => setFormName((e.target as HTMLInputElement).value)}
+              />
+            </label>
+          </Flex>
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => { setEditDialogOpen(false); setEditingItem(null); setFormName(""); }}
+              disabled={saving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleUpdateItem} disabled={saving}>
+              {t("common.save")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* History Dialog */}
+      <Dialog.Root open={historyDialogOpen} onOpenChange={(open) => { if (!open) setHistoryDialogOpen(false); }}>
+        <Dialog.Content style={{ maxWidth: 800 }}>
+          <Flex align="center" gap="3" mb="4">
+            <IconButton variant="ghost" onClick={() => setHistoryDialogOpen(false)}>
+              ←
+            </IconButton>
+            <Dialog.Title style={{ margin: 0 }}>
+              {selectedItem?.item.name} - {t("items.historyTitle")}
+            </Dialog.Title>
+          </Flex>
+
+          {selectedItem && (
+            <Flex direction="column" gap="4">
+              {/* Stats */}
+              <Flex gap="4" justify="center">
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.totalPurchases")}</Text>
+                  <Heading size="6">{selectedItem.stats.total_purchases}</Heading>
+                </Flex>
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.totalSpent")}</Text>
+                  <Heading size="6">{formatCurrency(selectedItem.stats.total_spent)}</Heading>
+                </Flex>
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.averagePrice")}</Text>
+                  <Heading size="6">{formatCurrency(selectedItem.stats.average_price)}</Heading>
+                </Flex>
+              </Flex>
+
+              {/* Unit price trend chart */}
+              {selectedItem.transactions.filter((t) => t.unit_price !== null).length > 1 && (
+                <Card>
+                  <Text size="2" weight="medium" mb="2">
+                    {t("items.unitPriceTrend")}
+                  </Text>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart
+                      data={selectedItem.transactions
+                        .filter((t) => t.unit_price !== null)
+                        .map((t) => ({
+                          date: t.date,
+                          price: t.unit_price,
+                          currency: t.currency,
+                        }))
+                        .reverse()}
+                    >
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value: number, _: string, props: any) => [
+                          formatWithConversion(value, props.payload?.currency || "USD"),
+                          t("transactions.unitPrice"),
+                        ]}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="price"
+                        stroke="var(--accent-9)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              {/* Transactions table */}
+              <Card>
+                <Text size="2" weight="medium" mb="2">
+                  {t("items.transactions")}
+                </Text>
+                <Table.Root variant="surface">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>{t("transactions.date")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.description")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.unitPrice")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.quantity")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.amount")}</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {selectedItem.transactions.length === 0 ? (
+                      <Table.Row>
+                        <Table.Cell colSpan={5}>
+                          <Text align="center" color="gray">
+                            {t("transactions.noTransactions")}
+                          </Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ) : (
+                      selectedItem.transactions.map((tr) => (
+                        <Table.Row key={tr.id}>
+                          <Table.Cell>{dayjs(tr.date).format("YYYY-MM-DD")}</Table.Cell>
+                          <Table.Cell>{tr.description}</Table.Cell>
+                          <Table.Cell>
+                            {tr.unit_price && tr.unit
+                              ? `${formatWithConversion(tr.unit_price, tr.currency)}/${t(`units.${tr.unit}`)}`
+                              : "-"}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {tr.quantity && tr.unit
+                              ? `${tr.quantity} ${t(`units.${tr.unit}`)}`
+                              : "-"}
+                          </Table.Cell>
+                          <Table.Cell>{formatWithConversion(tr.amount, tr.currency)}</Table.Cell>
+                        </Table.Row>
+                      ))
+                    )}
+                  </Table.Body>
+                </Table.Root>
+              </Card>
+            </Flex>
+          )}
+        </Dialog.Content>
+      </Dialog.Root>
+    </Flex>
   );
 };
 

@@ -1,113 +1,76 @@
 import React, { useState } from "react";
-import { Form, Input, Button, Card, Typography, message } from "antd";
-import { UserOutlined, LockOutlined, ArrowRightOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
+import { Flex, Card, TextField, Button, Text, Heading, Link as RadixLink } from "@radix-ui/themes";
+import { EnvelopeClosedIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { useTranslation } from "react-i18next";
-import LanguageSwitcher from "../ui/LanguageSwitcher";
-import "./Auth.css";
-
-const { Title, Text } = Typography;
+import { useToast } from "../ui/Toast";
 
 export const Login: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const toast = useToast();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = async (values: { email: string; password: string }) => {
+  const handleSubmit = async () => {
+    if (!email || !password) return;
     setLoading(true);
     try {
-      await login(values.email, values.password);
-      message.success(t("login.success") || "Login successful!");
+      await login(email, password);
+      toast.success(t("login.success"));
       navigate("/");
-    } catch (error: any) {
-      const errorMsg = error.message || t("login.error") || "Login failed";
-      
-      if (errorMsg.includes("Invalid credentials") || errorMsg.includes("credentials")) {
-        message.warning(t("login.hint") || "Don't have an account? Please register first!");
-      } else {
-        message.error(errorMsg);
-      }
+    } catch (err: any) {
+      toast.error(err.message || t("login.error"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-background">
-        <div className="auth-blob auth-blob-1"></div>
-        <div className="auth-blob auth-blob-2"></div>
-        <div className="auth-blob auth-blob-3"></div>
-      </div>
-      
-      <div className="auth-language-switcher">
-        <LanguageSwitcher />
-      </div>
+    <Flex justify="center" align="center" style={{ minHeight: "80vh" }}>
+      <Card size="3" style={{ width: 400 }}>
+        <Flex direction="column" gap="4" p="4">
+          <Flex direction="column" gap="1" align="center" mb="4">
+            <Heading size="6">{t("login.title")}</Heading>
+            <Text size="2" color="gray">{t("login.subtitle")}</Text>
+          </Flex>
 
-      <div className="auth-content">
-        <div className="auth-brand">
-          <div className="auth-brand-icon">💰</div>
-          <h1 className="auth-brand-title">{t("nav.title") || "Bookkeeping"}</h1>
-          <p className="auth-brand-subtitle">{t("login.subtitle") || "Track your finances with ease"}</p>
-        </div>
+          <TextField.Root
+            size="3"
+            placeholder={t("login.emailPlaceholder")}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          >
+            <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
+          </TextField.Root>
 
-        <Card className="auth-card" variant="borderless">
-          <div className="auth-card-header">
-            <Title level={2} className="auth-card-title">{t("login.title") || "Welcome Back"}</Title>
-            <Text className="auth-card-subtitle">{t("login.subtitle") || "Sign in to continue"}</Text>
-          </div>
+          <TextField.Root
+            size="3"
+            type="password"
+            placeholder={t("login.passwordPlaceholder")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          >
+            <TextField.Slot><LockClosedIcon /></TextField.Slot>
+          </TextField.Root>
 
-          <Form name="login" onFinish={onFinish} autoComplete="off" layout="vertical" size="large">
-            <Form.Item
-              name="email"
-              rules={[
-                { required: true, message: t("login.emailRequired") || "Please input your email!" },
-                { type: "email", message: t("login.emailInvalid") || "Please enter a valid email!" },
-              ]}
-            >
-              <Input 
-                prefix={<UserOutlined style={{ color: "#a8a29e" }} />} 
-                placeholder={t("login.emailPlaceholder") || "Email"} 
-              />
-            </Form.Item>
+          <Button size="3" onClick={handleSubmit} disabled={loading || !email || !password}>
+            {loading ? "..." : t("login.button")}
+          </Button>
 
-            <Form.Item 
-              name="password" 
-              rules={[{ required: true, message: t("login.passwordRequired") || "Please input your password!" }]}
-            >
-              <Input.Password 
-                prefix={<LockOutlined style={{ color: "#a8a29e" }} />} 
-                placeholder={t("login.passwordPlaceholder") || "Password"} 
-              />
-            </Form.Item>
-
-            <Form.Item>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                loading={loading} 
-                block 
-                icon={<ArrowRightOutlined />}
-                iconPlacement="end"
-                className="auth-submit-btn"
-              >
-                {t("login.button") || "Log in"}
-              </Button>
-            </Form.Item>
-
-            <div className="auth-footer">
-              <Text className="auth-footer-text">
-                {t("login.noAccount") || "Don't have an account?"}{" "}
-                <Link to="/register" className="auth-link">
-                  {t("login.registerLink") || "Register now"}
-                </Link>
-              </Text>
-            </div>
-          </Form>
-        </Card>
-      </div>
-    </div>
+          <Text size="2" align="center" color="gray">
+            {t("login.noAccount")}{" "}
+            <RadixLink asChild>
+              <Link to="/register">{t("login.registerLink")}</Link>
+            </RadixLink>
+          </Text>
+        </Flex>
+      </Card>
+    </Flex>
   );
 };

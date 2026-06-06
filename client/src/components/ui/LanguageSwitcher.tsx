@@ -1,32 +1,41 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Space } from 'antd';
+import { Flex, IconButton } from '@radix-ui/themes';
 
 const LanguageSwitcher: React.FC = () => {
   const { i18n } = useTranslation();
 
-  const changeLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
-    localStorage.setItem('language', lng);
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'zh' ? 'en' : 'zh';
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
   };
 
   return (
-    <Space>
-      <Button
-        type={i18n.language === 'en' ? 'primary' : 'default'}
-        onClick={() => changeLanguage('en')}
-        size="small"
+    <Flex gap="1">
+      <IconButton
+        size="2"
+        variant={i18n.language === 'en' ? 'solid' : 'soft'}
+        color="gray"
+        onClick={() => {
+          i18n.changeLanguage('en');
+          localStorage.setItem('language', 'en');
+        }}
       >
         EN
-      </Button>
-      <Button
-        type={i18n.language === 'zh' ? 'primary' : 'default'}
-        onClick={() => changeLanguage('zh')}
-        size="small"
+      </IconButton>
+      <IconButton
+        size="2"
+        variant={i18n.language === 'zh' ? 'solid' : 'soft'}
+        color="gray"
+        onClick={() => {
+          i18n.changeLanguage('zh');
+          localStorage.setItem('language', 'zh');
+        }}
       >
         中文
-      </Button>
-    </Space>
+      </IconButton>
+    </Flex>
   );
 };
 

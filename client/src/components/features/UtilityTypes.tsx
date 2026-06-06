@@ -1,13 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Table, Button, Form, Input, Select, Space, Modal, message, Tag, TreeSelect } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { getUtilityTypes, createUtilityType, updateUtilityType, deleteUtilityType, getCategories } from "../../api";
+import {
+  Card,
+  Table,
+  Button,
+  Flex,
+  Dialog,
+  TextField,
+  Select,
+  Text,
+  Heading,
+  Badge,
+  IconButton,
+} from "@radix-ui/themes";
+import { PlusIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
+import {
+  getUtilityTypes,
+  createUtilityType,
+  updateUtilityType,
+  deleteUtilityType,
+  getCategories,
+} from "../../api";
 import { UtilityType, Category } from "../../types";
-import type { ColumnsType } from "antd/es/table";
+import { useToast } from "../ui/Toast";
 import "./UtilityTypes.css";
-
-const { Option } = Select;
 
 const UTILITY_ICONS = [
   { label: "💧", value: "water" },
@@ -23,13 +39,21 @@ const UTILITY_ICONS = [
 
 const UtilityTypes: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const toast = useToast();
   const [types, setTypes] = useState<UtilityType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryTreeData, setCategoryTreeData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<UtilityType | null>(null);
-  const [form] = Form.useForm();
+
+  // Form state
+  const [formName, setFormName] = useState("");
+  const [formIcon, setFormIcon] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -40,38 +64,16 @@ const UtilityTypes: React.FC = () => {
       setLoading(true);
       const [typesRes, categoriesRes] = await Promise.all([
         getUtilityTypes(),
-        getCategories(false), // fetch tree structure
+        getCategories(false),
       ]);
       setTypes(typesRes.data);
-      const cats = categoriesRes.data as Category[];
-      setCategories(cats);
-      setCategoryTreeData(buildCategoryTree(cats));
+      setCategories(categoriesRes.data as Category[]);
     } catch (error) {
       console.error("Error loading utility types:", error);
-      message.error(t("utilityTypes.errorLoading"));
+      toast.error(t("utilityTypes.errorLoading"));
     } finally {
       setLoading(false);
     }
-  };
-
-  const buildCategoryTree = (cats: Category[]): any[] => {
-    const lang = i18n.language;
-    const getName = (cat: Category) => {
-      if (cat.translations && cat.translations[lang]) return cat.translations[lang];
-      if (cat.translations && cat.translations["en"]) return cat.translations["en"];
-      return cat.name;
-    };
-
-    return cats.map((cat) => ({
-      title: (
-        <span>
-          {getName(cat)} <span style={{ color: '#999', fontSize: 12 }}>({cat.type === 'income' ? t('categories.income') : t('categories.expense')})</span>
-        </span>
-      ),
-      value: cat.id,
-      key: cat.id,
-      children: cat.children ? buildCategoryTree(cat.children) : undefined,
-    }));
   };
 
   const loadTypes = async () => {
@@ -80,71 +82,92 @@ const UtilityTypes: React.FC = () => {
       setTypes(response.data);
     } catch (error) {
       console.error("Error loading utility types:", error);
-      message.error(t("utilityTypes.errorLoading"));
+      toast.error(t("utilityTypes.errorLoading"));
     }
   };
 
-  const openAddModal = () => {
-    setEditingType(null);
-    form.resetFields();
-    setIsModalVisible(true);
+  // Build flat category list with indentation for display
+  const buildCategoryOptions = (cats: Category[], level: number = 0): { value: string; label: string }[] => {
+    const lang = i18n.language;
+    const getName = (cat: Category) => {
+      if (cat.translations && cat.translations[lang]) return cat.translations[lang];
+      if (cat.translations && cat.translations["en"]) return cat.translations["en"];
+      return cat.name;
+    };
+    const result: { value: string; label: string }[] = [];
+    cats.forEach((cat) => {
+      const prefix = level > 0 ? "  ".repeat(level) + "└ " : "";
+      result.push({
+        value: String(cat.id),
+        label: `${prefix}${getName(cat)} (${cat.type === "income" ? t("categories.income") : t("categories.expense")})`,
+      });
+      if (cat.children && cat.children.length > 0) {
+        result.push(...buildCategoryOptions(cat.children, level + 1));
+      }
+    });
+    return result;
   };
 
-  const handleSubmit = async (values: any) => {
+  const openAddDialog = () => {
+    setEditingType(null);
+    setFormName("");
+    setFormIcon("");
+    setFormCategoryId(null);
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!formName.trim()) return;
+    setSaving(true);
     try {
       if (editingType) {
         await updateUtilityType(editingType.id, {
-          name: values.name,
-          icon: values.icon,
-          category_id: values.category_id || null,
+          name: formName,
+          icon: formIcon || null,
+          category_id: formCategoryId || null,
         });
-        message.success(t("utilityTypes.successUpdating"));
+        toast.success(t("utilityTypes.successUpdating"));
       } else {
         await createUtilityType({
-          name: values.name,
-          icon: values.icon,
-          category_id: values.category_id || null,
+          name: formName,
+          icon: formIcon || null,
+          category_id: formCategoryId || null,
         });
-        message.success(t("utilityTypes.successCreating"));
+        toast.success(t("utilityTypes.successCreating"));
       }
-      form.resetFields();
-      setIsModalVisible(false);
+      setDialogOpen(false);
       setEditingType(null);
       loadTypes();
     } catch (error: any) {
       console.error("Error saving utility type:", error);
-      message.error(error.response?.data?.error || t(editingType ? "utilityTypes.errorUpdating" : "utilityTypes.errorCreating"));
+      toast.error(
+        error.response?.data?.error ||
+          t(editingType ? "utilityTypes.errorUpdating" : "utilityTypes.errorCreating"),
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleEdit = (utType: UtilityType) => {
     setEditingType(utType);
-    form.setFieldsValue({
-      name: utType.name,
-      icon: utType.icon,
-      category_id: utType.category_id,
-    });
-    setIsModalVisible(true);
+    setFormName(utType.name);
+    setFormIcon(utType.icon || "");
+    setFormCategoryId(utType.category_id);
+    setDialogOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    Modal.confirm({
-      title: t("utilityTypes.deleteTitle"),
-      content: t("utilityTypes.deleteConfirm"),
-      okText: t("common.yes"),
-      cancelText: t("common.no"),
-      okType: "danger",
-      onOk: async () => {
-        try {
-          await deleteUtilityType(id);
-          message.success(t("utilityTypes.successDeleting"));
-          loadTypes();
-        } catch (error) {
-          console.error("Error deleting utility type:", error);
-          message.error(t("utilityTypes.errorDeleting"));
-        }
-      },
-    });
+  const handleDelete = async () => {
+    if (deleteTarget === null) return;
+    try {
+      await deleteUtilityType(deleteTarget);
+      toast.success(t("utilityTypes.successDeleting"));
+      setDeleteTarget(null);
+      loadTypes();
+    } catch (error) {
+      console.error("Error deleting utility type:", error);
+      toast.error(t("utilityTypes.errorDeleting"));
+    }
   };
 
   const getIconEmoji = (iconValue: string | null) => {
@@ -173,122 +196,164 @@ const UtilityTypes: React.FC = () => {
     return undefined;
   };
 
-  const columns: ColumnsType<UtilityType> = [
-    {
-      title: t("utilityTypes.icon"),
-      dataIndex: "icon",
-      key: "icon",
-      width: 60,
-      render: (icon: string | null) => <span style={{ fontSize: 20 }}>{getIconEmoji(icon)}</span>,
-    },
-    {
-      title: t("utilityTypes.name"),
-      dataIndex: "name",
-      key: "name",
-    },
-    {
-      title: t("utilityTypes.bindCategory"),
-      key: "category",
-      render: (_, record) => {
-        if (!record.category_id) return <Tag>-</Tag>;
-        return <Tag color="blue">{getCategoryName(record)}</Tag>;
-      },
-    },
-    {
-      title: t("utilityTypes.actions"),
-      key: "actions",
-      render: (_, record) => (
-        <Space>
-          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            {t("common.edit")}
-          </Button>
-          <Button type="primary" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>
-            {t("utilityTypes.deleteBtn")}
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
   return (
-    <div className="utility-types-page">
-      <div className="utility-types-header">
-        <h1 className="utility-types-title">{t("utilityTypes.title")}</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
+    <Flex direction="column" gap="4">
+      <Flex justify="between" align="center">
+        <Heading size="6">{t("utilityTypes.title")}</Heading>
+        <Button onClick={openAddDialog}>
+          <PlusIcon />
           {t("utilityTypes.addNew")}
         </Button>
-      </div>
+      </Flex>
 
-      <Card className="utility-types-table-card" variant="borderless">
-        <Table
-          columns={columns}
-          dataSource={types}
-          rowKey="id"
-          loading={loading}
-          locale={{ emptyText: t("utilityTypes.noTypes") }}
-          pagination={{ pageSize: 20 }}
-        />
+      <Card>
+        <Table.Root variant="surface">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeaderCell width="60px">{t("utilityTypes.icon")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityTypes.name")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityTypes.bindCategory")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityTypes.actions")}</Table.ColumnHeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {loading ? (
+              <Table.Row>
+                <Table.Cell colSpan={4}>
+                  <Text align="center" color="gray">...</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : types.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan={4}>
+                  <Text align="center" color="gray">{t("utilityTypes.noTypes")}</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : (
+              types.map((utType) => (
+                <Table.Row key={utType.id}>
+                  <Table.Cell>
+                    <span style={{ fontSize: 20 }}>{getIconEmoji(utType.icon)}</span>
+                  </Table.Cell>
+                  <Table.Cell>{utType.name}</Table.Cell>
+                  <Table.Cell>
+                    {utType.category_id ? (
+                      <Badge color="blue">{getCategoryName(utType)}</Badge>
+                    ) : (
+                      <Badge color="gray">-</Badge>
+                    )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Flex gap="2">
+                      <IconButton variant="soft" color="blue" onClick={() => handleEdit(utType)}>
+                        <Pencil1Icon />
+                      </IconButton>
+                      <IconButton variant="soft" color="red" onClick={() => setDeleteTarget(utType.id)}>
+                        <TrashIcon />
+                      </IconButton>
+                    </Flex>
+                  </Table.Cell>
+                </Table.Row>
+              ))
+            )}
+          </Table.Body>
+        </Table.Root>
       </Card>
 
-      <Modal
-        title={editingType ? t("utilityTypes.editTitle") : t("utilityTypes.addNew")}
-        open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingType(null);
-          form.resetFields();
+      {/* Add/Edit Dialog */}
+      <Dialog.Root
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) { setDialogOpen(false); setEditingType(null); }
         }}
-        footer={null}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            name="name"
-            label={t("utilityTypes.name")}
-            rules={[{ required: true, message: t("utilityTypes.nameRequired") }]}
-          >
-            <Input placeholder={t("utilityTypes.namePlaceholder")} />
-          </Form.Item>
+        <Dialog.Content style={{ maxWidth: 480 }}>
+          <Dialog.Title>
+            {editingType ? t("utilityTypes.editTitle") : t("utilityTypes.addNew")}
+          </Dialog.Title>
 
-          <Form.Item name="icon" label={t("utilityTypes.icon")}>
-            <Select placeholder={t("utilityTypes.iconPlaceholder")} allowClear>
-              {UTILITY_ICONS.map((icon) => (
-                <Option key={icon.value} value={icon.value}>
-                  {icon.label}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+          <Flex direction="column" gap="3" mt="4">
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("utilityTypes.name")}
+              </Text>
+              <TextField.Root
+                placeholder={t("utilityTypes.namePlaceholder")}
+                value={formName}
+                onChange={(e) => setFormName((e.target as HTMLInputElement).value)}
+              />
+            </label>
 
-          <Form.Item name="category_id" label={t("utilityTypes.bindCategory")}>
-            <TreeSelect
-              treeData={categoryTreeData}
-              placeholder={t("utilityTypes.selectCategory")}
-              allowClear
-              showSearch
-              treeNodeFilterProp="title"
-              treeDefaultExpandAll
-            />
-          </Form.Item>
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("utilityTypes.icon")}
+              </Text>
+              <Select.Root value={formIcon || ""} onValueChange={setFormIcon}>
+                <Select.Trigger style={{ width: "100%" }} placeholder={t("utilityTypes.iconPlaceholder")} />
+                <Select.Content>
+                  <Select.Item value="">{t("utilityTypes.iconPlaceholder")}</Select.Item>
+                  {UTILITY_ICONS.map((icon) => (
+                    <Select.Item key={icon.value} value={icon.value}>
+                      {icon.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </label>
 
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingType ? t("utilityTypes.update") : t("utilityTypes.add")}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsModalVisible(false);
-                  setEditingType(null);
-                  form.resetFields();
-                }}
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("utilityTypes.bindCategory")}
+              </Text>
+              <Select.Root
+                value={formCategoryId?.toString() ?? ""}
+                onValueChange={(val) => setFormCategoryId(val ? parseInt(val) : null)}
               >
-                {t("common.cancel")}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+                <Select.Trigger style={{ width: "100%" }} placeholder={t("utilityTypes.selectCategory")} />
+                <Select.Content>
+                  <Select.Item value="">{t("utilityTypes.selectCategory")}</Select.Item>
+                  {buildCategoryOptions(categories).map((opt) => (
+                    <Select.Item key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </label>
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => { setDialogOpen(false); setEditingType(null); }}
+              disabled={saving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {editingType ? t("utilityTypes.update") : t("utilityTypes.add")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>{t("utilityTypes.deleteTitle")}</Dialog.Title>
+          <Text size="2" mt="2">{t("utilityTypes.deleteConfirm")}</Text>
+          <Flex gap="3" mt="4" justify="end">
+            <Button variant="soft" color="gray" onClick={() => setDeleteTarget(null)}>
+              {t("common.no")}
+            </Button>
+            <Button color="red" onClick={handleDelete}>
+              {t("common.yes")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+    </Flex>
   );
 };
 

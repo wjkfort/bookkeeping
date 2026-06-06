@@ -1,8 +1,16 @@
-import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ConfigProvider, Layout, Menu, Button } from "antd";
-import { DashboardOutlined, TransactionOutlined, AppstoreOutlined, ShoppingOutlined, LogoutOutlined, ThunderboltOutlined, EnvironmentOutlined, ToolOutlined } from '@ant-design/icons';
+import { Flex, Container, Tabs, IconButton, Text, Heading, Separator } from "@radix-ui/themes";
+import {
+  DashboardIcon,
+  ListBulletIcon,
+  MixerHorizontalIcon,
+  ArchiveIcon,
+  HomeIcon,
+  LightningBoltIcon,
+  GearIcon,
+  ExitIcon,
+} from "@radix-ui/react-icons";
 import Dashboard from "./components/features/Dashboard";
 import Transactions from "./components/features/Transactions";
 import Categories from "./components/features/Categories";
@@ -15,125 +23,174 @@ import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LanguageSwitcher from "./components/ui/LanguageSwitcher";
 import { useAuth } from "./contexts/AuthContext";
-import zhCN from "antd/locale/zh_CN";
-import enUS from "antd/locale/en_US";
-import { antdTheme } from "./theme/antdTheme";
-import "./theme/globalStyles.css";
 
-const { Header, Content } = Layout;
+const navItems = [
+  { path: "/", icon: DashboardIcon },
+  { path: "/transactions", icon: ListBulletIcon },
+  { path: "/categories", icon: MixerHorizontalIcon },
+  { path: "/items", icon: ArchiveIcon },
+  { path: "/utility-addresses", icon: HomeIcon },
+  { path: "/utility-readings", icon: LightningBoltIcon },
+  { path: "/utility-types", icon: GearIcon },
+] as const;
 
 function AppContent() {
   const { t } = useTranslation();
   const location = useLocation();
-  const [selectedKey, setSelectedKey] = useState(location.pathname);
-  const { isAuthenticated, logout, user } = useAuth();
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { isAuthenticated, loading, logout, user } = useAuth();
 
-  useEffect(() => {
-    setSelectedKey(location.pathname);
-  }, [location.pathname]);
+  const currentTab =
+    location.pathname === "/"
+      ? "dashboard"
+      : location.pathname.replace("/", "") || "dashboard";
 
-  const menuItems = [
-    {
-      key: "/",
-      icon: <DashboardOutlined />,
-      label: <Link to="/">{t("nav.dashboard")}</Link>,
-    },
-    {
-      key: "/transactions",
-      icon: <TransactionOutlined />,
-      label: <Link to="/transactions">{t("nav.transactions")}</Link>,
-    },
-    {
-      key: "/categories",
-      icon: <AppstoreOutlined />,
-      label: <Link to="/categories">{t("nav.categories")}</Link>,
-    },
-    {
-      key: "/items",
-      icon: <ShoppingOutlined />,
-      label: <Link to="/items">{t("nav.items")}</Link>,
-    },
-    {
-      key: "/utility-addresses",
-      icon: <EnvironmentOutlined />,
-      label: <Link to="/utility-addresses">{t("nav.utilityAddresses")}</Link>,
-    },
-    {
-      key: "/utility-readings",
-      icon: <ThunderboltOutlined />,
-      label: <Link to="/utility-readings">{t("nav.utilityReadings")}</Link>,
-    },
-    {
-      key: "/utility-types",
-      icon: <ToolOutlined />,
-      label: <Link to="/utility-types">{t("nav.utilityTypes")}</Link>,
-    },
-  ];
+  const isAuthPage =
+    location.pathname === "/login" || location.pathname === "/register";
 
-  // Don't show header on login/register pages
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  // Wait for auth to initialize (checking localStorage)
+  if (loading) {
+    return null;
+  }
 
+  // Redirect unauthenticated users to login
+  if (!isAuthenticated && !isAuthPage) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Auth pages render standalone — no nav bar, no layout wrapper
+  if (isAuthPage) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Routes>
+    );
+  }
+
+  // Authenticated app shell with navigation
   return (
-    <Layout style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
-      {!isAuthPage && isAuthenticated && (
-        <Header className="app-header">
-          <div className="header-content">
-            <div className="header-left">
-              <div className="header-brand">
-                <span className="header-brand-icon">💰</span>
-                <h1 className="header-brand-title">{t("nav.title")}</h1>
-              </div>
-              <Menu 
-                theme="light" 
-                mode="horizontal" 
-                selectedKeys={[selectedKey]} 
-                items={menuItems} 
-                className="header-menu"
-              />
-            </div>
-            <div className="header-right">
-              <span className="header-username">{user?.username}</span>
+    <Flex direction="column" minHeight="100vh">
+      {isAuthenticated && (
+        <>
+          <Flex
+            px="6"
+            py="3"
+            align="center"
+            justify="between"
+            style={{ borderBottom: "1px solid var(--gray-5)" }}
+          >
+            <Flex align="center" gap="6">
+              <Flex align="center" gap="2">
+                <Text size="5">💰</Text>
+                <Heading size="3" style={{ letterSpacing: "-0.02em" }}>
+                  {t("nav.title")}
+                </Heading>
+              </Flex>
+              <Tabs.Root value={currentTab}>
+                <Tabs.List>
+                  {navItems.map((item) => (
+                    <Tabs.Trigger
+                      key={item.path}
+                      value={
+                        item.path === "/"
+                          ? "dashboard"
+                          : item.path.replace("/", "")
+                      }
+                      asChild
+                    >
+                      <Link to={item.path}>
+                        <item.icon />
+                      </Link>
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+              </Tabs.Root>
+            </Flex>
+            <Flex align="center" gap="3">
+              <Text size="2" color="gray">
+                {user?.username}
+              </Text>
               <LanguageSwitcher />
-              <Button 
-                type="text" 
-                icon={<LogoutOutlined />} 
-                onClick={logout}
-                className="header-logout-btn"
-              >
-                {t("nav.logout")}
-              </Button>
-            </div>
-          </div>
-        </Header>
+              <IconButton variant="ghost" color="gray" onClick={logout}>
+                <ExitIcon />
+              </IconButton>
+            </Flex>
+          </Flex>
+          <Separator size="4" />
+        </>
       )}
-      <Content className={isAuthPage ? "content-auth" : "content-main"}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard key={`dashboard-${refreshKey}`} /></ProtectedRoute>} />
-          <Route path="/transactions" element={<ProtectedRoute><Transactions key={`transactions-${refreshKey}`} /></ProtectedRoute>} />
-          <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-          <Route path="/items" element={<ProtectedRoute><Items /></ProtectedRoute>} />
-          <Route path="/utility-addresses" element={<ProtectedRoute><UtilityAddresses /></ProtectedRoute>} />
-          <Route path="/utility-readings" element={<ProtectedRoute><UtilityReadings /></ProtectedRoute>} />
-          <Route path="/utility-types" element={<ProtectedRoute><UtilityTypes /></ProtectedRoute>} />
-        </Routes>
-      </Content>
-    </Layout>
+
+      <Flex flexGrow="1" direction="column">
+        <Container size="4" px="4" py="6" style={{ flex: 1 }}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/transactions"
+              element={
+                <ProtectedRoute>
+                  <Transactions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/categories"
+              element={
+                <ProtectedRoute>
+                  <Categories />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/items"
+              element={
+                <ProtectedRoute>
+                  <Items />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/utility-addresses"
+              element={
+                <ProtectedRoute>
+                  <UtilityAddresses />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/utility-readings"
+              element={
+                <ProtectedRoute>
+                  <UtilityReadings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/utility-types"
+              element={
+                <ProtectedRoute>
+                  <UtilityTypes />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Container>
+      </Flex>
+    </Flex>
   );
 }
 
 function App() {
-  const { i18n } = useTranslation();
-  const locale = i18n.language === "zh" ? zhCN : enUS;
-
   return (
-    <ConfigProvider locale={locale} theme={antdTheme}>
-      <Router>
-        <AppContent />
-      </Router>
-    </ConfigProvider>
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 

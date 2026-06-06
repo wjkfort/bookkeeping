@@ -1,17 +1,34 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Table, Button, Form, Input, Select, Space, Modal, message, Segmented, Tag, DatePicker } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { getUtilityAddresses, getUtilityTypes, getUtilityReadings, createUtilityReading, updateUtilityReading, deleteUtilityReading } from "../../api";
+import {
+  Card,
+  Table,
+  Button,
+  Flex,
+  Dialog,
+  TextField,
+  Select,
+  Text,
+  Heading,
+  Badge,
+  IconButton,
+} from "@radix-ui/themes";
+import { PlusIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
+import {
+  getUtilityAddresses,
+  getUtilityTypes,
+  getUtilityReadings,
+  createUtilityReading,
+  updateUtilityReading,
+  deleteUtilityReading,
+} from "../../api";
 import { UtilityReading, UtilityAddress, UtilityType } from "../../types";
-import type { ColumnsType } from "antd/es/table";
+import { useToast } from "../ui/Toast";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-cn";
 import monthFromatter from "dayjs/plugin/localeData";
 dayjs.extend(monthFromatter);
 import "./UtilityReadings.css";
-
-const { Option } = Select;
 
 const UTILITY_ICONS: Record<string, string> = {
   water: "💧",
@@ -27,22 +44,35 @@ const UTILITY_ICONS: Record<string, string> = {
 
 const UtilityReadings: React.FC = () => {
   const { t } = useTranslation();
+  const toast = useToast();
   const [addresses, setAddresses] = useState<UtilityAddress[]>([]);
   const [utilityTypes, setUtilityTypes] = useState<UtilityType[]>([]);
   const [readings, setReadings] = useState<UtilityReading[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingReading, setEditingReading] = useState<UtilityReading | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | "all">("all");
   const [addressFilter, setAddressFilter] = useState<number | "all">("all");
-  const [form] = Form.useForm();
 
-  // Set default record_time to current month when opening add modal
-  const openAddModal = () => {
+  // Form state
+  const [formAddressId, setFormAddressId] = useState<number | null>(null);
+  const [formTypeId, setFormTypeId] = useState<number | null>(null);
+  const [formRecordTime, setFormRecordTime] = useState("");
+  const [formBalance, setFormBalance] = useState("");
+  const [formCurrency, setFormCurrency] = useState("CNY");
+  const [saving, setSaving] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+
+  const openAddDialog = () => {
     setEditingReading(null);
-    form.resetFields();
-    form.setFieldsValue({ record_time: dayjs(), currency: "CNY" });
-    setIsModalVisible(true);
+    setFormAddressId(null);
+    setFormTypeId(null);
+    setFormRecordTime(dayjs().format("YYYY-MM"));
+    setFormBalance("");
+    setFormCurrency("CNY");
+    setDialogOpen(true);
   };
 
   useEffect(() => {
@@ -62,7 +92,7 @@ const UtilityReadings: React.FC = () => {
       setReadings(readingsRes.data);
     } catch (error) {
       console.error("Error loading utility data:", error);
-      message.error(t("utilityReadings.errorLoading"));
+      toast.error(t("utilityReadings.errorLoading"));
     } finally {
       setLoading(false);
     }
@@ -74,7 +104,7 @@ const UtilityReadings: React.FC = () => {
       setReadings(response.data);
     } catch (error) {
       console.error("Error loading utility readings:", error);
-      message.error(t("utilityReadings.errorLoading"));
+      toast.error(t("utilityReadings.errorLoading"));
     }
   };
 
@@ -83,129 +113,62 @@ const UtilityReadings: React.FC = () => {
     return UTILITY_ICONS[iconValue] || iconValue;
   };
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async () => {
+    setSaving(true);
     try {
-      const recordTime = values.record_time ? dayjs(values.record_time).format("YYYY-MM") : undefined;
       if (editingReading) {
         await updateUtilityReading(editingReading.id, {
-          balance: values.balance,
-          currency: values.currency,
+          balance: parseFloat(formBalance) || 0,
+          currency: formCurrency,
         });
-        message.success(t("utilityReadings.successUpdating"));
+        toast.success(t("utilityReadings.successUpdating"));
       } else {
+        if (!formAddressId || !formTypeId) return;
         await createUtilityReading({
-          address_id: values.address_id,
-          type_id: values.type_id,
-          balance: values.balance,
-          record_time: recordTime!,
-          currency: values.currency,
+          address_id: formAddressId,
+          type_id: formTypeId,
+          balance: parseFloat(formBalance) || 0,
+          record_time: formRecordTime,
+          currency: formCurrency,
         });
-        message.success(t("utilityReadings.successCreating"));
+        toast.success(t("utilityReadings.successCreating"));
       }
-      form.resetFields();
-      setIsModalVisible(false);
+      setDialogOpen(false);
       setEditingReading(null);
       loadReadings();
     } catch (error: any) {
       console.error("Error saving utility reading:", error);
-      message.error(error.response?.data?.error || t(editingReading ? "utilityReadings.errorUpdating" : "utilityReadings.errorCreating"));
+      toast.error(
+        error.response?.data?.error ||
+          t(editingReading ? "utilityReadings.errorUpdating" : "utilityReadings.errorCreating"),
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleEdit = (reading: UtilityReading) => {
     setEditingReading(reading);
-    form.setFieldsValue({
-      address_id: reading.address_id,
-      type_id: reading.type_id,
-      balance: reading.balance,
-      record_time: dayjs(reading.record_time, "YYYY-MM"),
-      currency: reading.currency,
-    });
-    setIsModalVisible(true);
+    setFormAddressId(reading.address_id);
+    setFormTypeId(reading.type_id);
+    setFormBalance(String(reading.balance));
+    setFormRecordTime(reading.record_time);
+    setFormCurrency(reading.currency);
+    setDialogOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    Modal.confirm({
-      title: t("utilityReadings.deleteTitle"),
-      content: t("utilityReadings.deleteConfirm"),
-      okText: t("common.yes"),
-      cancelText: t("common.no"),
-      okType: "danger",
-      onOk: async () => {
-        try {
-          await deleteUtilityReading(id);
-          message.success(t("utilityReadings.successDeleting"));
-          loadReadings();
-        } catch (error) {
-          console.error("Error deleting utility reading:", error);
-          message.error(t("utilityReadings.errorDeleting"));
-        }
-      },
-    });
+  const handleDelete = async () => {
+    if (deleteTarget === null) return;
+    try {
+      await deleteUtilityReading(deleteTarget);
+      toast.success(t("utilityReadings.successDeleting"));
+      setDeleteTarget(null);
+      loadReadings();
+    } catch (error) {
+      console.error("Error deleting utility reading:", error);
+      toast.error(t("utilityReadings.errorDeleting"));
+    }
   };
-
-  const columns: ColumnsType<UtilityReading> = [
-    {
-      title: t("utilityReadings.address"),
-      dataIndex: "address_name",
-      key: "address_name",
-      filters: addresses.map((addr) => ({ text: addr.name, value: addr.id })),
-      onFilter: (value, record) => record.address_id === value,
-    },
-    {
-      title: t("utilityReadings.type"),
-      dataIndex: "type_name",
-      key: "type_name",
-      render: (typeName: string, record) => (
-        <Tag color="blue">
-          {getIconEmoji(record.type_icon)} {typeName}
-        </Tag>
-      ),
-      filters: utilityTypes.map((ut) => ({ text: ut.name, value: ut.id })),
-      onFilter: (value, record) => record.type_id === value,
-    },
-    {
-      title: t("utilityReadings.recordTime"),
-      dataIndex: "record_time",
-      key: "record_time",
-      sorter: (a, b) => a.record_time.localeCompare(b.record_time),
-      render: (time: string) => {
-        const [year, month] = time.split("-");
-        return `${year}-${month}`;
-      },
-    },
-    {
-      title: t("utilityReadings.balance"),
-      dataIndex: "balance",
-      key: "balance",
-      render: (balance: number, record) => (
-        <span>
-          {record.currency === "CNY" ? "¥" : "$"}
-          {balance.toFixed(2)}
-        </span>
-      ),
-      sorter: (a, b) => a.balance - b.balance,
-    },
-    {
-      title: t("utilityReadings.currency"),
-      dataIndex: "currency",
-      key: "currency",
-    },
-    {
-      title: t("utilityReadings.actions"),
-      key: "actions",
-      render: (_, record) => (
-        <Space>
-          <Button type="primary" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            {t("common.edit")}
-          </Button>
-          <Button type="primary" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>
-            {t("utilityReadings.deleteBtn")}
-          </Button>
-        </Space>
-      ),
-    },
-  ];
 
   const filteredReadings = readings.filter((r) => {
     const typeMatch = typeFilter === "all" || r.type_id === typeFilter;
@@ -214,120 +177,249 @@ const UtilityReadings: React.FC = () => {
   });
 
   return (
-    <div className="utility-readings-page">
-      <div className="utility-readings-header">
-        <h1 className="utility-readings-title">{t("utilityReadings.title")}</h1>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openAddModal}>
+    <Flex direction="column" gap="4">
+      <Flex justify="between" align="center">
+        <Heading size="6">{t("utilityReadings.title")}</Heading>
+        <Button onClick={openAddDialog}>
+          <PlusIcon />
           {t("utilityReadings.addNew")}
         </Button>
-      </div>
+      </Flex>
 
-      <Card className="utility-readings-filter-card" variant="borderless">
-        <Space wrap>
-          <Select
-            value={typeFilter}
-            onChange={(val) => setTypeFilter(val as number | "all")}
-            style={{ minWidth: 150 }}
-            allowClear
-            placeholder={t("utilityReadings.allTypes")}
+      <Card>
+        <Flex gap="3" wrap="wrap">
+          <Select.Root
+            value={typeFilter === "all" ? "all" : String(typeFilter)}
+            onValueChange={(val) => setTypeFilter(val === "all" ? "all" : parseInt(val))}
           >
-            <Option value="all">{t("utilityReadings.all")}</Option>
-            {utilityTypes.map((ut) => (
-              <Option key={ut.id} value={ut.id}>
-                {getIconEmoji(ut.icon)} {ut.name}
-              </Option>
-            ))}
-          </Select>
-          <Select
-            value={addressFilter}
-            onChange={(val) => setAddressFilter(val as number | "all")}
-            style={{ minWidth: 150 }}
-            allowClear
-            placeholder={t("utilityReadings.selectAddress")}
+            <Select.Trigger placeholder={t("utilityReadings.allTypes")} />
+            <Select.Content>
+              <Select.Item value="all">{t("utilityReadings.all")}</Select.Item>
+              {utilityTypes.map((ut) => (
+                <Select.Item key={ut.id} value={String(ut.id)}>
+                  {getIconEmoji(ut.icon)} {ut.name}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+
+          <Select.Root
+            value={addressFilter === "all" ? "all" : String(addressFilter)}
+            onValueChange={(val) => setAddressFilter(val === "all" ? "all" : parseInt(val))}
           >
-            <Option value="all">{t("utilityReadings.all")}</Option>
-            {addresses.map((addr) => (
-              <Option key={addr.id} value={addr.id}>
-                {addr.name}
-              </Option>
-            ))}
-          </Select>
-        </Space>
+            <Select.Trigger placeholder={t("utilityReadings.selectAddress")} />
+            <Select.Content>
+              <Select.Item value="all">{t("utilityReadings.all")}</Select.Item>
+              {addresses.map((addr) => (
+                <Select.Item key={addr.id} value={String(addr.id)}>
+                  {addr.name}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </Flex>
       </Card>
 
-      <Card className="utility-readings-table-card" variant="borderless">
-        <Table columns={columns} dataSource={filteredReadings} rowKey="id" loading={loading} locale={{ emptyText: t("utilityReadings.noReadings") }} pagination={{ pageSize: 20 }} />
+      <Card>
+        <Table.Root variant="surface">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeaderCell>{t("utilityReadings.address")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityReadings.type")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityReadings.recordTime")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityReadings.balance")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityReadings.currency")}</Table.ColumnHeaderCell>
+              <Table.ColumnHeaderCell>{t("utilityReadings.actions")}</Table.ColumnHeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {loading ? (
+              <Table.Row>
+                <Table.Cell colSpan={6}>
+                  <Text align="center" color="gray">...</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : filteredReadings.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan={6}>
+                  <Text align="center" color="gray">{t("utilityReadings.noReadings")}</Text>
+                </Table.Cell>
+              </Table.Row>
+            ) : (
+              filteredReadings.map((reading) => (
+                <Table.Row key={reading.id}>
+                  <Table.Cell>{reading.address_name}</Table.Cell>
+                  <Table.Cell>
+                    <Badge color="blue">
+                      {getIconEmoji(reading.type_icon)} {reading.type_name}
+                    </Badge>
+                  </Table.Cell>
+                  <Table.Cell>
+                    {(() => {
+                      const [year, month] = reading.record_time.split("-");
+                      return `${year}-${month}`;
+                    })()}
+                  </Table.Cell>
+                  <Table.Cell>
+                    {reading.currency === "CNY" ? "¥" : "$"}
+                    {reading.balance.toFixed(2)}
+                  </Table.Cell>
+                  <Table.Cell>{reading.currency}</Table.Cell>
+                  <Table.Cell>
+                    <Flex gap="2">
+                      <IconButton variant="soft" color="blue" onClick={() => handleEdit(reading)}>
+                        <Pencil1Icon />
+                      </IconButton>
+                      <IconButton variant="soft" color="red" onClick={() => setDeleteTarget(reading.id)}>
+                        <TrashIcon />
+                      </IconButton>
+                    </Flex>
+                  </Table.Cell>
+                </Table.Row>
+              ))
+            )}
+          </Table.Body>
+        </Table.Root>
       </Card>
 
-      <Modal
-        title={editingReading ? t("utilityReadings.editTitle") : t("utilityReadings.addNew")}
-        open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingReading(null);
-          form.resetFields();
+      {/* Add/Edit Dialog */}
+      <Dialog.Root
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) { setDialogOpen(false); setEditingReading(null); }
         }}
-        footer={null}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {!editingReading && (
-            <>
-              <Form.Item name="address_id" label={t("utilityReadings.address")} rules={[{ required: true, message: t("utilityReadings.addressRequired") }]}>
-                <Select placeholder={t("utilityReadings.selectAddress")} showSearch>
-                  {addresses.map((addr) => (
-                    <Option key={addr.id} value={addr.id}>
-                      {addr.name} - {addr.address}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
+        <Dialog.Content style={{ maxWidth: 480 }}>
+          <Dialog.Title>
+            {editingReading ? t("utilityReadings.editTitle") : t("utilityReadings.addNew")}
+          </Dialog.Title>
 
-              <Form.Item name="type_id" label={t("utilityReadings.type")} rules={[{ required: true, message: t("utilityReadings.typeRequired") }]}>
-                <Select placeholder={t("utilityReadings.selectType")}>
-                  {utilityTypes.map((ut) => (
-                    <Option key={ut.id} value={ut.id}>
-                      {getIconEmoji(ut.icon)} {ut.name}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
+          <Flex direction="column" gap="3" mt="4">
+            {!editingReading && (
+              <>
+                <label>
+                  <Text as="div" size="2" mb="1" weight="medium">
+                    {t("utilityReadings.address")}
+                  </Text>
+                  <Select.Root
+                    value={formAddressId?.toString() ?? ""}
+                    onValueChange={(val) => setFormAddressId(parseInt(val))}
+                  >
+                    <Select.Trigger style={{ width: "100%" }} placeholder={t("utilityReadings.selectAddress")} />
+                    <Select.Content>
+                      {addresses.map((addr) => (
+                        <Select.Item key={addr.id} value={String(addr.id)}>
+                          {addr.name} - {addr.address}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </label>
 
-              <Form.Item name="record_time" label={t("utilityReadings.recordTime")} rules={[{ required: true, message: t("utilityReadings.recordTimeRequired") }]}>
-                <DatePicker picker="month" style={{ width: "100%" }} />
-              </Form.Item>
-            </>
-          )}
+                <label>
+                  <Text as="div" size="2" mb="1" weight="medium">
+                    {t("utilityReadings.type")}
+                  </Text>
+                  <Select.Root
+                    value={formTypeId?.toString() ?? ""}
+                    onValueChange={(val) => setFormTypeId(parseInt(val))}
+                  >
+                    <Select.Trigger style={{ width: "100%" }} placeholder={t("utilityReadings.selectType")} />
+                    <Select.Content>
+                      {utilityTypes.map((ut) => (
+                        <Select.Item key={ut.id} value={String(ut.id)}>
+                          {getIconEmoji(ut.icon)} {ut.name}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </label>
 
-          <Form.Item name="balance" label={t("utilityReadings.balance")} rules={[{ required: true, message: t("utilityReadings.balanceRequired") }]}>
-            <Input type="number" step="0.01" min="0" placeholder="0.00" />
-          </Form.Item>
+                <label>
+                  <Text as="div" size="2" mb="1" weight="medium">
+                    {t("utilityReadings.recordTime")}
+                  </Text>
+                  <input
+                    type="month"
+                    value={formRecordTime}
+                    onChange={(e) => setFormRecordTime(e.target.value)}
+                    style={{
+                      width: "100%",
+                      height: 32,
+                      padding: "4px 8px",
+                      borderRadius: "var(--radius-2)",
+                      border: "1px solid var(--gray-7)",
+                      background: "var(--color-surface)",
+                      color: "var(--gray-12)",
+                      fontSize: 14,
+                      fontFamily: "inherit",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+              </>
+            )}
 
-          <Form.Item name="currency" label={t("utilityReadings.currency")} rules={[{ required: true }]} initialValue="CNY">
-            <Select>
-              <Option value="CNY">CNY (¥)</Option>
-              <Option value="USD">USD ($)</Option>
-            </Select>
-          </Form.Item>
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("utilityReadings.balance")}
+              </Text>
+              <TextField.Root
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={formBalance}
+                onChange={(e) => setFormBalance((e.target as HTMLInputElement).value)}
+              />
+            </label>
 
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingReading ? t("utilityReadings.update") : t("utilityReadings.add")}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsModalVisible(false);
-                  setEditingReading(null);
-                  form.resetFields();
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("utilityReadings.currency")}
+              </Text>
+              <Select.Root value={formCurrency} onValueChange={setFormCurrency}>
+                <Select.Trigger style={{ width: "100%" }} />
+                <Select.Content>
+                  <Select.Item value="CNY">CNY (¥)</Select.Item>
+                  <Select.Item value="USD">USD ($)</Select.Item>
+                </Select.Content>
+              </Select.Root>
+            </label>
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => { setDialogOpen(false); setEditingReading(null); }}
+              disabled={saving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {editingReading ? t("utilityReadings.update") : t("utilityReadings.add")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>{t("utilityReadings.deleteTitle")}</Dialog.Title>
+          <Text size="2" mt="2">{t("utilityReadings.deleteConfirm")}</Text>
+          <Flex gap="3" mt="4" justify="end">
+            <Button variant="soft" color="gray" onClick={() => setDeleteTarget(null)}>
+              {t("common.no")}
+            </Button>
+            <Button color="red" onClick={handleDelete}>
+              {t("common.yes")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+    </Flex>
   );
 };
 

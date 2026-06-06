@@ -1,147 +1,81 @@
-import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, message } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, ArrowRightOutlined } from '@ant-design/icons';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { useTranslation } from 'react-i18next';
-import LanguageSwitcher from '../ui/LanguageSwitcher';
-import './Auth.css';
-
-const { Title, Text } = Typography;
+import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Flex, Card, TextField, Button, Text, Heading, Link as RadixLink } from "@radix-ui/themes";
+import { EnvelopeClosedIcon, LockClosedIcon, PersonIcon } from "@radix-ui/react-icons";
+import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../ui/Toast";
 
 export const Register: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
-  const navigate = useNavigate();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { register } = useAuth();
+  const toast = useToast();
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = async (values: { email: string; password: string; username: string }) => {
+  const handleSubmit = async () => {
+    if (!username || !email || !password) return;
+    if (password !== confirmPassword) {
+      toast.error(t("register.passwordMismatch"));
+      return;
+    }
+    if (password.length < 6) {
+      toast.error(t("register.passwordMin"));
+      return;
+    }
     setLoading(true);
     try {
-      await register(values.email, values.password, values.username);
-      message.success(t('register.success') || 'Registration successful!');
-      navigate('/');
-    } catch (error: any) {
-      message.error(error.message || t('register.error') || 'Registration failed');
+      await register(email, password, username);
+      toast.success(t("register.success"));
+      navigate("/");
+    } catch (err: any) {
+      toast.error(err.message || t("register.error"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-background">
-        <div className="auth-blob auth-blob-1"></div>
-        <div className="auth-blob auth-blob-2"></div>
-        <div className="auth-blob auth-blob-3"></div>
-      </div>
-      
-      <div className="auth-language-switcher">
-        <LanguageSwitcher />
-      </div>
+    <Flex justify="center" align="center" style={{ minHeight: "80vh" }}>
+      <Card size="3" style={{ width: 400 }}>
+        <Flex direction="column" gap="4" p="4">
+          <Flex direction="column" gap="1" align="center" mb="4">
+            <Heading size="6">{t("register.title")}</Heading>
+            <Text size="2" color="gray">{t("register.subtitle")}</Text>
+          </Flex>
 
-      <div className="auth-content">
-        <div className="auth-brand">
-          <div className="auth-brand-icon">💰</div>
-          <h1 className="auth-brand-title">{t("nav.title") || "Bookkeeping"}</h1>
-          <p className="auth-brand-subtitle">{t("register.subtitle") || "Start tracking your finances today"}</p>
-        </div>
+          <TextField.Root size="3" placeholder={t("register.usernamePlaceholder")} value={username} onChange={(e) => setUsername(e.target.value)}>
+            <TextField.Slot><PersonIcon /></TextField.Slot>
+          </TextField.Root>
 
-        <Card className="auth-card" variant="borderless">
-          <div className="auth-card-header">
-            <Title level={2} className="auth-card-title">{t('register.title') || 'Create Account'}</Title>
-            <Text className="auth-card-subtitle">{t('register.subtitle') || 'Join us to get started'}</Text>
-          </div>
+          <TextField.Root size="3" placeholder={t("register.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)}>
+            <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
+          </TextField.Root>
 
-          <Form
-            name="register"
-            onFinish={onFinish}
-            autoComplete="off"
-            layout="vertical"
-            size="large"
-          >
-            <Form.Item
-              name="username"
-              rules={[{ required: true, message: t('register.usernameRequired') || 'Please input your username!' }]}
-            >
-              <Input 
-                prefix={<UserOutlined style={{ color: "#a8a29e" }} />} 
-                placeholder={t('register.usernamePlaceholder') || 'Username'} 
-              />
-            </Form.Item>
+          <TextField.Root size="3" type="password" placeholder={t("register.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)}>
+            <TextField.Slot><LockClosedIcon /></TextField.Slot>
+          </TextField.Root>
 
-            <Form.Item
-              name="email"
-              rules={[
-                { required: true, message: t('register.emailRequired') || 'Please input your email!' },
-                { type: 'email', message: t('register.emailInvalid') || 'Please enter a valid email!' }
-              ]}
-            >
-              <Input 
-                prefix={<MailOutlined style={{ color: "#a8a29e" }} />} 
-                placeholder={t('register.emailPlaceholder') || 'Email'} 
-              />
-            </Form.Item>
+          <TextField.Root size="3" type="password" placeholder={t("register.confirmPasswordPlaceholder")} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}>
+            <TextField.Slot><LockClosedIcon /></TextField.Slot>
+          </TextField.Root>
 
-            <Form.Item
-              name="password"
-              rules={[
-                { required: true, message: t('register.passwordRequired') || 'Please input your password!' },
-                { min: 6, message: t('register.passwordMin') || 'Password must be at least 6 characters!' }
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined style={{ color: "#a8a29e" }} />}
-                placeholder={t('register.passwordPlaceholder') || 'Password (min 6 characters)'}
-              />
-            </Form.Item>
+          <Button size="3" onClick={handleSubmit} disabled={loading || !username || !email || !password}>
+            {loading ? "..." : t("register.button")}
+          </Button>
 
-            <Form.Item
-              name="confirmPassword"
-              dependencies={['password']}
-              rules={[
-                { required: true, message: t('register.confirmPasswordRequired') || 'Please confirm your password!' },
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (!value || getFieldValue('password') === value) {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(new Error(t('register.passwordMismatch') || 'Passwords do not match!'));
-                  },
-                }),
-              ]}
-            >
-              <Input.Password
-                prefix={<LockOutlined style={{ color: "#a8a29e" }} />}
-                placeholder={t('register.confirmPasswordPlaceholder') || 'Confirm Password'}
-              />
-            </Form.Item>
-
-            <Form.Item>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                loading={loading} 
-                block 
-                icon={<ArrowRightOutlined />}
-                iconPlacement="end"
-                className="auth-submit-btn"
-              >
-                {t('register.button') || 'Register'}
-              </Button>
-            </Form.Item>
-
-            <div className="auth-footer">
-              <Text className="auth-footer-text">
-                {t('register.hasAccount') || 'Already have an account?'}{' '}
-                <Link to="/login" className="auth-link">
-                  {t('register.loginLink') || 'Log in'}
-                </Link>
-              </Text>
-            </div>
-          </Form>
-        </Card>
-      </div>
-    </div>
+          <Text size="2" align="center" color="gray">
+            {t("register.hasAccount")}{" "}
+            <RadixLink asChild>
+              <Link to="/login">{t("register.loginLink")}</Link>
+            </RadixLink>
+          </Text>
+        </Flex>
+      </Card>
+    </Flex>
   );
 };

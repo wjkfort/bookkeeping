@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Table, Button, Space } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Flex, Table, IconButton, Text, Badge } from '@radix-ui/themes';
+import { Pencil1Icon, TrashIcon } from '@radix-ui/react-icons';
 import { useCurrency } from '../../hooks/useCurrency';
 import { Transaction, Category, Item } from '../../types';
-import type { ColumnsType } from 'antd/es/table';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -21,10 +20,10 @@ interface TransactionTableProps {
 const TransactionTable: React.FC<TransactionTableProps> = ({
   transactions,
   categories,
-  items,
-  loading = false,
+  items: _items,
+  loading: _loading = false,
   showActions = false,
-  pagination = false,
+  pagination: _pagination = false,
   onEdit,
   onDelete,
   onItemClick,
@@ -54,108 +53,112 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     return category.name;
   };
 
-  const columns: ColumnsType<Transaction> = [
-    {
-      title: t('transactions.date'),
-      dataIndex: 'date',
-      key: 'date',
-      sorter: showActions ? (a, b) => a.date.localeCompare(b.date) : undefined,
-    },
-    {
-      title: t('transactions.description'),
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: t('transactions.category'),
-      dataIndex: 'category_id',
-      key: 'category_id',
-      render: (categoryId: number) => getCategoryName(categoryId),
-    },
-    {
-      title: t('transactions.item'),
-      dataIndex: 'item_name',
-      key: 'item_name',
-      render: (itemName: string | null, record: Transaction) => {
-        if (!itemName || !record.item_id) return '-';
-        return (
-          <Button 
-            type="link" 
-            style={{ padding: 0 }}
-            onClick={() => onItemClick && onItemClick(record.item_id!)}
-          >
-            {itemName}
-          </Button>
-        );
-      },
-    },
-    {
-      title: t('transactions.amount'),
-      key: 'amount',
-      render: (_, record) => (
-        <span>
-          {formatWithConversion(record.amount, record.currency)}
-          {record.currency !== currencyCode && (
-            <span style={{ fontSize: '0.85em', color: '#999', marginLeft: '8px' }}>
-              ({formatCurrency(record.amount, record.currency)})
-            </span>
-          )}
-        </span>
-      ),
-    },
-  ];
+  // Helper to get category type for amount coloring
+  const getCategoryType = (categoryId: number): 'income' | 'expense' | undefined => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category?.type;
+  };
 
-  // Add actions column if showActions is true
-  if (showActions && onEdit && onDelete) {
-    columns.push({
-      title: t('transactions.actions'),
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            type="primary"
-            icon={<EditOutlined />}
-            onClick={() => onEdit(record)}
-          >
-            {t('transactions.editBtn')}
-          </Button>
-          <Button
-            type="primary"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => onDelete(record.id)}
-          >
-            {t('transactions.deleteBtn')}
-          </Button>
-        </Space>
-      ),
-    });
+  const hasActions = showActions && onEdit && onDelete;
+
+  if (transactions.length === 0) {
+    return (
+      <Text as="p" align="center" color="gray" style={{ padding: '24px' }}>
+        {t('transactions.noTransactions')}
+      </Text>
+    );
   }
 
   return (
-    <div>
-      <Table
-        columns={columns}
-        dataSource={transactions}
-        rowKey="id"
-        loading={loading}
-        pagination={pagination}
-        locale={{ emptyText: t('transactions.noTransactions') }}
-        summary={() => (
-          <Table.Summary fixed>
-            <Table.Summary.Row>
-              <Table.Summary.Cell index={0} colSpan={4}>
-                <strong>{t('transactions.total')}</strong>
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={1}>
-                <strong>{formatCurrency(totalAmount, currencyCode)}</strong>
-              </Table.Summary.Cell>
-              {showActions && <Table.Summary.Cell index={2} />}
-            </Table.Summary.Row>
-          </Table.Summary>
-        )}
-      />
-    </div>
+    <Table.Root>
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeaderCell>{t('transactions.date')}</Table.ColumnHeaderCell>
+          <Table.ColumnHeaderCell>{t('transactions.amount')}</Table.ColumnHeaderCell>
+          <Table.ColumnHeaderCell>{t('transactions.category')}</Table.ColumnHeaderCell>
+          <Table.ColumnHeaderCell>{t('transactions.description')}</Table.ColumnHeaderCell>
+          <Table.ColumnHeaderCell>{t('transactions.item')}</Table.ColumnHeaderCell>
+          {hasActions && (
+            <Table.ColumnHeaderCell>{t('transactions.actions')}</Table.ColumnHeaderCell>
+          )}
+        </Table.Row>
+      </Table.Header>
+
+      <Table.Body>
+        {transactions.map((record) => {
+          const categoryType = getCategoryType(record.category_id);
+          const isIncome = categoryType === 'income';
+
+          return (
+            <Table.Row key={record.id}>
+              <Table.Cell>{record.date}</Table.Cell>
+              <Table.Cell>
+                <Text color={isIncome ? 'green' : 'red'}>
+                  {formatWithConversion(record.amount, record.currency)}
+                </Text>
+                {record.currency !== currencyCode && (
+                  <Text size="1" color="gray" style={{ marginLeft: '8px' }}>
+                    ({formatCurrency(record.amount, record.currency)})
+                  </Text>
+                )}
+              </Table.Cell>
+              <Table.Cell>{getCategoryName(record.category_id)}</Table.Cell>
+              <Table.Cell>{record.description}</Table.Cell>
+              <Table.Cell>
+                {record.item_name && record.item_id ? (
+                  <Badge
+                    onClick={() => onItemClick && onItemClick(record.item_id!)}
+                    style={{ cursor: onItemClick ? 'pointer' : 'default' }}
+                  >
+                    {record.item_name}
+                  </Badge>
+                ) : (
+                  <Text color="gray">-</Text>
+                )}
+              </Table.Cell>
+              {hasActions && (
+                <Table.Cell>
+                  <Flex gap="2">
+                    <IconButton
+                      size="1"
+                      variant="soft"
+                      color="blue"
+                      onClick={() => onEdit!(record)}
+                      title={t('transactions.editBtn')}
+                    >
+                      <Pencil1Icon />
+                    </IconButton>
+                    <IconButton
+                      size="1"
+                      variant="soft"
+                      color="red"
+                      onClick={() => onDelete!(record.id)}
+                      title={t('transactions.deleteBtn')}
+                    >
+                      <TrashIcon />
+                    </IconButton>
+                  </Flex>
+                </Table.Cell>
+              )}
+            </Table.Row>
+          );
+        })}
+
+        {/* Total summary row */}
+        <Table.Row>
+          <Table.Cell>
+            <Text weight="bold">{t('transactions.total')}</Text>
+          </Table.Cell>
+          <Table.Cell>
+            <Text weight="bold">{formatCurrency(totalAmount, currencyCode)}</Text>
+          </Table.Cell>
+          <Table.Cell />
+          <Table.Cell />
+          <Table.Cell />
+          {hasActions && <Table.Cell />}
+        </Table.Row>
+      </Table.Body>
+    </Table.Root>
   );
 };
 

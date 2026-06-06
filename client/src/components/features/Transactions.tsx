@@ -1,44 +1,91 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Card, Table, Button, Form, Input, Select, DatePicker, Space, Modal, message, Row, Col, AutoComplete, Collapse, Tag, Statistic, Alert } from "antd";
-import { PlusOutlined, FilterOutlined, HistoryOutlined, ArrowLeftOutlined, LineChartOutlined, PlusCircleOutlined, CheckCircleOutlined } from "@ant-design/icons";
-import { Line } from "@ant-design/plots";
+import {
+  Card,
+  Button,
+  Flex,
+  Dialog,
+  Table,
+  TextField,
+  Select,
+  Text,
+  Heading,
+  Badge,
+  IconButton,
+  Callout,
+} from "@radix-ui/themes";
+import { PlusIcon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getTransactions, createTransaction, updateTransaction, deleteTransaction, getCategories, searchItems, getItemHistory, getItems } from "../../api";
+import {
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  getCategories,
+  searchItems,
+  getItemHistory,
+  getItems,
+} from "../../api";
 import { Transaction, Category, TransactionFilters, Item, ItemHistory } from "../../types";
 import TransactionTable from "./TransactionTable";
+import { useToast } from "../ui/Toast";
 import dayjs from "dayjs";
 import Fuse from "fuse.js";
 import "./Transactions.css";
 
-const { Option } = Select;
-const { TextArea } = Input;
-const { Panel } = Collapse;
-
 const Transactions: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const toast = useToast();
   const { currencyCode, formatCurrency, formatWithConversion } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [filters, setFilters] = useState<TransactionFilters>({
-    category_id: "",
-    start_date: "",
-    end_date: "",
-  });
-  const [form] = Form.useForm();
-  const [filterForm] = Form.useForm();
-  const [itemOptions, setItemOptions] = useState<{ value: string; label: React.ReactNode; isNew?: boolean; item?: Item }[]>([]);
+
+  // Filter state
+  const [filterCategoryId, setFilterCategoryId] = useState<string>("");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+
+  // Form state
+  const [formAmount, setFormAmount] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formCategoryId, setFormCategoryId] = useState<number | null>(null);
+  const [formItemName, setFormItemName] = useState("");
+  const [formDate, setFormDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [formUnitPrice, setFormUnitPrice] = useState("");
+  const [formQuantity, setFormQuantity] = useState("");
+  const [formUnit, setFormUnit] = useState("");
+  const [showUnitTracking, setShowUnitTracking] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Item search
+  const [itemOptions, setItemOptions] = useState<
+    { value: string; label: string; isNew?: boolean; item?: Item }[]
+  >([]);
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [selectedItemHistory, setSelectedItemHistory] = useState<ItemHistory | null>(null);
   const [loadingItemHistory, setLoadingItemHistory] = useState(false);
-  const [itemHistoryModalVisible, setItemHistoryModalVisible] = useState(false);
-  const [showUnitTracking, setShowUnitTracking] = useState(false);
-  const [pendingItemName, setPendingItemName] = useState<string>("");
-  const [similarItems, setSimilarItems] = useState<Item[]>([]);
   const [showSimilarItemsWarning, setShowSimilarItemsWarning] = useState(false);
+  const [similarItems, setSimilarItems] = useState<Item[]>([]);
+  const [pendingItemName, setPendingItemName] = useState("");
+
+  // Confirm new item dialog
+  const [confirmNewItemOpen, setConfirmNewItemOpen] = useState(false);
+
+  // Item history dialog
+  const [itemHistoryDialogOpen, setItemHistoryDialogOpen] = useState(false);
+  const [historyItemData, setHistoryItemData] = useState<ItemHistory | null>(null);
 
   // Helper function to get translated category name
   const getCategoryName = (category: Category): string => {
@@ -60,12 +107,11 @@ const Transactions: React.FC = () => {
   const loadCategories = async () => {
     try {
       const response = await getCategories(true);
-      // Sort categories to show parents first, then their children
       const sorted = sortCategoriesWithChildren(response.data);
       setCategories(sorted);
     } catch (error) {
       console.error("Error loading categories:", error);
-      message.error(t("categories.errorLoading"));
+      toast.error(t("categories.errorLoading"));
     }
   };
 
@@ -82,19 +128,21 @@ const Transactions: React.FC = () => {
     const result: Category[] = [];
     const parentCategories = cats.filter((cat) => !cat.parent_id);
     const childCategories = cats.filter((cat) => cat.parent_id);
-
     parentCategories.forEach((parent) => {
       result.push(parent);
       const children = childCategories.filter((child) => child.parent_id === parent.id);
       result.push(...children);
     });
-
     return result;
   };
 
   const loadTransactions = async (filterParams?: TransactionFilters) => {
     try {
-      const activeFilters = filterParams || filters;
+      const activeFilters = filterParams || {
+        category_id: filterCategoryId,
+        start_date: filterStartDate,
+        end_date: filterEndDate,
+      };
       const params: any = {};
       if (activeFilters.category_id) params.category_id = activeFilters.category_id;
       if (activeFilters.start_date) params.start_date = activeFilters.start_date;
@@ -104,138 +152,115 @@ const Transactions: React.FC = () => {
       setTransactions(response.data);
     } catch (error) {
       console.error("Error loading transactions:", error);
-      message.error(t("transactions.errorLoading"));
+      toast.error(t("transactions.errorLoading"));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (values: any) => {
+  const resetForm = () => {
+    setFormAmount("");
+    setFormDescription("");
+    setFormCategoryId(null);
+    setFormItemName("");
+    setFormDate(dayjs().format("YYYY-MM-DD"));
+    setFormUnitPrice("");
+    setFormQuantity("");
+    setFormUnit("");
+    setShowUnitTracking(false);
+    setSelectedItemHistory(null);
+    setShowSimilarItemsWarning(false);
+    setSimilarItems([]);
+    setPendingItemName("");
+    setShowItemDropdown(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!formAmount || !formCategoryId) return;
+    setSaving(true);
     try {
       const data: any = {
-        amount: parseFloat(values.amount),
+        amount: parseFloat(formAmount),
         currency: currencyCode,
-        category_id: parseInt(values.category_id),
-        date: values.date.format("YYYY-MM-DD"),
-        description: values.description || "",
-        item_name: values.item_name || "",
+        category_id: formCategoryId,
+        date: formDate,
+        description: formDescription || "",
+        item_name: formItemName || "",
       };
 
-      // Add unit tracking fields if provided
-      if (values.unit_price) {
-        data.unit_price = parseFloat(values.unit_price);
-      }
-      if (values.quantity) {
-        data.quantity = parseFloat(values.quantity);
-      }
-      if (values.unit) {
-        data.unit = values.unit;
-      }
+      if (formUnitPrice) data.unit_price = parseFloat(formUnitPrice);
+      if (formQuantity) data.quantity = parseFloat(formQuantity);
+      if (formUnit) data.unit = formUnit;
 
       if (editingId) {
         await updateTransaction(editingId, data);
-        message.success(t("transactions.successUpdating"));
+        toast.success(t("transactions.successUpdating"));
         setEditingId(null);
       } else {
         await createTransaction(data);
-        message.success(t("transactions.successCreating"));
+        toast.success(t("transactions.successCreating"));
       }
 
-      form.resetFields();
-      setIsModalVisible(false);
-      setShowUnitTracking(false);
-      setShowSimilarItemsWarning(false);
-      setSimilarItems([]);
-      setPendingItemName("");
+      resetForm();
+      setDialogOpen(false);
       loadTransactions();
-      loadItems(); // Reload items in case a new item was created
+      loadItems();
     } catch (error: any) {
       console.error("Error saving transaction:", error);
-      message.error(t("transactions.errorSaving") + ": " + (error.response?.data?.detail || error.message));
+      toast.error(t("transactions.errorSaving") + ": " + (error.response?.data?.detail || error.message));
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleItemSearch = async (searchText: string) => {
+    setFormItemName(searchText);
     if (!searchText || searchText.length < 1) {
       setItemOptions([]);
+      setShowItemDropdown(false);
       setSelectedItemHistory(null);
       setShowSimilarItemsWarning(false);
       return;
     }
 
     try {
-      // Use fuzzy matching to find similar items
       const fuse = new Fuse(items, {
         keys: ["name"],
-        threshold: 0.4, // 0 = exact match, 1 = match anything
+        threshold: 0.4,
         includeScore: true,
       });
 
       const fuzzyResults = fuse.search(searchText);
       const exactMatch = items.find((item) => item.name.toLowerCase() === searchText.toLowerCase());
 
-      const options: { value: string; label: React.ReactNode; isNew?: boolean; item?: Item }[] = [];
+      const options: { value: string; label: string; isNew?: boolean; item?: Item }[] = [];
 
-      // Add exact matches first
       if (exactMatch) {
         options.push({
           value: exactMatch.name,
-          label: (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "4px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0, marginRight: "8px" }}>
-                <CheckCircleOutlined style={{ color: "#52c41a", flexShrink: 0, fontSize: "16px" }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{exactMatch.name}</span>
-              </div>
-              <Tag color="green" style={{ flexShrink: 0, margin: 0 }}>
-                {t("transactions.selectExistingItem")}
-              </Tag>
-            </div>
-          ),
+          label: `✓ ${exactMatch.name} — ${t("transactions.selectExistingItem")}`,
           item: exactMatch,
         });
       }
 
-      // Add fuzzy matches (excluding exact match)
       fuzzyResults
         .filter((result) => result.item.name.toLowerCase() !== searchText.toLowerCase())
         .slice(0, 5)
         .forEach((result) => {
           options.push({
             value: result.item.name,
-            label: (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "4px 0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0, marginRight: "8px" }}>
-                  <CheckCircleOutlined style={{ color: "#1890ff", flexShrink: 0, fontSize: "16px" }} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{result.item.name}</span>
-                </div>
-                <Tag color="blue" style={{ flexShrink: 0, margin: 0 }}>
-                  {t("transactions.selectExistingItem")}
-                </Tag>
-              </div>
-            ),
+            label: `${result.item.name} — ${t("transactions.selectExistingItem")}`,
             item: result.item,
           });
         });
 
-      // Add "Create new" option if no exact match
       if (!exactMatch) {
         options.push({
           value: searchText,
-          label: (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "4px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, minWidth: 0, marginRight: "8px" }}>
-                <PlusCircleOutlined style={{ color: "#faad14", flexShrink: 0, fontSize: "16px" }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 10 }}>{searchText}</span>
-              </div>
-              <Tag color="orange" style={{ flexShrink: 0, margin: 0 }}>
-                {t("transactions.createNewItem")}
-              </Tag>
-            </div>
-          ),
+          label: `+ ${searchText} — ${t("transactions.createNewItem")}`,
           isNew: true,
         });
 
-        // Show warning if similar items exist
         if (fuzzyResults.length > 0) {
           setShowSimilarItemsWarning(true);
           setSimilarItems(fuzzyResults.slice(0, 3).map((r) => r.item));
@@ -249,13 +274,16 @@ const Transactions: React.FC = () => {
       }
 
       setItemOptions(options);
+      setShowItemDropdown(options.length > 0);
     } catch (error) {
       console.error("Error searching items:", error);
     }
   };
 
   const handleItemSelect = async (value: string, option: any) => {
-    // If selecting an existing item, load its history
+    setShowItemDropdown(false);
+    setFormItemName(value);
+
     if (option.item) {
       try {
         setLoadingItemHistory(true);
@@ -269,57 +297,34 @@ const Transactions: React.FC = () => {
         setLoadingItemHistory(false);
       }
     } else if (option.isNew) {
-      // If creating a new item and similar items exist, show confirmation
       if (similarItems.length > 0) {
         setPendingItemName(value);
-        Modal.confirm({
-          title: t("transactions.confirmNewItem"),
-          content: (
-            <div>
-              <p>
-                {t("transactions.confirmNewItemMessage")} "<strong>{value}</strong>"?
-              </p>
-              <p style={{ marginTop: "12px", color: "#faad14" }}>
-                <strong>{t("transactions.similarItemsExist")}:</strong>
-              </p>
-              <ul style={{ marginTop: "8px" }}>
-                {similarItems.map((item) => (
-                  <li key={item.id}>{item.name}</li>
-                ))}
-              </ul>
-            </div>
-          ),
-          okText: t("common.yes"),
-          cancelText: t("common.no"),
-          onOk: () => {
-            setShowSimilarItemsWarning(false);
-            setSimilarItems([]);
-            setSelectedItemHistory(null);
-          },
-          onCancel: () => {
-            form.setFieldsValue({ item_name: "" });
-            setPendingItemName("");
-          },
-        });
+        setConfirmNewItemOpen(true);
       } else {
         setSelectedItemHistory(null);
       }
     }
   };
 
+  const confirmNewItem = () => {
+    setShowSimilarItemsWarning(false);
+    setSimilarItems([]);
+    setSelectedItemHistory(null);
+    setConfirmNewItemOpen(false);
+  };
+
   const handleViewItemHistory = async (itemId: number) => {
     try {
       const response = await getItemHistory(itemId);
-      setSelectedItemHistory(response.data);
-      setItemHistoryModalVisible(true);
+      setHistoryItemData(response.data);
+      setItemHistoryDialogOpen(true);
     } catch (error) {
       console.error("Error loading item history:", error);
-      message.error(t("items.errorLoadingHistory"));
+      toast.error(t("items.errorLoadingHistory"));
     }
   };
 
   const handleEdit = async (transaction: Transaction) => {
-    // Load item name if transaction has an item_id
     let itemName = "";
     if (transaction.item_id) {
       try {
@@ -333,399 +338,543 @@ const Transactions: React.FC = () => {
       setSelectedItemHistory(null);
     }
 
-    form.setFieldsValue({
-      amount: transaction.amount,
-      description: transaction.description || "",
-      category_id: transaction.category_id,
-      item_name: itemName,
-      date: dayjs(transaction.date),
-      unit_price: transaction.unit_price,
-      quantity: transaction.quantity,
-      unit: transaction.unit,
-    });
+    setFormAmount(String(transaction.amount));
+    setFormDescription(transaction.description || "");
+    setFormCategoryId(transaction.category_id);
+    setFormItemName(itemName);
+    setFormDate(transaction.date);
+    setFormUnitPrice(transaction.unit_price ? String(transaction.unit_price) : "");
+    setFormQuantity(transaction.quantity ? String(transaction.quantity) : "");
+    setFormUnit(transaction.unit || "");
 
-    // Show unit tracking section if transaction has unit data
     if (transaction.unit_price || transaction.quantity || transaction.unit) {
       setShowUnitTracking(true);
     }
 
     setEditingId(transaction.id);
-    setIsModalVisible(true);
+    setDialogOpen(true);
   };
 
   const handleDelete = async (id: number) => {
-    Modal.confirm({
-      title: t("transactions.deleteTitle"),
-      content: t("transactions.deleteConfirm"),
-      okText: t("common.yes"),
-      cancelText: t("common.no"),
-      okType: "danger",
-      onOk: async () => {
-        try {
-          await deleteTransaction(id);
-          message.success(t("transactions.successDeleting"));
-          loadTransactions();
-        } catch (error) {
-          console.error("Error deleting transaction:", error);
-          message.error(t("transactions.errorDeleting"));
-        }
-      },
-    });
+    try {
+      await deleteTransaction(id);
+      toast.success(t("transactions.successDeleting"));
+      loadTransactions();
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      toast.error(t("transactions.errorDeleting"));
+    }
   };
 
-  const handleFilterSubmit = (values: any) => {
+  const handleFilterSubmit = () => {
     const newFilters = {
-      category_id: values.category_id || "",
-      start_date: values.start_date ? values.start_date.format("YYYY-MM-DD") : "",
-      end_date: values.end_date ? values.end_date.format("YYYY-MM-DD") : "",
+      category_id: filterCategoryId,
+      start_date: filterStartDate,
+      end_date: filterEndDate,
     };
-    setFilters(newFilters);
     loadTransactions(newFilters);
   };
 
   return (
-    <div className="transactions-page">
-      <div className="transactions-header">
-        <h1 className="transactions-title">{t("transactions.title")}</h1>
-        <Space className="transactions-actions">
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingId(null);
-              setSelectedItemHistory(null);
-              setShowSimilarItemsWarning(false);
-              setSimilarItems([]);
-              setPendingItemName("");
-              form.resetFields();
-              setIsModalVisible(true);
-            }}
-          >
-            {t("transactions.addNew")}
+    <Flex direction="column" gap="4">
+      <Flex justify="between" align="center">
+        <Heading size="6">{t("transactions.title")}</Heading>
+        <Button
+          onClick={() => {
+            setEditingId(null);
+            resetForm();
+            setDialogOpen(true);
+          }}
+        >
+          <PlusIcon />
+          {t("transactions.addNew")}
+        </Button>
+      </Flex>
+
+      {/* Filter */}
+      <Card>
+        <Flex gap="3" wrap="wrap" align="end">
+          <label>
+            <Text as="div" size="1" mb="1" color="gray">
+              {t("transactions.allCategories")}
+            </Text>
+            <Select.Root
+              value={filterCategoryId}
+              onValueChange={setFilterCategoryId}
+            >
+              <Select.Trigger placeholder={t("transactions.allCategories")} />
+              <Select.Content>
+                {categories.map((cat) => (
+                  <Select.Item key={cat.id} value={String(cat.id)}>
+                    {cat.parent_id ? "  └─ " : ""}
+                    {getCategoryName(cat)}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </label>
+
+          <label>
+            <Text as="div" size="1" mb="1" color="gray">
+              {t("transactions.startDate")}
+            </Text>
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              style={{
+                height: 32,
+                padding: "4px 8px",
+                borderRadius: "var(--radius-2)",
+                border: "1px solid var(--gray-7)",
+                background: "var(--color-surface)",
+                color: "var(--gray-12)",
+                fontSize: 14,
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+              }}
+            />
+          </label>
+
+          <label>
+            <Text as="div" size="1" mb="1" color="gray">
+              {t("transactions.endDate")}
+            </Text>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              style={{
+                height: 32,
+                padding: "4px 8px",
+                borderRadius: "var(--radius-2)",
+                border: "1px solid var(--gray-7)",
+                background: "var(--color-surface)",
+                color: "var(--gray-12)",
+                fontSize: 14,
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+              }}
+            />
+          </label>
+
+          <Button onClick={handleFilterSubmit}>
+            <MagnifyingGlassIcon />
+            {t("transactions.applyFilters")}
           </Button>
-        </Space>
-      </div>
-
-      <Card
-        className="filter-card"
-        title={
-          <>
-            <FilterOutlined /> {t("transactions.filterTitle")}
-          </>
-        }
-        bordered={false}
-      >
-        <Form form={filterForm} layout="inline" onFinish={handleFilterSubmit}>
-          <Form.Item name="category_id">
-            <Select style={{ width: 200 }} placeholder={t("transactions.allCategories")} allowClear>
-              {categories.map((category) => (
-                <Option key={category.id} value={category.id}>
-                  {category.parent_id ? "  └─ " : ""}
-                  {getCategoryName(category)}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="start_date">
-            <DatePicker placeholder={t("transactions.startDate")} />
-          </Form.Item>
-          <Form.Item name="end_date">
-            <DatePicker placeholder={t("transactions.endDate")} />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              {t("transactions.applyFilters")}
-            </Button>
-          </Form.Item>
-        </Form>
+        </Flex>
       </Card>
 
-      <Card className="transactions-table-card" bordered={false}>
-        <TransactionTable transactions={transactions} categories={categories} items={items} loading={loading} showActions={true} onEdit={handleEdit} onDelete={handleDelete} onItemClick={handleViewItemHistory} />
+      {/* Transactions table */}
+      <Card>
+        <TransactionTable
+          transactions={transactions}
+          categories={categories}
+          items={items}
+          loading={loading}
+          showActions={true}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onItemClick={handleViewItemHistory}
+        />
       </Card>
 
-      <Modal
-        title={editingId ? t("transactions.edit") : t("transactions.addNew")}
-        open={isModalVisible}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingId(null);
-          setSelectedItemHistory(null);
-          setShowSimilarItemsWarning(false);
-          setSimilarItems([]);
-          setPendingItemName("");
-          form.resetFields();
+      {/* Add/Edit Dialog */}
+      <Dialog.Root
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) { setDialogOpen(false); setEditingId(null); resetForm(); }
         }}
-        footer={null}
-        width={600}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ date: dayjs() }}>
-          <Form.Item name="amount" label={t("transactions.amount")} rules={[{ required: true, message: t("transactions.amountRequired") }]}>
-            <Input type="number" step="0.01" placeholder="0.00" />
-          </Form.Item>
+        <Dialog.Content style={{ maxWidth: 560, maxHeight: "80vh", overflow: "auto" }}>
+          <Dialog.Title>
+            {editingId ? t("transactions.edit") : t("transactions.addNew")}
+          </Dialog.Title>
 
-          <Form.Item>
-            <Button type="link" onClick={() => setShowUnitTracking(!showUnitTracking)} style={{ padding: 0 }}>
+          <Flex direction="column" gap="3" mt="4">
+            {/* Amount */}
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("transactions.amount")}
+              </Text>
+              <TextField.Root
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={formAmount}
+                onChange={(e) => setFormAmount((e.target as HTMLInputElement).value)}
+              />
+            </label>
+
+            {/* Unit tracking toggle */}
+            <Button
+              variant="ghost"
+              size="2"
+              onClick={() => setShowUnitTracking(!showUnitTracking)}
+              style={{ alignSelf: "flex-start" }}
+            >
               {showUnitTracking ? "− " : "+ "}
               {t("transactions.trackUnitPrice")}
             </Button>
-          </Form.Item>
 
-          {showUnitTracking && (
-            <>
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Form.Item name="unit_price" label={t("transactions.unitPrice")}>
-                    <Input type="number" step="0.01" placeholder={t("transactions.unitPricePlaceholder")} />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="quantity" label={t("transactions.quantity")}>
-                    <Input type="number" step="0.01" placeholder={t("transactions.quantityPlaceholder")} />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Form.Item name="unit" label={t("transactions.unit")}>
-                <Select placeholder={t("transactions.unitPlaceholder")} allowClear>
-                  <Option value="gallon">{t("units.gallon")}</Option>
-                  <Option value="liter">{t("units.liter")}</Option>
-                  <Option value="kg">{t("units.kg")}</Option>
-                  <Option value="lb">{t("units.lb")}</Option>
-                  <Option value="piece">{t("units.piece")}</Option>
-                  <Option value="box">{t("units.box")}</Option>
-                  <Option value="bottle">{t("units.bottle")}</Option>
-                  <Option value="pack">{t("units.pack")}</Option>
-                </Select>
-              </Form.Item>
-            </>
-          )}
+            {showUnitTracking && (
+              <>
+                <Flex gap="3">
+                  <label style={{ flex: 1 }}>
+                    <Text as="div" size="2" mb="1" weight="medium">
+                      {t("transactions.unitPrice")}
+                    </Text>
+                    <TextField.Root
+                      type="number"
+                      step="0.01"
+                      placeholder={t("transactions.unitPricePlaceholder")}
+                      value={formUnitPrice}
+                      onChange={(e) => setFormUnitPrice((e.target as HTMLInputElement).value)}
+                    />
+                  </label>
+                  <label style={{ flex: 1 }}>
+                    <Text as="div" size="2" mb="1" weight="medium">
+                      {t("transactions.quantity")}
+                    </Text>
+                    <TextField.Root
+                      type="number"
+                      step="0.01"
+                      placeholder={t("transactions.quantityPlaceholder")}
+                      value={formQuantity}
+                      onChange={(e) => setFormQuantity((e.target as HTMLInputElement).value)}
+                    />
+                  </label>
+                </Flex>
+                <label>
+                  <Text as="div" size="2" mb="1" weight="medium">
+                    {t("transactions.unit")}
+                  </Text>
+                  <Select.Root value={formUnit} onValueChange={setFormUnit}>
+                    <Select.Trigger style={{ width: "100%" }} placeholder={t("transactions.unitPlaceholder")} />
+                    <Select.Content>
+                      {["gallon", "liter", "kg", "lb", "piece", "box", "bottle", "pack"].map((u) => (
+                        <Select.Item key={u} value={u}>
+                          {t(`units.${u}`)}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </label>
+              </>
+            )}
 
-          <Form.Item name="description" label={t("transactions.description")}>
-            <TextArea rows={3} placeholder={t("transactions.descriptionPlaceholder")} />
-          </Form.Item>
+            {/* Description */}
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("transactions.description")}
+              </Text>
+              <TextField.Root
+                placeholder={t("transactions.descriptionPlaceholder")}
+                value={formDescription}
+                onChange={(e) => setFormDescription((e.target as HTMLInputElement).value)}
+              />
+            </label>
 
-          <Form.Item name="item_name" label={t("transactions.itemName")}>
-            <AutoComplete
-              options={itemOptions}
-              onSearch={handleItemSearch}
-              onSelect={handleItemSelect}
-              placeholder={t("transactions.itemNamePlaceholder")}
-              allowClear
-              optionLabelProp="value"
-              onChange={(value) => {
-                if (!value) {
-                  setSelectedItemHistory(null);
-                  setShowSimilarItemsWarning(false);
-                  setSimilarItems([]);
-                }
-              }}
-            />
-          </Form.Item>
-
-          {showSimilarItemsWarning && similarItems.length > 0 && (
-            <Alert
-              message={t("transactions.similarItemsFound")}
-              description={
-                <div>
-                  <p>{t("transactions.similarItemsExist")}:</p>
-                  <ul style={{ marginTop: "8px", marginBottom: 0 }}>
-                    {similarItems.map((item) => (
-                      <li key={item.id}>
-                        <a
-                          onClick={() => {
-                            form.setFieldsValue({ item_name: item.name });
-                            handleItemSelect(item.name, { item });
-                          }}
-                        >
-                          {item.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+            {/* Item name */}
+            <label style={{ position: "relative" }}>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("transactions.itemName")}
+              </Text>
+              <TextField.Root
+                placeholder={t("transactions.itemNamePlaceholder")}
+                value={formItemName}
+                onChange={(e) => handleItemSearch((e.target as HTMLInputElement).value)}
+                onFocus={() => itemOptions.length > 0 && setShowItemDropdown(true)}
+                onBlur={() => setTimeout(() => setShowItemDropdown(false), 200)}
+              />
+              {showItemDropdown && itemOptions.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                    background: "var(--color-panel-solid)",
+                    border: "1px solid var(--gray-6)",
+                    borderRadius: "var(--radius-2)",
+                    boxShadow: "var(--shadow-3)",
+                    maxHeight: 200,
+                    overflow: "auto",
+                  }}
+                >
+                  {itemOptions.map((opt) => (
+                    <div
+                      key={opt.value}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleItemSelect(opt.value, opt);
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid var(--gray-4)",
+                        fontSize: 14,
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+                  ))}
                 </div>
-              }
-              type="warning"
-              showIcon
-              style={{ marginBottom: "16px" }}
-            />
-          )}
+              )}
+            </label>
 
-          {selectedItemHistory && selectedItemHistory.stats.total_purchases > 0 && (
-            <Card
-              size="small"
-              title={
-                <>
-                  <HistoryOutlined /> {t("items.purchaseHistory")}
-                </>
-              }
-              style={{ marginBottom: "16px", backgroundColor: "#f5f5f5" }}
-            >
-              <Space direction="vertical" style={{ width: "100%" }}>
-                <div>
-                  <Tag color="blue">
-                    {t("items.totalPurchases")}: {selectedItemHistory.stats.total_purchases}
-                  </Tag>
-                  <Tag color="green">
-                    {t("items.averagePrice")}: {formatCurrency(selectedItemHistory.stats.average_price, "USD")}
-                  </Tag>
-                  <Tag color="orange">
-                    {t("items.lastPurchase")}: {selectedItemHistory.stats.last_purchase_date ? dayjs(selectedItemHistory.stats.last_purchase_date).format("YYYY-MM-DD") : "-"}
-                  </Tag>
-                </div>
-                <Collapse ghost>
-                  <Panel header={t("items.recentTransactions")} key="1">
-                    {selectedItemHistory.transactions.slice(0, 3).map((txn) => (
-                      <div key={txn.id} style={{ padding: "4px 0", borderBottom: "1px solid #e8e8e8" }}>
-                        <Space>
-                          <span>{dayjs(txn.date).format("YYYY-MM-DD")}</span>
-                          <span>{formatCurrency(txn.amount, txn.currency)}</span>
-                          <span style={{ color: "#999" }}>{txn.description}</span>
-                        </Space>
-                      </div>
-                    ))}
-                  </Panel>
-                </Collapse>
-              </Space>
-            </Card>
-          )}
+            {/* Similar items warning */}
+            {showSimilarItemsWarning && similarItems.length > 0 && (
+              <Callout.Root color="yellow" size="1">
+                <Callout.Text>
+                  {t("transactions.similarItemsExist")}:{" "}
+                  {similarItems.map((item, i) => (
+                    <span key={item.id}>
+                      <span
+                        style={{ cursor: "pointer", textDecoration: "underline" }}
+                        onClick={() => {
+                          setFormItemName(item.name);
+                          handleItemSelect(item.name, { item });
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                      {i < similarItems.length - 1 ? ", " : ""}
+                    </span>
+                  ))}
+                </Callout.Text>
+              </Callout.Root>
+            )}
 
-          <Form.Item name="category_id" label={t("transactions.category")} rules={[{ required: true, message: t("transactions.categoryRequired") }]}>
-            <Select placeholder={t("transactions.selectCategory")}>
-              {categories.map((category) => (
-                <Option key={category.id} value={category.id}>
-                  {category.parent_id ? "  └─ " : ""}
-                  {getCategoryName(category)} ({t(`categories.${category.type}`)})
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="date" label={t("transactions.date")} rules={[{ required: true, message: t("transactions.dateRequired") }]}>
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingId ? t("transactions.update") : t("transactions.add")}
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsModalVisible(false);
-                  setEditingId(null);
-                  setSelectedItemHistory(null);
-                  setShowSimilarItemsWarning(false);
-                  setSimilarItems([]);
-                  setPendingItemName("");
-                  form.resetFields();
-                }}
-              >
-                {t("transactions.cancel")}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Item History Modal */}
-      <Modal
-        title={
-          <Space>
-            <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setItemHistoryModalVisible(false)} />
-            {selectedItemHistory?.item.name} - {t("items.historyTitle")}
-          </Space>
-        }
-        open={itemHistoryModalVisible}
-        onCancel={() => setItemHistoryModalVisible(false)}
-        footer={null}
-        width={1000}
-      >
-        {selectedItemHistory && (
-          <>
-            <Card title={t("items.statistics")} style={{ marginBottom: "16px" }}>
-              <Row gutter={16}>
-                <Col span={6}>
-                  <Statistic title={t("items.totalPurchases")} value={selectedItemHistory.stats.total_purchases} />
-                </Col>
-                <Col span={6}>
-                  <Statistic title={t("items.totalSpent")} value={formatCurrency(selectedItemHistory.stats.total_spent, "USD")} />
-                </Col>
-                <Col span={6}>
-                  <Statistic title={t("items.averagePrice")} value={formatCurrency(selectedItemHistory.stats.average_price, "USD")} />
-                </Col>
-                <Col span={6}>
-                  <Statistic title={t("items.firstPurchase")} value={selectedItemHistory.stats.first_purchase_date ? dayjs(selectedItemHistory.stats.first_purchase_date).format("YYYY-MM-DD") : "-"} />
-                </Col>
-              </Row>
-            </Card>
-
-            {selectedItemHistory.transactions.length > 1 && (
-              <Card
-                title={
-                  <>
-                    <LineChartOutlined /> {t("items.priceTrend")}
-                  </>
-                }
-                style={{ marginBottom: "16px" }}
-              >
-                <Line
-                  data={selectedItemHistory.transactions
-                    .map((t) => ({
-                      date: t.date,
-                      price: t.amount,
-                    }))
-                    .reverse()}
-                  xField="date"
-                  yField="price"
-                  point={{
-                    size: 5,
-                    shape: "circle",
-                  }}
-                  label={{
-                    style: {
-                      fill: "#aaa",
-                    },
-                  }}
-                  tooltip={{
-                    formatter: (datum) => {
-                      return { name: t("transactions.amount"), value: formatCurrency(datum.price, "USD") };
-                    },
-                  }}
-                  height={250}
-                />
+            {/* Selected item history */}
+            {selectedItemHistory && selectedItemHistory.stats.total_purchases > 0 && (
+              <Card>
+                <Flex direction="column" gap="2">
+                  <Flex gap="2" wrap="wrap">
+                    <Badge color="blue">
+                      {t("items.totalPurchases")}: {selectedItemHistory.stats.total_purchases}
+                    </Badge>
+                    <Badge color="green">
+                      {t("items.averagePrice")}: {formatCurrency(selectedItemHistory.stats.average_price, "USD")}
+                    </Badge>
+                    <Badge color="orange">
+                      {t("items.lastPurchase")}:{" "}
+                      {selectedItemHistory.stats.last_purchase_date
+                        ? dayjs(selectedItemHistory.stats.last_purchase_date).format("YYYY-MM-DD")
+                        : "-"}
+                    </Badge>
+                  </Flex>
+                  {selectedItemHistory.transactions.slice(0, 3).map((txn) => (
+                    <Flex key={txn.id} gap="3" style={{ fontSize: 13, color: "var(--gray-11)" }}>
+                      <span>{dayjs(txn.date).format("YYYY-MM-DD")}</span>
+                      <span>{formatCurrency(txn.amount, txn.currency)}</span>
+                      <span>{txn.description}</span>
+                    </Flex>
+                  ))}
+                </Flex>
               </Card>
             )}
 
-            <Card title={t("items.transactions")}>
-              <Table
-                columns={[
-                  {
-                    title: t("transactions.date"),
-                    dataIndex: "date",
-                    key: "date",
-                    render: (date: string) => dayjs(date).format("YYYY-MM-DD"),
-                  },
-                  {
-                    title: t("transactions.description"),
-                    dataIndex: "description",
-                    key: "description",
-                  },
-                  {
-                    title: t("transactions.amount"),
-                    key: "amount",
-                    render: (_, record) => <span>{formatWithConversion(record.amount, record.currency)}</span>,
-                  },
-                ]}
-                dataSource={selectedItemHistory.transactions}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                locale={{ emptyText: t("transactions.noTransactions") }}
+            {/* Category */}
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("transactions.category")}
+              </Text>
+              <Select.Root
+                value={formCategoryId?.toString() ?? ""}
+                onValueChange={(val) => setFormCategoryId(parseInt(val))}
+              >
+                <Select.Trigger style={{ width: "100%" }} placeholder={t("transactions.selectCategory")} />
+                <Select.Content>
+                  {categories.map((cat) => (
+                    <Select.Item key={cat.id} value={String(cat.id)}>
+                      {cat.parent_id ? "  └─ " : ""}
+                      {getCategoryName(cat)} ({t(`categories.${cat.type}`)})
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </label>
+
+            {/* Date */}
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("transactions.date")}
+              </Text>
+              <input
+                type="date"
+                value={formDate}
+                onChange={(e) => setFormDate(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: 32,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-7)",
+                  background: "var(--color-surface)",
+                  color: "var(--gray-12)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
               />
-            </Card>
-          </>
-        )}
-      </Modal>
-    </div>
+            </label>
+          </Flex>
+
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => { setDialogOpen(false); setEditingId(null); resetForm(); }}
+              disabled={saving}
+            >
+              {t("transactions.cancel")}
+            </Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {editingId ? t("transactions.update") : t("transactions.add")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Confirm New Item Dialog */}
+      <Dialog.Root open={confirmNewItemOpen} onOpenChange={(open) => { if (!open) setConfirmNewItemOpen(false); }}>
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>{t("transactions.confirmNewItem")}</Dialog.Title>
+          <Text size="2" mt="2">
+            {t("transactions.confirmNewItemMessage")} "<strong>{pendingItemName}</strong>"?
+          </Text>
+          <Text size="2" mt="2" color="yellow">
+            {t("transactions.similarItemsExist")}:
+          </Text>
+          <ul style={{ margin: "8px 0 0 16px", padding: 0 }}>
+            {similarItems.map((item) => (
+              <li key={item.id}>{item.name}</li>
+            ))}
+          </ul>
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => {
+                setConfirmNewItemOpen(false);
+                setFormItemName("");
+                setPendingItemName("");
+              }}
+            >
+              {t("common.no")}
+            </Button>
+            <Button onClick={confirmNewItem}>
+              {t("common.yes")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Item History Dialog */}
+      <Dialog.Root open={itemHistoryDialogOpen} onOpenChange={(open) => { if (!open) setItemHistoryDialogOpen(false); }}>
+        <Dialog.Content style={{ maxWidth: 800, maxHeight: "80vh", overflow: "auto" }}>
+          <Flex align="center" gap="3" mb="4">
+            <IconButton variant="ghost" onClick={() => setItemHistoryDialogOpen(false)}>
+              ←
+            </IconButton>
+            <Dialog.Title style={{ margin: 0 }}>
+              {historyItemData?.item.name} - {t("items.historyTitle")}
+            </Dialog.Title>
+          </Flex>
+
+          {historyItemData && (
+            <Flex direction="column" gap="4">
+              {/* Stats */}
+              <Flex gap="4" justify="center">
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.totalPurchases")}</Text>
+                  <Heading size="6">{historyItemData.stats.total_purchases}</Heading>
+                </Flex>
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.totalSpent")}</Text>
+                  <Heading size="6">{formatCurrency(historyItemData.stats.total_spent, "USD")}</Heading>
+                </Flex>
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.averagePrice")}</Text>
+                  <Heading size="6">{formatCurrency(historyItemData.stats.average_price, "USD")}</Heading>
+                </Flex>
+                <Flex direction="column" align="center" gap="1" style={{ flex: 1 }}>
+                  <Text size="2" color="gray">{t("items.firstPurchase")}</Text>
+                  <Heading size="6">
+                    {historyItemData.stats.first_purchase_date
+                      ? dayjs(historyItemData.stats.first_purchase_date).format("YYYY-MM-DD")
+                      : "-"}
+                  </Heading>
+                </Flex>
+              </Flex>
+
+              {/* Price trend chart */}
+              {historyItemData.transactions.length > 1 && (
+                <Card>
+                  <Text size="2" weight="medium" mb="2">
+                    {t("items.priceTrend")}
+                  </Text>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart
+                      data={historyItemData.transactions
+                        .map((tx) => ({
+                          date: tx.date,
+                          price: tx.amount,
+                          currency: tx.currency,
+                        }))
+                        .reverse()}
+                    >
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip
+                        formatter={(value: number, _: string, props: any) => [
+                          formatWithConversion(value, props.payload?.currency || "USD"),
+                          t("transactions.amount"),
+                        ]}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="price"
+                        stroke="var(--accent-9)"
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              {/* Transactions */}
+              <Card>
+                <Text size="2" weight="medium" mb="2">
+                  {t("items.transactions")}
+                </Text>
+                <Table.Root variant="surface">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>{t("transactions.date")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.description")}</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>{t("transactions.amount")}</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {historyItemData.transactions.map((txn) => (
+                      <Table.Row key={txn.id}>
+                        <Table.Cell>{dayjs(txn.date).format("YYYY-MM-DD")}</Table.Cell>
+                        <Table.Cell>{txn.description}</Table.Cell>
+                        <Table.Cell>{formatWithConversion(txn.amount, txn.currency)}</Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Card>
+            </Flex>
+          )}
+        </Dialog.Content>
+      </Dialog.Root>
+    </Flex>
   );
 };
 

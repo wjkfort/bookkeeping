@@ -1,7 +1,7 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import { Spin } from 'antd';
+import React from "react";
+import { Navigate } from "react-router-dom";
+import { Flex, Spinner, Text } from "@radix-ui/themes";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,9 +12,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" />
-      </div>
+      <Flex justify="center" align="center" style={{ minHeight: "60vh" }}>
+        <Flex direction="column" align="center" gap="3">
+          <Spinner size="3" />
+          <Text size="2" color="gray">Loading...</Text>
+        </Flex>
+      </Flex>
     );
   }
 

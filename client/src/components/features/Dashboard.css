@@ -5,35 +5,6 @@
     margin: 0 auto;
 }
 
-/* Header */
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 40px;
-    padding-bottom: 24px;
-    border-bottom: 2px solid #f5f5f4;
-}
-
-.dashboard-title {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 0;
-    background: linear-gradient(135deg, #f4623d 0%, #e89b0b 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.02em;
-}
-
-.dashboard-subtitle {
-    font-size: 1.125rem;
-    color: #78716c;
-    margin: 8px 0 0 0;
-    font-weight: 500;
-}
-
 /* ========================================
    Necessary Output - Utility Icons
    Shared abstraction for water, elec, etc.
@@ -686,14 +657,7 @@
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.chart-card .ant-card-head {
-    border-bottom: 2px solid #f5f5f4;
-    padding: 24px 32px;
-}
 
-.chart-card .ant-card-body {
-    padding: 32px;
-}
 
 .chart-header {
     display: flex;
@@ -726,13 +690,7 @@
     color: #ff6b3d;
 }
 
-.chart-toggle .ant-switch-checked {
-    background: #f43f5e;
-}
 
-.chart-toggle .ant-switch {
-    background: #22c55e;
-}
 
 /* Transactions Card */
 .transactions-card {
@@ -741,14 +699,7 @@
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
-.transactions-card .ant-card-head {
-    border-bottom: 2px solid #f5f5f4;
-    padding: 24px 32px;
-}
 
-.transactions-card .ant-card-body {
-    padding: 0;
-}
 
 .card-title {
     font-family: "Outfit", system-ui, sans-serif;
@@ -771,16 +722,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-    .dashboard-header {
-        flex-direction: column;
-        gap: 20px;
-        align-items: stretch;
-    }
-
-    .dashboard-title {
-        font-size: 2rem;
-    }
-
     .hero-stats {
         grid-template-columns: 1fr;
     }
@@ -805,20 +746,9 @@
         gap: 16px;
     }
 
-    .chart-card .ant-card-head {
-        padding: 20px 24px;
-    }
-
-    .chart-card .ant-card-body {
-        padding: 24px;
-    }
 }
 
 @media (max-width: 480px) {
-    .dashboard-title {
-        font-size: 1.75rem;
-    }
-
     .stat-value {
         font-size: 1.75rem;
     }
@@ -830,37 +760,9 @@
     }
 }
 
-/* Radio button group styling */
-.ant-radio-group {
-    display: flex;
-    gap: 4px;
-}
 
-.ant-radio-button-wrapper {
-    border-radius: 8px !important;
-    border: 2px solid #e7e5e4 !important;
-    font-weight: 600;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
 
-.ant-radio-button-wrapper:hover {
-    color: #ff6b3d;
-    border-color: rgba(255, 107, 61, 0.3) !important;
-}
 
-.ant-radio-button-wrapper-checked {
-    background: linear-gradient(135deg, #ff6b3d 0%, #f04e1f 100%) !important;
-    border-color: #ff6b3d !important;
-    color: white !important;
-}
-
-.ant-radio-button-wrapper-checked:hover {
-    color: white !important;
-}
-
-.ant-radio-button-wrapper::before {
-    display: none;
-}
 
 /* Chart improvements */
 .recharts-pie-label-text {
@@ -1003,23 +905,7 @@
     flex-shrink: 0;
 }
 
-.subscription-item .ant-progress {
-    flex: 1;
-    min-width: 80px;
-}
 
-.subscription-item .ant-progress-inner {
-    border-radius: 6px !important;
-}
-
-.subscription-item .ant-progress-bg {
-    border-radius: 6px !important;
-    height: 6px !important;
-}
-
-.subscription-item .ant-progress-outer {
-    padding-right: 0 !important;
-}
 
 /* Popover */
 .subscription-popover-content {

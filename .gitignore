@@ -42,3 +42,6 @@ skills-lock.json
 .agents/
 .factory/
 CLAUDE.md
+.deepseek
+.codegraph
+.reasonix
