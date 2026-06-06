@@ -1,516 +1,11 @@
-/* Dashboard Styles - Bold, warm, approachable */
+/* Dashboard Styles */
 
-.dashboard {
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
-/* ========================================
-   Necessary Output - Utility Icons
-   Shared abstraction for water, elec, etc.
-   ======================================== */
-
-/* Container */
-.necessary-output-wrapper {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-    margin-bottom: 0;
-    width: auto;
-    flex-shrink: 0;
-    align-self: stretch;
-}
-
-.necessary-output-title {
-    display: flex;
-    align-items: center;
-}
-
-.necessary-output-address {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #78716c;
-    white-space: nowrap;
-}
-
-.necessary-output-icons {
-    display: inline-flex;
-    align-items: center;
-    gap: 100px;
-}
-
-/* Shared base — every utility icon gets these */
-.utility-icon {
-    position: relative;
-    cursor: pointer;
-    animation: breathe 3s ease-in-out infinite;
-    transition: filter 0.3s ease;
-}
-
-.utility-icon-value {
-    position: absolute;
-    bottom: 16%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: white;
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 2;
-}
-
-/* Shared ripple ring */
-.utility-ripple-ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    transform: translate(-50%, -50%);
-    opacity: 0;
-    pointer-events: none;
-}
-
-.utility-icon.ripple .utility-ripple-ring {
-    animation: ripple-out 0.6s ease-out;
-}
-
-/* --- Water Droplet Variant --- */
-.water-droplet {
-    width: 76px;
-    height: 96px;
-    filter: drop-shadow(0 4px 14px rgba(14, 165, 233, 0.4));
-}
-
-.water-droplet:hover {
-    filter: drop-shadow(0 6px 22px rgba(14, 165, 233, 0.6));
-}
-
-.water-droplet .utility-icon-value {
-    text-shadow: 0 1px 3px rgba(2, 132, 199, 0.5);
-}
-
-.water-droplet .utility-ripple-ring {
-    border-color: rgba(56, 189, 248, 0.6);
-}
-
-/* Teardrop shape */
-.water-droplet-body {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-    background: linear-gradient(180deg, #bae6fd 0%, #e0f2fe 100%);
-    overflow: hidden;
-    box-shadow: inset 0 -2px 6px rgba(2, 132, 199, 0.15);
-}
-
-/* Liquid fill */
-.water-droplet-liquid {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 65%;
-    background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
-}
-
-/* CSS wave */
-.water-wave {
-    position: absolute;
-    top: -8px;
-    left: -50%;
-    width: 200%;
-    height: 16px;
-    border-radius: 40%;
-}
-
-.water-wave-1 {
-    background: rgba(125, 211, 252, 0.7);
-    animation: wave-slide 3s ease-in-out infinite;
-}
-
-.water-wave-2 {
-    background: rgba(14, 165, 233, 0.4);
-    top: -5px;
-    animation: wave-slide 3.5s ease-in-out infinite reverse;
-}
-
-@keyframes wave-slide {
-    0%,
-    100% {
-        transform: translateX(0) rotate(0deg);
-    }
-    50% {
-        transform: translateX(25%) rotate(3deg);
-    }
-}
-
-/* Glass highlight */
-.water-droplet-highlight {
-    position: absolute;
-    top: 18%;
-    left: 18%;
-    width: 22%;
-    height: 28%;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 100%);
-    border-radius: 50%;
-    transform: rotate(-20deg);
-    pointer-events: none;
-}
-
-/* --- Electricity Bolt Variant --- */
-.elec-bolt {
-    width: 56px;
-    height: 96px;
-    filter: drop-shadow(0 4px 14px rgba(234, 179, 8, 0.4));
-}
-
-.elec-bolt:hover {
-    filter: drop-shadow(0 6px 22px rgba(234, 179, 8, 0.65));
-}
-
-.elec-bolt .utility-icon-value {
-    color: #78350f;
-    text-shadow: 0 1px 2px rgba(251, 191, 36, 0.4);
-    bottom: 12%;
-}
-
-.elec-bolt .utility-ripple-ring {
-    border-color: rgba(251, 191, 36, 0.6);
-}
-
-/* Lightning bolt shape */
-.elec-bolt-body {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #fde68a 0%, #fbbf24 40%, #f59e0b 100%);
-    clip-path: polygon(55% 0%, 25% 42%, 45% 42%, 20% 100%, 80% 50%, 55% 50%, 75% 0%);
-    overflow: hidden;
-}
-
-.elec-bolt-highlight {
-    position: absolute;
-    top: 10%;
-    left: 15%;
-    width: 30%;
-    height: 35%;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
-    border-radius: 50%;
-    transform: rotate(-15deg);
-    pointer-events: none;
-}
-
-/* --- Drinking Water Bottle Variant --- */
-.drinking-water {
-    width: 56px;
-    height: 96px;
-    filter: drop-shadow(0 4px 14px rgba(14, 165, 233, 0.35));
-}
-
-.drinking-water:hover {
-    filter: drop-shadow(0 6px 22px rgba(14, 165, 233, 0.55));
-}
-
-.drinking-water .utility-icon-value {
-    color: #0c4a6e;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
-    bottom: 10%;
-}
-
-.drinking-water .utility-ripple-ring {
-    border-color: rgba(56, 189, 248, 0.6);
-}
-
-.drinking-water-body {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, rgba(186, 230, 253, 0.9) 0%, rgba(224, 242, 254, 0.9) 100%);
-    border-radius: 8px 8px 20px 20px;
-    overflow: hidden;
-    border: 2px solid rgba(14, 165, 233, 0.3);
-}
-
-.drinking-water-cap {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 50%;
-    height: 12px;
-    background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
-    border-radius: 4px 4px 0 0;
-}
-
-.drinking-water-label {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.6rem;
-    font-weight: 700;
-    color: #0369a1;
-    text-align: center;
-    line-height: 1.1;
-}
-
-.drinking-water-label span {
-    display: block;
-    font-size: 0.5rem;
-    font-weight: 400;
-    opacity: 0.8;
-}
-
-/* --- Internet/Satellite Dish Variant --- */
-.wifi-router {
-    width: 80px;
-    height: 80px;
-    filter: drop-shadow(0 4px 14px rgba(139, 92, 246, 0.35));
-}
-
-.wifi-router:hover {
-    filter: drop-shadow(0 6px 22px rgba(139, 92, 246, 0.55));
-}
-
-.wifi-router .utility-icon-value {
-    color: #4c1d95;
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
-    bottom: 5%;
-}
-
-.wifi-router .utility-ripple-ring {
-    border-color: rgba(167, 139, 250, 0.6);
-}
-
-.wifi-router-body {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #e9d5ff 0%, #ddd6fe 100%);
-    border-radius: 50%;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 3px solid rgba(139, 92, 246, 0.4);
-    box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.1);
-}
-
-.satellite-dish {
-    position: relative;
-    width: 70%;
-    height: 70%;
-}
-
-.satellite-arc {
-    position: absolute;
-    border: 4px solid transparent;
-    border-radius: 50%;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-}
-
-.satellite-arc:nth-child(1) {
-    width: 20px;
-    height: 20px;
-    border-top-color: #7c3aed;
-    border-right-color: #7c3aed;
-    animation: satellite-pulse 2s ease-in-out infinite;
-}
-
-.satellite-arc:nth-child(2) {
-    width: 40px;
-    height: 40px;
-    border-top-color: #a78bfa;
-    border-right-color: #a78bfa;
-    animation: satellite-pulse 2s ease-in-out infinite 0.2s;
-}
-
-.satellite-arc:nth-child(3) {
-    width: 60px;
-    height: 60px;
-    border-top-color: #c4b5fd;
-    border-right-color: #c4b5fd;
-    animation: satellite-pulse 2s ease-in-out infinite 0.4s;
-}
-
-.satellite-dot {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 10px;
-    height: 10px;
-    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-    border-radius: 50%;
-    box-shadow: 0 0 10px rgba(124, 58, 237, 0.6);
-}
-
-@keyframes satellite-pulse {
-    0%,
-    100% {
-        opacity: 0.5;
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-    50% {
-        opacity: 1;
-        transform: translate(-50%, -50%) rotate(15deg);
-    }
-}
-
-/* --- Shared Animations --- */
-@keyframes breathe {
-    0%,
-    100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.08);
-    }
-}
-
-@keyframes ripple-out {
-    0% {
-        width: 0;
-        height: 0;
-        opacity: 0.7;
-    }
-    100% {
-        width: 130px;
-        height: 130px;
-        opacity: 0;
-    }
-}
-
-/* --- Shared Popover --- */
-.utility-popover-content {
-    padding: 4px 0;
-}
-
-.utility-popover-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #94a3b8;
-    font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.utility-popover-value {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 1.125rem;
-    font-weight: 700;
-}
-
-.utility-popover-value--water {
-    color: #0369a1;
-}
-
-.utility-popover-value--elec {
-    color: #b45309;
-}
-
-.utility-popover-value--generic {
-    color: #475569;
-}
-
-.utility-popover-value--drinking-water {
-    color: #0369a1;
-}
-
-.utility-popover-value--wifi {
-    color: #7c3aed;
-}
-
-/* --- Generic Utility Variant --- */
-.utility-generic {
-    width: 76px;
-    height: 96px;
-    filter: drop-shadow(0 4px 14px rgba(100, 116, 139, 0.35));
-}
-
-.utility-generic:hover {
-    filter: drop-shadow(0 6px 22px rgba(100, 116, 139, 0.55));
-}
-
-.utility-generic .utility-icon-value {
-    color: white;
-    text-shadow: 0 1px 3px rgba(71, 85, 105, 0.5);
-}
-
-.utility-generic .utility-ripple-ring {
-    border-color: rgba(148, 163, 184, 0.6);
-}
-
-.utility-generic-body {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 20%;
-    background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.utility-generic-emoji {
-    font-size: 2.2rem;
-    line-height: 1;
-}
-
-/* --- Responsive --- */
-@media (max-width: 480px) {
-    .water-droplet {
-        width: 60px;
-        height: 76px;
-    }
-
-    .elec-bolt {
-        width: 44px;
-        height: 76px;
-    }
-
-    .utility-icon-value {
-        font-size: 0.6rem;
-    }
-
-    .utility-generic {
-        width: 60px;
-        height: 76px;
-    }
-
-    .utility-generic-emoji {
-        font-size: 1.6rem;
-    }
-
-    .drinking-water {
-        width: 44px;
-        height: 76px;
-    }
-
-    .wifi-router {
-        width: 64px;
-        height: 64px;
-    }
-}
-
-/* Hero Stats - No cards, pure design */
+/* Hero Stats */
 .hero-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 24px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 
 .stat-card {
@@ -520,83 +15,48 @@
     display: flex;
     align-items: center;
     gap: 20px;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.3s ease;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .stat-card::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     opacity: 0.08;
-    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 0.3s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 25px -8px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card:hover::before {
     opacity: 0.12;
 }
 
-/* Income stat - softer green */
 .stat-income {
-    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    border: 1px solid #bbf7d0;
+    background: var(--jade-3);
+    border: 1px solid var(--jade-5);
 }
+.stat-income::before { background: var(--jade-9); }
+.stat-income .stat-icon { color: var(--jade-9); }
 
-.stat-income::before {
-    background: #20b55a;
-}
-
-.stat-income .stat-icon {
-    color: #16934a;
-}
-
-.stat-income .stat-value {
-    color: #15703d;
-}
-
-/* Expense stat - softer rose */
 .stat-expense {
-    background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
-    border: 1px solid #fecdd3;
+    background: var(--tomato-3);
+    border: 1px solid var(--tomato-5);
 }
+.stat-expense::before { background: var(--tomato-9); }
+.stat-expense .stat-icon { color: var(--tomato-9); }
 
-.stat-expense::before {
-    background: #e63f5a;
-}
-
-.stat-expense .stat-icon {
-    color: #d11d48;
-}
-
-.stat-expense .stat-value {
-    color: #ae123c;
-}
-
-/* Balance stat - softer terracotta */
 .stat-balance {
-    background: linear-gradient(135deg, #fff5f2 0%, #ffe8e0 100%);
-    border: 1px solid #ffd4c7;
+    background: var(--indigo-3);
+    border: 1px solid var(--indigo-5);
 }
-
-.stat-balance::before {
-    background: #f4623d;
-}
-
-.stat-balance .stat-icon {
-    color: #e04e1f;
-}
-
-.stat-balance .stat-value {
-    color: #c13a0f;
-}
+.stat-balance::before { background: var(--indigo-9); }
+.stat-balance .stat-icon { color: var(--indigo-9); }
 
 .stat-icon {
     font-size: 40px;
@@ -611,206 +71,11 @@
     flex-shrink: 0;
 }
 
-.stat-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.stat-label {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #78716c;
-    margin-bottom: 8px;
-}
-
-.stat-value {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 2.25rem;
-    font-weight: 600;
-    line-height: 1;
-    margin-bottom: 4px;
-    letter-spacing: -0.02em;
-}
-
-.stat-currency {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #a8a29e;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-/* Chart Cards */
-.chart-card {
-    border-radius: 20px;
-    border: 2px solid #f5f5f4;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.chart-card:hover {
-    border-color: rgba(255, 107, 61, 0.2);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-
-
-.chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.chart-title {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #292524;
-}
-
-.chart-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-.chart-toggle span {
-    color: #a8a29e;
-    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.chart-toggle span.active {
-    color: #ff6b3d;
-}
-
-
-
-/* Transactions Card */
-.transactions-card {
-    border-radius: 20px;
-    border: 2px solid #f5f5f4;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-}
-
-
-
-.card-title {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #292524;
-}
-
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 80px 24px;
-    color: #a8a29e;
-}
-
-.empty-state p {
-    font-size: 1.125rem;
-    margin: 0;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .hero-stats {
-        grid-template-columns: 1fr;
-    }
-
-    .stat-card {
-        padding: 24px;
-    }
-
-    .stat-icon {
-        width: 64px;
-        height: 64px;
-        font-size: 36px;
-    }
-
-    .stat-value {
-        font-size: 2rem;
-    }
-
-    .chart-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-    }
-
-}
-
-@media (max-width: 480px) {
-    .stat-value {
-        font-size: 1.75rem;
-    }
-
-    .stat-icon {
-        width: 56px;
-        height: 56px;
-        font-size: 32px;
-    }
-}
-
-
-
-
-
-/* Chart improvements */
-.recharts-pie-label-text {
-    font-family: "Inter", system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    fill: #292524;
-}
-
-.recharts-legend-item-text {
-    font-family: "Inter", system-ui, sans-serif;
-    font-weight: 500;
-    color: #57534e !important;
-}
-
-.recharts-cartesian-axis-tick-value {
-    font-family: "Inter", system-ui, sans-serif;
-    font-size: 12px;
-    fill: #78716c;
-}
-
-/* ========================================
-   Top Info Row - Utilities & Subscriptions
-   ======================================== */
-
-.top-info-row {
-    display: flex;
-    align-items: flex-start;
-    gap: 40px;
-    margin-bottom: 32px;
-    width: 100%;
-}
-
-.top-info-row .necessary-output-wrapper {
-    margin-bottom: 0;
-    flex-shrink: 0;
-}
-
-/* ========================================
-   Subscription Management
-   ======================================== */
-
+/* Subscription Management */
 .subscription-section {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-width: 0;
-    flex: 1;
 }
 
 .subscription-header {
@@ -822,20 +87,9 @@
 .subscription-title {
     display: flex;
     align-items: center;
-    font-family: "Outfit", system-ui, sans-serif;
     font-size: 0.95rem;
     font-weight: 600;
-    color: #78716c;
-}
-
-.subscription-empty {
-    padding: 16px 14px;
-    border-radius: 10px;
-    background: #fafaf9;
-    border: 1.5px dashed #e7e5e4;
-    color: #a8a29e;
-    font-size: 0.85rem;
-    text-align: center;
+    color: var(--gray-11);
 }
 
 .subscription-scroll {
@@ -845,21 +99,15 @@
     overflow-y: auto;
     max-height: 200px;
     padding-right: 4px;
-    scrollbar-width: thin;
-    scrollbar-color: #d6d3d1 transparent;
 }
 
-.subscription-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-
-.subscription-scroll::-webkit-scrollbar-thumb {
-    background: #d6d3d1;
-    border-radius: 4px;
-}
-
-.subscription-scroll::-webkit-scrollbar-track {
-    background: transparent;
+.subscription-empty {
+    padding: 16px;
+    border-radius: 8px;
+    border: 1.5px dashed var(--gray-6);
+    color: var(--gray-9);
+    font-size: 0.85rem;
+    text-align: center;
 }
 
 .subscription-item {
@@ -867,28 +115,28 @@
     align-items: center;
     gap: 10px;
     padding: 8px 14px;
-    border-radius: 10px;
-    background: #fafaf9;
-    border: 1.5px solid #f5f5f4;
+    border-radius: 8px;
+    background: var(--gray-2);
+    border: 1.5px solid var(--gray-4);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.25s ease;
     flex-shrink: 0;
 }
 
 .subscription-item:hover {
-    border-color: #d6d3d1;
+    border-color: var(--gray-6);
     box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
     transform: translateY(-1px);
 }
 
 .subscription-item.warning {
-    border-color: #fde68a;
-    background: #fffbeb;
+    border-color: var(--amber-6);
+    background: var(--amber-2);
 }
 
 .subscription-item.urgent {
-    border-color: #fca5a5;
-    background: #fef2f2;
+    border-color: var(--red-6);
+    background: var(--red-2);
 }
 
 .subscription-item-icon {
@@ -905,66 +153,31 @@
     flex-shrink: 0;
 }
 
-
-
-/* Popover */
-.subscription-popover-content {
-    padding: 4px 0;
-    min-width: 140px;
-}
-
-.subscription-popover-name {
-    font-family: "Outfit", system-ui, sans-serif;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #292524;
-    margin-bottom: 4px;
-}
-
-.subscription-popover-amount {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #f4623d;
-    margin-bottom: 6px;
-}
-
-.subscription-popover-end {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.75rem;
-    color: #a8a29e;
-    margin-bottom: 6px;
-}
-
-.subscription-popover-remaining {
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #78716c;
-}
-
-.subscription-popover-remaining.warning {
-    color: #d97706;
-}
-
-.subscription-popover-remaining.urgent {
-    color: #ef4444;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
-    .top-info-row {
-        flex-direction: column;
-        gap: 24px;
+    .hero-stats {
+        grid-template-columns: 1fr;
+    }
+    .stat-card {
+        padding: 24px;
+    }
+    .stat-icon {
+        width: 64px;
+        height: 64px;
+        font-size: 36px;
     }
 }
 
 @media (max-width: 480px) {
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        font-size: 32px;
+    }
     .subscription-item {
         padding: 6px 10px;
         gap: 8px;
     }
-
     .subscription-item-icon {
         font-size: 0.95rem;
     }
