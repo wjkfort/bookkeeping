@@ -149,45 +149,6 @@ export interface HonoVariables {
   userId: number;
 }
 
-export interface UtilityType {
-  id: number;
-  user_id: number;
-  name: string;
-  icon: string | null;
-  category_id: number | null;
-  category_name?: string;
-  created_at: string;
-}
-
-export interface UtilityReading {
-  id: number;
-  user_id: number;
-  address_id: number;
-  address_name?: string;
-  address_full?: string;
-  type_id: number;
-  type_name?: string;
-  type_icon?: string;
-  balance: number;
-  record_time: string; // YYYY-MM
-  currency: string;
-  created_at: string;
-}
-
-export interface UtilityReadingsSummary {
-  address_id: number;
-  address_name: string;
-  address_full: string;
-  type_id: number;
-  type_name: string;
-  type_icon: string | null;
-  currency: string;
-  currentMonth: UtilityReading | null;
-  lastMonth: UtilityReading | null;
-  lastMonthExpense: number;
-  recharges: number;
-}
-
 export interface Subscription {
   id: number;
   user_id: number;

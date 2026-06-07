@@ -6,18 +6,13 @@ import {
   ListBulletIcon,
   MixerHorizontalIcon,
   ArchiveIcon,
-  HomeIcon,
-  LightningBoltIcon,
-  GearIcon,
   ExitIcon,
 } from "@radix-ui/react-icons";
 import Dashboard from "./components/features/Dashboard";
 import Transactions from "./components/features/Transactions";
 import Categories from "./components/features/Categories";
 import Items from "./components/features/Items";
-import UtilityAddresses from "./components/features/UtilityAddresses";
-import UtilityReadings from "./components/features/UtilityReadings";
-import UtilityTypes from "./components/features/UtilityTypes";
+
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -29,9 +24,6 @@ const navItems = [
   { path: "/transactions", icon: ListBulletIcon },
   { path: "/categories", icon: MixerHorizontalIcon },
   { path: "/items", icon: ArchiveIcon },
-  { path: "/utility-addresses", icon: HomeIcon },
-  { path: "/utility-readings", icon: LightningBoltIcon },
-  { path: "/utility-types", icon: GearIcon },
 ] as const;
 
 function AppContent() {
@@ -155,30 +147,7 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/utility-addresses"
-              element={
-                <ProtectedRoute>
-                  <UtilityAddresses />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/utility-readings"
-              element={
-                <ProtectedRoute>
-                  <UtilityReadings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/utility-types"
-              element={
-                <ProtectedRoute>
-                  <UtilityTypes />
-                </ProtectedRoute>
-              }
-            />
+
           </Routes>
         </Container>
       </Flex>

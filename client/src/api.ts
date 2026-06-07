@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from "axios";
-import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory, UtilityReading, UtilityReadingsSummary, UtilityAddress, UtilityType, Subscription } from "./types";
+import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory, Subscription } from "./types";
 
 // Use environment variable in production, localhost in development
 const API_BASE_URL = import.meta.env.PROD
@@ -105,47 +105,6 @@ export const updateItem = (id: number, data: { name: string }): Promise<AxiosRes
 export const deleteItem = (id: number): Promise<AxiosResponse<void>> => api.delete(`/items/${id}`);
 
 export const searchItems = (query: string): Promise<AxiosResponse<Item[]>> => api.get(`/items/search/${query}`);
-
-// Utility Readings
-export const getUtilityReadings = (): Promise<AxiosResponse<UtilityReading[]>> => api.get("/utility-readings");
-
-export const getUtilityReadingsSummary = (): Promise<AxiosResponse<UtilityReadingsSummary[]>> => api.get("/utility-readings/summary");
-
-export const getUtilityReading = (id: number): Promise<AxiosResponse<UtilityReading>> => api.get(`/utility-readings/${id}`);
-
-export const createUtilityReading = (data: {
-  address_id: number;
-  type_id: number;
-  balance: number;
-  record_time: string;
-  currency?: string;
-}): Promise<AxiosResponse<UtilityReading>> => api.post("/utility-readings", data);
-
-export const updateUtilityReading = (id: number, data: { balance?: number; currency?: string }): Promise<AxiosResponse<UtilityReading>> => api.put(`/utility-readings/${id}`, data);
-
-export const deleteUtilityReading = (id: number): Promise<AxiosResponse<void>> => api.delete(`/utility-readings/${id}`);
-
-// Utility Addresses
-export const getUtilityAddresses = (): Promise<AxiosResponse<UtilityAddress[]>> => api.get("/utility-addresses");
-
-export const getUtilityAddress = (id: number): Promise<AxiosResponse<UtilityAddress>> => api.get(`/utility-addresses/${id}`);
-
-export const createUtilityAddress = (data: { name: string; address: string }): Promise<AxiosResponse<UtilityAddress>> => api.post("/utility-addresses", data);
-
-export const updateUtilityAddress = (id: number, data: { name?: string; address?: string }): Promise<AxiosResponse<UtilityAddress>> => api.put(`/utility-addresses/${id}`, data);
-
-export const deleteUtilityAddress = (id: number): Promise<AxiosResponse<void>> => api.delete(`/utility-addresses/${id}`);
-
-// Utility Types
-export const getUtilityTypes = (): Promise<AxiosResponse<UtilityType[]>> => api.get("/utility-types");
-
-export const getUtilityType = (id: number): Promise<AxiosResponse<UtilityType>> => api.get(`/utility-types/${id}`);
-
-export const createUtilityType = (data: { name: string; icon?: string; category_id?: number | null }): Promise<AxiosResponse<UtilityType>> => api.post("/utility-types", data);
-
-export const updateUtilityType = (id: number, data: { name?: string; icon?: string; category_id?: number | null }): Promise<AxiosResponse<UtilityType>> => api.put(`/utility-types/${id}`, data);
-
-export const deleteUtilityType = (id: number): Promise<AxiosResponse<void>> => api.delete(`/utility-types/${id}`);
 
 // Subscriptions
 export const getSubscriptions = (): Promise<AxiosResponse<Subscription[]>> => api.get("/subscriptions");
