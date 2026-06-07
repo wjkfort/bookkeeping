@@ -1,5 +1,0 @@
-# Proxy all /api/* requests to the backend Worker
-/api/* https://bookkeeping-backend.YOUR_SUBDOMAIN.workers.dev/api/:splat 200
-
-# SPA fallback — redirect all frontend routes to index.html
-/* /index.html 200
