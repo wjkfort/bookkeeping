@@ -1,23 +1,5 @@
-# Cloudflare Pages Configuration
+# Proxy all /api/* requests to the backend Worker
+/api/* https://bookkeeping-backend.YOUR_SUBDOMAIN.workers.dev/api/:splat 200
 
-# Build configuration
-[build]
-  command = "npm run build"
-  publish = "dist"
-
-# Environment variables for production
-[build.environment]
-  NODE_VERSION = "18"
-
-# Redirects and headers
-[[redirects]]
-  from = "/api/*"
-  to = "https://bookkeeping-backend.YOUR_SUBDOMAIN.workers.dev/api/:splat"
-  status = 200
-  force = true
-
-# SPA fallback - redirect all routes to index.html
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# SPA fallback — redirect all frontend routes to index.html
+/* /index.html 200
