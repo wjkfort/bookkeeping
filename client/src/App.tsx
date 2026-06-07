@@ -72,11 +72,13 @@ function AppContent() {
             style={{ borderBottom: "1px solid var(--gray-5)" }}
           >
             <Flex align="center" gap="6">
-              <Flex align="center" gap="2">
-                <Text size="5">💰</Text>
-                <Heading size="3" style={{ letterSpacing: "-0.02em" }}>
-                  {t("nav.title")}
-                </Heading>
+              <Flex align="center" gap="2" asChild>
+                <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
+                  <Text size="5">💰</Text>
+                  <Heading size="3" style={{ letterSpacing: "-0.02em" }}>
+                    {t("nav.title")}
+                  </Heading>
+                </Link>
               </Flex>
               <Tabs.Root value={currentTab}>
                 <Tabs.List>
