@@ -80,6 +80,11 @@ const Transactions: React.FC = () => {
   const [similarItems, setSimilarItems] = useState<Item[]>([]);
   const [pendingItemName, setPendingItemName] = useState("");
 
+  // Category search state
+  const [categorySearchText, setCategorySearchText] = useState("");
+  const [filteredCategoryOptions, setFilteredCategoryOptions] = useState<Category[]>([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
   // Confirm new item dialog
   const [confirmNewItemOpen, setConfirmNewItemOpen] = useState(false);
 
@@ -173,6 +178,9 @@ const Transactions: React.FC = () => {
     setSimilarItems([]);
     setPendingItemName("");
     setShowItemDropdown(false);
+    setCategorySearchText("");
+    setFilteredCategoryOptions([]);
+    setShowCategoryDropdown(false);
   };
 
   const handleSubmit = async () => {
@@ -341,6 +349,8 @@ const Transactions: React.FC = () => {
     setFormAmount(String(transaction.amount));
     setFormDescription(transaction.description || "");
     setFormCategoryId(transaction.category_id);
+    const cat = categories.find((c) => c.id === transaction.category_id);
+    if (cat) setCategorySearchText(getCategoryName(cat));
     setFormItemName(itemName);
     setFormDate(transaction.date);
     setFormUnitPrice(transaction.unit_price ? String(transaction.unit_price) : "");
@@ -677,24 +687,96 @@ const Transactions: React.FC = () => {
             )}
 
             {/* Category */}
-            <label>
+            <label style={{ position: "relative" }}>
               <Text as="div" size="2" mb="1" weight="medium">
                 {t("transactions.category")}
               </Text>
-              <Select.Root
-                value={formCategoryId?.toString() ?? ""}
-                onValueChange={(val) => setFormCategoryId(parseInt(val))}
-              >
-                <Select.Trigger style={{ width: "100%" }} placeholder={t("transactions.selectCategory")} />
-                <Select.Content>
-                  {categories.map((cat) => (
-                    <Select.Item key={cat.id} value={String(cat.id)}>
+              <input
+                type="text"
+                placeholder={t("transactions.selectCategory")}
+                value={categorySearchText}
+                onChange={(e) => {
+                  const text = e.target.value;
+                  setCategorySearchText(text);
+                  if (text) {
+                    const filtered = categories.filter((cat) =>
+                      getCategoryName(cat).toLowerCase().includes(text.toLowerCase())
+                    );
+                    setFilteredCategoryOptions(filtered);
+                    setShowCategoryDropdown(filtered.length > 0);
+                  } else {
+                    setFilteredCategoryOptions(categories);
+                    setShowCategoryDropdown(true);
+                    setFormCategoryId(null);
+                  }
+                }}
+                onFocus={() => {
+                  if (categorySearchText) {
+                    const filtered = categories.filter((cat) =>
+                      getCategoryName(cat).toLowerCase().includes(categorySearchText.toLowerCase())
+                    );
+                    setFilteredCategoryOptions(filtered);
+                    setShowCategoryDropdown(filtered.length > 0);
+                  } else {
+                    setFilteredCategoryOptions(categories);
+                    setShowCategoryDropdown(true);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setShowCategoryDropdown(false), 200)}
+                style={{
+                  width: "100%",
+                  height: 32,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-7)",
+                  background: "var(--color-surface)",
+                  color: "var(--gray-12)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+              {showCategoryDropdown && filteredCategoryOptions.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    zIndex: 10,
+                    background: "var(--color-panel-solid)",
+                    border: "1px solid var(--gray-6)",
+                    borderRadius: "var(--radius-2)",
+                    boxShadow: "var(--shadow-3)",
+                    maxHeight: 200,
+                    overflow: "auto",
+                  }}
+                >
+                  {filteredCategoryOptions.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setFormCategoryId(cat.id);
+                        setCategorySearchText(getCategoryName(cat));
+                        setShowCategoryDropdown(false);
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid var(--gray-4)",
+                        fontSize: 14,
+                      }}
+                    >
                       {cat.parent_id ? "  └─ " : ""}
-                      {getCategoryName(cat)} ({t(`categories.${cat.type}`)})
-                    </Select.Item>
+                      {getCategoryName(cat)}
+                      <span style={{ color: "var(--gray-9)", fontSize: 12, marginLeft: 8 }}>
+                        ({t(`categories.${cat.type}`)})
+                      </span>
+                    </div>
                   ))}
-                </Select.Content>
-              </Select.Root>
+                </div>
+              )}
             </label>
 
             {/* Date */}
