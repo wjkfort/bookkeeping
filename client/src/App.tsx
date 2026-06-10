@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Flex, Container, Tabs, IconButton, Text, Heading, Separator } from "@radix-ui/themes";
+import { Flex, Tabs, IconButton, Text, Heading, Separator } from "@radix-ui/themes";
 import {
   DashboardIcon,
   ListBulletIcon,
@@ -114,8 +114,7 @@ function AppContent() {
         </>
       )}
 
-      <Flex flexGrow="1" direction="column">
-        <Container size="4" px="4" py="6" style={{ flex: 1 }}>
+      <Flex flexGrow="1" direction="column" px="4" py="6" style={{ flex: 1 }}>
           <Routes>
             <Route
               path="/"
@@ -151,7 +150,6 @@ function AppContent() {
             />
 
           </Routes>
-        </Container>
       </Flex>
     </Flex>
   );

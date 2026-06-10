@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Button,
+  Card,
   Flex,
   Popover,
   Progress,
@@ -26,6 +27,7 @@ import SubscriptionModal from "./SubscriptionModal";
 import MonthPicker from "../ui/MonthPicker";
 import { useToast } from "../ui/Toast";
 import dayjs, { Dayjs } from "dayjs";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import "./Dashboard.css";
 
 const Dashboard: React.FC = () => {
@@ -39,6 +41,12 @@ const Dashboard: React.FC = () => {
     currency: "USD",
   });
   const [overallBalance, setOverallBalance] = useState<number>(0);
+  const [todaySummary, setTodaySummary] = useState<Summary>({
+    total_income: 0,
+    total_expense: 0,
+    balance: 0,
+    currency: "USD",
+  });
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
   const [isOverall, setIsOverall] = useState(false);
@@ -58,6 +66,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadTodayData();
   }, [currencyCode, selectedMonth, isOverall]);
 
   useEffect(() => {
@@ -104,6 +113,20 @@ const Dashboard: React.FC = () => {
       console.error("Error loading data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTodayData = async () => {
+    try {
+      const today = dayjs().format("YYYY-MM-DD");
+      const res = await getSummary({
+        target_currency: currencyCode,
+        start_date: today,
+        end_date: today,
+      });
+      setTodaySummary(res.data);
+    } catch (error) {
+      console.error("Error loading today data:", error);
     }
   };
 
@@ -184,6 +207,53 @@ const Dashboard: React.FC = () => {
           </Flex>
         </div>
       </div>
+
+      {/* Today's Spending */}
+      <Card>
+        <Flex direction="column" gap="3">
+          <Text size="3" weight="bold">{t("dashboard.todayTitle")}</Text>
+          <Flex gap="6" wrap="wrap" align="center" justify="between">
+            <Flex gap="6" wrap="wrap">
+              <Flex direction="column" gap="1">
+                <Text size="2" color="gray">{t("dashboard.todayIncome")}</Text>
+                <Heading size="5" color="jade">
+                  {todaySummary.total_income.toFixed(2)} {currencyCode}
+                </Heading>
+              </Flex>
+              <Flex direction="column" gap="1">
+                <Text size="2" color="gray">{t("dashboard.todayExpense")}</Text>
+                <Heading size="5" color="tomato">
+                  {todaySummary.total_expense.toFixed(2)} {currencyCode}
+                </Heading>
+              </Flex>
+              <Flex direction="column" gap="1">
+                <Text size="2" color="gray">{t("dashboard.todayNet")}</Text>
+                <Heading size="5">
+                  {todaySummary.balance.toFixed(2)} {currencyCode}
+                </Heading>
+              </Flex>
+            </Flex>
+            <ResponsiveContainer width={180} height={60}>
+              <BarChart
+                data={[
+                  { name: t("dashboard.todayIncome"), value: todaySummary.total_income },
+                  { name: t("dashboard.todayExpense"), value: todaySummary.total_expense },
+                ]}
+              >
+                <XAxis dataKey="name" hide />
+                <YAxis hide />
+                <Tooltip
+                  formatter={(value: any) =>
+                    [Number(value).toFixed(2), ""]
+                  }
+                  labelFormatter={() => ""}
+                />
+                <Bar dataKey="value" fill="var(--jade-9)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Flex>
+        </Flex>
+      </Card>
 
       {/* Subscription Management */}
       <div className="subscription-section">

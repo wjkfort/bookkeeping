@@ -39,7 +39,11 @@
     "recharges": "Recharges",
     "nextBilling": "Next billing",
     "daysRemaining": "days remaining",
-    "noSubscriptions": "No subscriptions yet"
+    "noSubscriptions": "No subscriptions yet",
+    "todayTitle": "Today",
+    "todayIncome": "Today's Income",
+    "todayExpense": "Today's Expense",
+    "todayNet": "Today's Net"
   },
   "transactions": {
     "title": "Transactions",

@@ -377,15 +377,15 @@ const Categories: React.FC = () => {
                 {t('categories.parentCategory')}
               </Text>
               <Select.Root
-                value={formParentId?.toString() ?? ''}
-                onValueChange={(val) => setFormParentId(val ? parseInt(val) : null)}
+                value={formParentId?.toString() ?? '__none__'}
+                onValueChange={(val) => setFormParentId(val === '__none__' ? null : parseInt(val))}
               >
                 <Select.Trigger
                   style={{ width: '100%' }}
                   placeholder={t('categories.noParent')}
                 />
                 <Select.Content>
-                  <Select.Item value="">{t('categories.noParent')}</Select.Item>
+                  <Select.Item value="__none__">{t('categories.noParent')}</Select.Item>
                   {getAvailableParents(formType).map((cat) => (
                     <Select.Item key={cat.id} value={cat.id.toString()}>
                       {getCategoryName(cat)}

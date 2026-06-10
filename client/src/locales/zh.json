@@ -39,7 +39,11 @@
     "recharges": "充值",
     "nextBilling": "下次扣款",
     "daysRemaining": "天剩余",
-    "noSubscriptions": "暂无订阅"
+    "noSubscriptions": "暂无订阅",
+    "todayTitle": "今日消费",
+    "todayIncome": "今日收入",
+    "todayExpense": "今日支出",
+    "todayNet": "今日净额"
   },
   "transactions": {
     "title": "交易记录",
