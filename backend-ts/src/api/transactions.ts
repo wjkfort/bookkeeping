@@ -36,46 +36,102 @@ async function getAllSubcategoryIds(db: D1Database, categoryId: number, userId: 
 }
 
 // GET /api/v1/transactions - List transactions with filters
+// Optional: page + page_size for pagination (default page_size=20 when page is sent)
+// Response when paginated: { items, total, page, page_size, total_pages, totals }
+// Response when not paginated (legacy): Transaction[]
 app.get('/', async (c) => {
   const category_id = c.req.query('category_id');
   const start_date = c.req.query('start_date');
   const end_date = c.req.query('end_date');
+  const pageParam = c.req.query('page');
+  const pageSizeParam = c.req.query('page_size');
   const userId = c.get('userId');
-  
+
+  const paginated = pageParam !== undefined && pageParam !== '';
+  const page = Math.max(1, parseInt(pageParam || '1', 10) || 1);
+  const page_size = Math.min(100, Math.max(1, parseInt(pageSizeParam || '20', 10) || 20));
+
   try {
-    let query = `SELECT t.*, i.name as item_name 
-                 FROM transactions t 
-                 LEFT JOIN items i ON t.item_id = i.id AND i.user_id = t.user_id 
-                 WHERE t.user_id = ?`;
+    let where = 'WHERE t.user_id = ?';
     const params: any[] = [userId];
 
     if (category_id) {
       // Get all subcategory IDs including the parent
       const categoryIds = await getAllSubcategoryIds(c.env.DB, parseInt(category_id), userId);
-      
-      // Build IN clause for all category IDs
+
       const placeholders = categoryIds.map(() => '?').join(',');
-      query += ` AND t.category_id IN (${placeholders})`;
+      where += ` AND t.category_id IN (${placeholders})`;
       params.push(...categoryIds);
     }
 
     if (start_date) {
-      query += ' AND t.date >= ?';
+      where += ' AND t.date >= ?';
       params.push(start_date);
     }
 
     if (end_date) {
-      query += ' AND t.date <= ?';
+      where += ' AND t.date <= ?';
       params.push(end_date);
     }
 
-    query += ' ORDER BY t.date DESC, t.created_at DESC';
+    if (!paginated) {
+      const query = `SELECT t.*, i.name as item_name
+                     FROM transactions t
+                     LEFT JOIN items i ON t.item_id = i.id AND i.user_id = t.user_id
+                     ${where}
+                     ORDER BY t.date DESC, t.created_at DESC`;
+      const { results } = await c.env.DB.prepare(query).bind(...params).all<Transaction>();
+      return c.json(results);
+    }
 
-    const stmt = c.env.DB.prepare(query);
-    const { results } = await (params.length > 0 ? stmt.bind(...params) : stmt).all<Transaction>();
+    const countRow = await c.env.DB.prepare(
+      `SELECT COUNT(*) as total FROM transactions t ${where}`
+    )
+      .bind(...params)
+      .first<{ total: number }>();
+    const total = countRow?.total ?? 0;
+    const total_pages = total === 0 ? 0 : Math.ceil(total / page_size);
+    const offset = (page - 1) * page_size;
 
-    return c.json(results);
+    // Totals over the full filtered set (not just the current page)
+    const sumRows = await c.env.DB.prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN c.type = 'income' THEN t.amount ELSE 0 END), 0) as income,
+         COALESCE(SUM(CASE WHEN c.type = 'expense' THEN t.amount ELSE 0 END), 0) as expense
+       FROM transactions t
+       JOIN categories c ON t.category_id = c.id
+       ${where}`
+    )
+      .bind(...params)
+      .first<{ income: number; expense: number }>();
+
+    const listQuery = `SELECT t.*, i.name as item_name
+                       FROM transactions t
+                       LEFT JOIN items i ON t.item_id = i.id AND i.user_id = t.user_id
+                       ${where}
+                       ORDER BY t.date DESC, t.created_at DESC
+                       LIMIT ? OFFSET ?`;
+    const { results } = await c.env.DB.prepare(listQuery)
+      .bind(...params, page_size, offset)
+      .all<Transaction>();
+
+    const income = sumRows?.income ?? 0;
+    const expense = sumRows?.expense ?? 0;
+
+    return c.json({
+      items: results,
+      total,
+      page,
+      page_size,
+      total_pages,
+      totals: {
+        income: Math.round(income * 100) / 100,
+        expense: Math.round(expense * 100) / 100,
+        net: Math.round((income - expense) * 100) / 100,
+      },
+    });
   } catch (error) {
+    console.error('Failed to fetch transactions:', error);
     return c.json({ error: 'Failed to fetch transactions' }, 500);
   }
 });

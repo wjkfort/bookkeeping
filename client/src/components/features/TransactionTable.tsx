@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Flex, Table, IconButton, Text, Badge, Card } from '@radix-ui/themes';
 import { Pencil1Icon, TrashIcon } from '@radix-ui/react-icons';
 import { useCurrency } from '../../hooks/useCurrency';
-import { Transaction, Category, Item } from '../../types';
+import { Transaction, Category, Item, TransactionListTotals } from '../../types';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -12,6 +12,9 @@ interface TransactionTableProps {
   loading?: boolean;
   showActions?: boolean;
   pagination?: boolean | object;
+  /** When set, summary uses filter-wide totals instead of summing the current page */
+  summaryTotals?: TransactionListTotals | null;
+  summaryCount?: number;
   onEdit?: (transaction: Transaction) => void;
   onDelete?: (id: number) => void;
   onItemClick?: (itemId: number) => void;
@@ -24,6 +27,8 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   loading: _loading = false,
   showActions = false,
   pagination: _pagination = false,
+  summaryTotals = null,
+  summaryCount,
   onEdit,
   onDelete,
   onItemClick,
@@ -50,6 +55,14 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   };
 
   const { totalIncome, totalExpense, net, count } = useMemo(() => {
+    if (summaryTotals) {
+      return {
+        totalIncome: summaryTotals.income,
+        totalExpense: summaryTotals.expense,
+        net: summaryTotals.net,
+        count: summaryCount ?? transactions.length,
+      };
+    }
     let income = 0;
     let expense = 0;
     for (const transaction of transactions) {
@@ -70,15 +83,46 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
       net: income - expense,
       count: transactions.length,
     };
-  }, [transactions, currencyCode, convertAmount, categories]);
+  }, [transactions, currencyCode, convertAmount, categories, summaryTotals, summaryCount]);
 
   const hasActions = showActions && onEdit && onDelete;
 
   if (transactions.length === 0) {
     return (
-      <Text as="p" align="center" color="gray" style={{ padding: '24px' }}>
-        {t('transactions.noTransactions')}
-      </Text>
+      <Flex direction="column">
+        {summaryTotals && (
+          <Card style={{ marginBottom: 12 }}>
+            <Flex gap="5" wrap="wrap" align="center" justify="between">
+              <Flex gap="5" wrap="wrap" align="center">
+                <Flex direction="column" gap="1">
+                  <Text size="1" color="gray">{t('transactions.totalIncome')}</Text>
+                  <Text size="4" weight="bold" color="green">
+                    {formatCurrency(totalIncome, currencyCode)}
+                  </Text>
+                </Flex>
+                <Flex direction="column" gap="1">
+                  <Text size="1" color="gray">{t('transactions.totalExpense')}</Text>
+                  <Text size="4" weight="bold" color="red">
+                    {formatCurrency(totalExpense, currencyCode)}
+                  </Text>
+                </Flex>
+                <Flex direction="column" gap="1">
+                  <Text size="1" color="gray">{t('transactions.net')}</Text>
+                  <Text size="4" weight="bold" color={net >= 0 ? 'green' : 'red'}>
+                    {formatCurrency(net, currencyCode)}
+                  </Text>
+                </Flex>
+              </Flex>
+              <Text size="1" color="gray">
+                {t('transactions.count', { count })}
+              </Text>
+            </Flex>
+          </Card>
+        )}
+        <Text as="p" align="center" color="gray" style={{ padding: '24px' }}>
+          {t('transactions.noTransactions')}
+        </Text>
+      </Flex>
     );
   }
 

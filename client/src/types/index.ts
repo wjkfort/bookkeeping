@@ -87,6 +87,21 @@ export interface TransactionFilters {
   end_date: string;
 }
 
+export interface TransactionListTotals {
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface TransactionListResponse {
+  items: Transaction[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  totals: TransactionListTotals;
+}
+
 export interface Item {
   id: number;
   name: string;

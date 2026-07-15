@@ -34,12 +34,14 @@ import {
   getItemHistory,
   getItems,
 } from "../../api";
-import { Transaction, Category, TransactionFilters, Item, ItemHistory } from "../../types";
+import { Transaction, Category, TransactionFilters, Item, ItemHistory, TransactionListTotals, TransactionListResponse } from "../../types";
 import TransactionTable from "./TransactionTable";
 import { useToast } from "../ui/Toast";
 import dayjs from "dayjs";
 import Fuse from "fuse.js";
 import "./Transactions.css";
+
+const PAGE_SIZE = 20;
 
 const Transactions: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -56,6 +58,12 @@ const Transactions: React.FC = () => {
   const [filterCategoryId, setFilterCategoryId] = useState<string>("");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [summaryTotals, setSummaryTotals] = useState<TransactionListTotals | null>(null);
 
   // Form state
   const [formAmount, setFormAmount] = useState("");
@@ -106,8 +114,11 @@ const Transactions: React.FC = () => {
   useEffect(() => {
     loadCategories();
     loadItems();
-    loadTransactions();
   }, []);
+
+  useEffect(() => {
+    loadTransactions();
+  }, [page]);
 
   const loadCategories = async () => {
     try {
@@ -141,20 +152,34 @@ const Transactions: React.FC = () => {
     return result;
   };
 
-  const loadTransactions = async (filterParams?: TransactionFilters) => {
+  const loadTransactions = async (
+    filterParams?: TransactionFilters,
+    pageOverride?: number,
+  ) => {
     try {
       const activeFilters = filterParams || {
         category_id: filterCategoryId,
         start_date: filterStartDate,
         end_date: filterEndDate,
       };
-      const params: any = {};
+      const activePage = pageOverride ?? page;
+      if (pageOverride !== undefined && pageOverride !== page) {
+        setPage(pageOverride);
+      }
+      const params: any = {
+        page: activePage,
+        page_size: PAGE_SIZE,
+      };
       if (activeFilters.category_id) params.category_id = activeFilters.category_id;
       if (activeFilters.start_date) params.start_date = activeFilters.start_date;
       if (activeFilters.end_date) params.end_date = activeFilters.end_date;
 
       const response = await getTransactions(params);
-      setTransactions(response.data);
+      const data = response.data as TransactionListResponse;
+      setTransactions(data.items || []);
+      setTotalCount(data.total || 0);
+      setTotalPages(data.total_pages || 0);
+      setSummaryTotals(data.totals || null);
     } catch (error) {
       console.error("Error loading transactions:", error);
       toast.error(t("transactions.errorLoading"));
@@ -211,7 +236,7 @@ const Transactions: React.FC = () => {
 
       resetForm();
       setDialogOpen(false);
-      loadTransactions();
+      loadTransactions(undefined, 1);
       loadItems();
     } catch (error: any) {
       console.error("Error saving transaction:", error);
@@ -369,7 +394,10 @@ const Transactions: React.FC = () => {
     try {
       await deleteTransaction(id);
       toast.success(t("transactions.successDeleting"));
-      loadTransactions();
+      // If last item on page deleted, go back a page when possible
+      const nextPage =
+        transactions.length === 1 && page > 1 ? page - 1 : page;
+      loadTransactions(undefined, nextPage);
     } catch (error) {
       console.error("Error deleting transaction:", error);
       toast.error(t("transactions.errorDeleting"));
@@ -382,7 +410,7 @@ const Transactions: React.FC = () => {
       start_date: filterStartDate,
       end_date: filterEndDate,
     };
-    loadTransactions(newFilters);
+    loadTransactions(newFilters, 1);
   };
 
   const applyDatePreset = (preset: "today" | "month" | "all") => {
@@ -397,11 +425,14 @@ const Transactions: React.FC = () => {
     }
     setFilterStartDate(start);
     setFilterEndDate(end);
-    loadTransactions({
-      category_id: filterCategoryId,
-      start_date: start,
-      end_date: end,
-    });
+    loadTransactions(
+      {
+        category_id: filterCategoryId,
+        start_date: start,
+        end_date: end,
+      },
+      1,
+    );
   };
 
   const isTodayPreset =
@@ -541,10 +572,41 @@ const Transactions: React.FC = () => {
           items={items}
           loading={loading}
           showActions={true}
+          summaryTotals={summaryTotals}
+          summaryCount={totalCount}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onItemClick={handleViewItemHistory}
         />
+        {totalPages > 1 && (
+          <Flex justify="between" align="center" mt="3" wrap="wrap" gap="2">
+            <Text size="2" color="gray">
+              {t("transactions.pageInfo", {
+                page,
+                totalPages,
+                total: totalCount,
+              })}
+            </Text>
+            <Flex gap="2" align="center">
+              <Button
+                size="1"
+                variant="soft"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                {t("transactions.prevPage")}
+              </Button>
+              <Button
+                size="1"
+                variant="soft"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                {t("transactions.nextPage")}
+              </Button>
+            </Flex>
+          </Flex>
+        )}
       </Card>
 
       {/* Add/Edit Dialog */}

@@ -10,6 +10,7 @@ import {
   MonthlySummary,
   CategorySummary,
   RenewSubscriptionResult,
+  TransactionListResponse,
 } from "./types";
 
 // Use environment variable in production, localhost in development
@@ -80,7 +81,10 @@ export const updateCategory = (id: number, data: Partial<Category>): Promise<Axi
 export const deleteCategory = (id: number): Promise<AxiosResponse<void>> => api.delete(`/categories/${id}`);
 
 // Transactions
-export const getTransactions = (params?: Record<string, any>): Promise<AxiosResponse<Transaction[]>> => api.get("/transactions", { params });
+export const getTransactions = (
+  params?: Record<string, any>
+): Promise<AxiosResponse<Transaction[] | TransactionListResponse>> =>
+  api.get("/transactions", { params });
 
 export const createTransaction = (data: Partial<Transaction>): Promise<AxiosResponse<Transaction>> => api.post("/transactions", data);
 
