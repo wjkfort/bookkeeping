@@ -50,10 +50,16 @@ api.route("/auth", authRouter);
 api.route("/proxy", proxyRouter);
 
 // Protected routes (auth required)
+// Note: Hono path matchers — bare mount paths need their own middleware entry
+api.use("/categories", authMiddleware);
 api.use("/categories/*", authMiddleware);
+api.use("/transactions", authMiddleware);
 api.use("/transactions/*", authMiddleware);
+api.use("/summary", authMiddleware);
 api.use("/summary/*", authMiddleware);
+api.use("/items", authMiddleware);
 api.use("/items/*", authMiddleware);
+api.use("/subscriptions", authMiddleware);
 api.use("/subscriptions/*", authMiddleware);
 
 api.route("/categories", categoriesRouter);

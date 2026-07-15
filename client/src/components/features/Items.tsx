@@ -11,7 +11,7 @@ import {
   Heading,
   IconButton,
 } from "@radix-ui/themes";
-import { EyeOpenIcon, Pencil1Icon, MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { EyeOpenIcon, Pencil1Icon, MagnifyingGlassIcon, TrashIcon } from "@radix-ui/react-icons";
 import {
   LineChart,
   Line,
@@ -21,7 +21,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useCurrency } from "../../hooks/useCurrency";
-import { getItems, getItemHistory, updateItem } from "../../api";
+import { getItems, getItemHistory, updateItem, deleteItem } from "../../api";
 import { ItemWithStats, ItemHistory, Transaction } from "../../types";
 import { useToast } from "../ui/Toast";
 import dayjs from "dayjs";
@@ -43,6 +43,10 @@ const Items: React.FC = () => {
   const [editingItem, setEditingItem] = useState<ItemWithStats | null>(null);
   const [formName, setFormName] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<ItemWithStats | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadItems();
@@ -106,6 +110,33 @@ const Items: React.FC = () => {
       toast.error(t("items.errorUpdating"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteItem(deleteTarget.id);
+      toast.success(t("items.deleteSuccess"));
+      setDeleteTarget(null);
+      // Keep list in sync with search filter
+      const next = items.filter((i) => i.id !== deleteTarget.id);
+      setItems(next);
+      if (!searchText.trim()) {
+        setFilteredItems(next);
+      } else {
+        setFilteredItems(
+          next.filter((item) =>
+            item.name.toLowerCase().includes(searchText.toLowerCase()),
+          ),
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error(t("items.deleteError"));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -182,6 +213,14 @@ const Items: React.FC = () => {
                       >
                         <EyeOpenIcon />
                       </IconButton>
+                      <IconButton
+                        variant="soft"
+                        color="red"
+                        onClick={() => setDeleteTarget(item)}
+                        title={t("items.deleteItem")}
+                      >
+                        <TrashIcon />
+                      </IconButton>
                     </Flex>
                   </Table.Cell>
                 </Table.Row>
@@ -222,6 +261,39 @@ const Items: React.FC = () => {
             </Button>
             <Button onClick={handleUpdateItem} disabled={saving}>
               {t("common.save")}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Delete confirm */}
+      <Dialog.Root
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <Dialog.Content style={{ maxWidth: 420 }}>
+          <Dialog.Title>{t("items.deleteItem")}</Dialog.Title>
+          <Text as="p" size="2" color="gray" mt="2">
+            {t("items.deleteConfirm", { name: deleteTarget?.name ?? "" })}
+          </Text>
+          {(deleteTarget?.total_purchases ?? 0) > 0 && (
+            <Text as="p" size="2" color="gray" mt="2">
+              {t("items.deleteNote")}
+            </Text>
+          )}
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button color="red" onClick={handleDeleteItem} disabled={deleting}>
+              {t("common.delete")}
             </Button>
           </Flex>
         </Dialog.Content>

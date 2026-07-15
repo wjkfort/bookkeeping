@@ -4,3 +4,8 @@ dist
 .dev.vars
 *.log
 .DS_Store
+
+# Local DB dumps with prod data
+prod-backup.sql
+prod-backup-*.sql
+*.sql.backup

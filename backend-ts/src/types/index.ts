@@ -78,6 +78,34 @@ export interface Summary {
   currency: string;
 }
 
+export interface MonthlySummary {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+}
+
+export interface CategorySummary {
+  category_id: number;
+  name: string;
+  parent_id: number | null;
+  amount: number;
+  pct: number;
+  translations?: CategoryTranslations | null;
+}
+
+export interface SubscriptionRenewal {
+  id: number;
+  user_id: number;
+  subscription_id: number;
+  transaction_id: number | null;
+  amount: number;
+  currency: string;
+  period_start: string;
+  period_end: string;
+  renewed_at: string;
+}
+
 // Request/Response types
 export interface CreateCategoryRequest {
   name: string;
@@ -160,5 +188,6 @@ export interface Subscription {
   cycle: number;
   category_id: number | null;
   category_name?: string | null;
+  last_renewed_at?: string | null;
   created_at: string;
 }

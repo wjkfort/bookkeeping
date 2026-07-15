@@ -5,7 +5,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 24px;
-    margin-bottom: 32px;
+    margin-bottom: 8px;
 }
 
 .stat-card {
@@ -71,6 +71,63 @@
     flex-shrink: 0;
 }
 
+/* Charts */
+.charts-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+}
+
+.chart-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 320px;
+}
+
+.chart-body {
+    flex: 1;
+    min-height: 260px;
+}
+
+.category-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    max-height: 240px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.category-legend-item {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--gray-11);
+}
+
+.category-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.category-legend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.category-legend-val {
+    color: var(--gray-10);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 /* Subscription Management */
 .subscription-section {
     display: flex;
@@ -97,8 +154,7 @@
     flex-direction: column;
     gap: 8px;
     overflow-y: auto;
-    max-height: 200px;
-    padding-right: 4px;
+    max-height: 280px;
 }
 
 .subscription-empty {
@@ -153,7 +209,41 @@
     flex-shrink: 0;
 }
 
+.subscription-item-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    gap: 1px;
+}
+
+.subscription-item-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-12);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.subscription-item-amount {
+    font-size: 0.75rem;
+    color: var(--gray-10);
+    font-variant-numeric: tabular-nums;
+}
+
+.subscription-item .rt-ProgressRoot {
+    width: 72px;
+    flex-shrink: 0;
+}
+
 /* Responsive */
+@media (max-width: 900px) {
+    .charts-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 768px) {
     .hero-stats {
         grid-template-columns: 1fr;

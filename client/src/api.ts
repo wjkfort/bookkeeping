@@ -1,5 +1,16 @@
 import axios, { AxiosResponse } from "axios";
-import { Category, Transaction, Summary, Item, ItemWithStats, ItemHistory, Subscription } from "./types";
+import {
+  Category,
+  Transaction,
+  Summary,
+  Item,
+  ItemWithStats,
+  ItemHistory,
+  Subscription,
+  MonthlySummary,
+  CategorySummary,
+  RenewSubscriptionResult,
+} from "./types";
 
 // Use environment variable in production, localhost in development
 const API_BASE_URL = import.meta.env.PROD
@@ -80,6 +91,20 @@ export const deleteTransaction = (id: number): Promise<AxiosResponse<void>> => a
 // Summary
 export const getSummary = (params?: Record<string, any>): Promise<AxiosResponse<Summary>> => api.get("/summary", { params });
 
+export const getMonthlySummary = (params?: {
+  months?: number;
+  target_currency?: string;
+}): Promise<AxiosResponse<{ currency: string; months: MonthlySummary[] }>> =>
+  api.get("/summary/monthly", { params });
+
+export const getCategorySummary = (params?: {
+  start_date?: string;
+  end_date?: string;
+  target_currency?: string;
+  level?: "parent" | "leaf";
+}): Promise<AxiosResponse<{ currency: string; total: number; categories: CategorySummary[] }>> =>
+  api.get("/summary/by-category", { params });
+
 // Exchange Rates
 export const getExchangeRates = (base: string = "USD", forceRefresh: boolean = false): Promise<AxiosResponse<ExchangeRatesResponse>> => api.get("/exchange-rates/rates", { params: { base, force_refresh: forceRefresh } });
 
@@ -130,6 +155,19 @@ export const updateSubscription = (id: number, data: {
   cycle?: number;
   category_id?: number | null;
 }): Promise<AxiosResponse<Subscription>> => api.put(`/subscriptions/${id}`, data);
+
+export const renewSubscription = (
+  id: number,
+  data?: {
+    amount?: number;
+    currency?: string;
+    date?: string;
+    category_id?: number | null;
+    create_transaction?: boolean;
+    description?: string;
+  }
+): Promise<AxiosResponse<RenewSubscriptionResult>> =>
+  api.post(`/subscriptions/${id}/renew`, data ?? {});
 
 export const deleteSubscription = (id: number): Promise<AxiosResponse<void>> => api.delete(`/subscriptions/${id}`);
 

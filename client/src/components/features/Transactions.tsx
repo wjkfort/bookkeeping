@@ -385,6 +385,33 @@ const Transactions: React.FC = () => {
     loadTransactions(newFilters);
   };
 
+  const applyDatePreset = (preset: "today" | "month" | "all") => {
+    let start = "";
+    let end = "";
+    if (preset === "today") {
+      start = dayjs().format("YYYY-MM-DD");
+      end = start;
+    } else if (preset === "month") {
+      start = dayjs().startOf("month").format("YYYY-MM-DD");
+      end = dayjs().endOf("month").format("YYYY-MM-DD");
+    }
+    setFilterStartDate(start);
+    setFilterEndDate(end);
+    loadTransactions({
+      category_id: filterCategoryId,
+      start_date: start,
+      end_date: end,
+    });
+  };
+
+  const isTodayPreset =
+    filterStartDate === dayjs().format("YYYY-MM-DD") &&
+    filterEndDate === dayjs().format("YYYY-MM-DD");
+  const isMonthPreset =
+    filterStartDate === dayjs().startOf("month").format("YYYY-MM-DD") &&
+    filterEndDate === dayjs().endOf("month").format("YYYY-MM-DD");
+  const isAllPreset = !filterStartDate && !filterEndDate;
+
   return (
     <Flex direction="column" gap="4">
       <Flex justify="between" align="center">
@@ -403,75 +430,106 @@ const Transactions: React.FC = () => {
 
       {/* Filter */}
       <Card>
-        <Flex gap="3" wrap="wrap" align="end">
-          <label>
-            <Text as="div" size="1" mb="1" color="gray">
-              {t("transactions.allCategories")}
+        <Flex direction="column" gap="3">
+          <Flex gap="2" wrap="wrap" align="center">
+            <Text size="1" color="gray">
+              {t("transactions.quickRange")}
             </Text>
-            <Select.Root
-              value={filterCategoryId}
-              onValueChange={setFilterCategoryId}
+            <Button
+              size="1"
+              variant={isTodayPreset ? "solid" : "soft"}
+              onClick={() => applyDatePreset("today")}
             >
-              <Select.Trigger placeholder={t("transactions.allCategories")} />
-              <Select.Content>
-                {categories.map((cat) => (
-                  <Select.Item key={cat.id} value={String(cat.id)}>
-                    {cat.parent_id ? "  └─ " : ""}
-                    {getCategoryName(cat)}
+              {t("transactions.today")}
+            </Button>
+            <Button
+              size="1"
+              variant={isMonthPreset ? "solid" : "soft"}
+              onClick={() => applyDatePreset("month")}
+            >
+              {t("transactions.thisMonth")}
+            </Button>
+            <Button
+              size="1"
+              variant={isAllPreset ? "solid" : "soft"}
+              onClick={() => applyDatePreset("all")}
+            >
+              {t("transactions.allTime")}
+            </Button>
+          </Flex>
+          <Flex gap="3" wrap="wrap" align="end">
+            <label>
+              <Text as="div" size="1" mb="1" color="gray">
+                {t("transactions.allCategories")}
+              </Text>
+              <Select.Root
+                value={filterCategoryId || "all"}
+                onValueChange={(v) => setFilterCategoryId(v === "all" ? "" : v)}
+              >
+                <Select.Trigger placeholder={t("transactions.allCategories")} />
+                <Select.Content>
+                  <Select.Item value="all">
+                    {t("transactions.allCategories")}
                   </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-          </label>
+                  {categories.map((cat) => (
+                    <Select.Item key={cat.id} value={String(cat.id)}>
+                      {cat.parent_id ? "  └─ " : ""}
+                      {getCategoryName(cat)}
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Root>
+            </label>
 
-          <label>
-            <Text as="div" size="1" mb="1" color="gray">
-              {t("transactions.startDate")}
-            </Text>
-            <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
-              style={{
-                height: 32,
-                padding: "4px 8px",
-                borderRadius: "var(--radius-2)",
-                border: "1px solid var(--gray-7)",
-                background: "var(--color-surface)",
-                color: "var(--gray-12)",
-                fontSize: 14,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
-          </label>
+            <label>
+              <Text as="div" size="1" mb="1" color="gray">
+                {t("transactions.startDate")}
+              </Text>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                style={{
+                  height: 32,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-7)",
+                  background: "var(--color-surface)",
+                  color: "var(--gray-12)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+            </label>
 
-          <label>
-            <Text as="div" size="1" mb="1" color="gray">
-              {t("transactions.endDate")}
-            </Text>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              style={{
-                height: 32,
-                padding: "4px 8px",
-                borderRadius: "var(--radius-2)",
-                border: "1px solid var(--gray-7)",
-                background: "var(--color-surface)",
-                color: "var(--gray-12)",
-                fontSize: 14,
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-              }}
-            />
-          </label>
+            <label>
+              <Text as="div" size="1" mb="1" color="gray">
+                {t("transactions.endDate")}
+              </Text>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                style={{
+                  height: 32,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-7)",
+                  background: "var(--color-surface)",
+                  color: "var(--gray-12)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+            </label>
 
-          <Button onClick={handleFilterSubmit}>
-            <MagnifyingGlassIcon />
-            {t("transactions.applyFilters")}
-          </Button>
+            <Button onClick={handleFilterSubmit}>
+              <MagnifyingGlassIcon />
+              {t("transactions.applyFilters")}
+            </Button>
+          </Flex>
         </Flex>
       </Card>
 

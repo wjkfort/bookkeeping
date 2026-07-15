@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Button,
@@ -9,26 +9,54 @@ import {
   Text,
   Heading,
 } from "@radix-ui/themes";
-import {
-  PlusIcon,
-} from "@radix-ui/react-icons";
+import { PlusIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "../../hooks/useCurrency";
 import {
   getSummary,
   getSubscriptions,
   deleteSubscription,
+  renewSubscription,
   proxyImage,
+  getMonthlySummary,
+  getCategorySummary,
 } from "../../api";
 import {
   Summary,
   Subscription,
+  MonthlySummary,
+  CategorySummary,
 } from "../../types";
 import SubscriptionModal from "./SubscriptionModal";
 import MonthPicker from "../ui/MonthPicker";
 import { useToast } from "../ui/Toast";
 import dayjs, { Dayjs } from "dayjs";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import "./Dashboard.css";
+
+const PIE_COLORS = [
+  "var(--jade-9)",
+  "var(--indigo-9)",
+  "var(--tomato-9)",
+  "var(--amber-9)",
+  "var(--cyan-9)",
+  "var(--purple-9)",
+  "var(--pink-9)",
+  "var(--orange-9)",
+  "var(--teal-9)",
+  "var(--gray-9)",
+];
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -47,13 +75,20 @@ const Dashboard: React.FC = () => {
     balance: 0,
     currency: "USD",
   });
+  const [monthlyTrend, setMonthlyTrend] = useState<MonthlySummary[]>([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<CategorySummary[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
   const [isOverall, setIsOverall] = useState(false);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] =
+    useState(false);
+  const [editingSubscription, setEditingSubscription] =
+    useState<Subscription | null>(null);
   const [revealedStats, setRevealedStats] = useState<Set<string>>(new Set());
+  const [renewingId, setRenewingId] = useState<number | null>(null);
 
   const toggleStat = (key: string) => {
     setRevealedStats((prev) => {
@@ -89,26 +124,73 @@ const Dashboard: React.FC = () => {
       loadSubscriptions();
     } catch (error) {
       console.error("Error deleting subscription:", error);
-      toast.error(t("subscriptions.deleteError") || "Failed to delete subscription");
+      toast.error(
+        t("subscriptions.deleteError") || "Failed to delete subscription",
+      );
+    }
+  };
+
+  const handleRenew = async (
+    sub: Subscription,
+    createTransaction: boolean,
+  ) => {
+    if (createTransaction && sub.amount > 0 && !sub.category_id) {
+      toast.error(
+        t("subscriptions.categoryRequired") ||
+          "Set a category before renewing with expense",
+      );
+      return;
+    }
+
+    const msg =
+      createTransaction && sub.amount > 0
+        ? t("dashboard.renewConfirm") || "Renew and record expense?"
+        : t("dashboard.renewNoAmount") || "Extend date only?";
+    if (!window.confirm(msg)) return;
+
+    setRenewingId(sub.id);
+    try {
+      await renewSubscription(sub.id, {
+        create_transaction: createTransaction && sub.amount > 0,
+      });
+      toast.success(t("dashboard.renewSuccess") || "Subscription renewed");
+      await Promise.all([loadSubscriptions(), loadData(), loadTodayData()]);
+    } catch (error: any) {
+      console.error("Error renewing subscription:", error);
+      toast.error(
+        error.response?.data?.error ||
+          t("dashboard.renewError") ||
+          "Failed to renew",
+      );
+    } finally {
+      setRenewingId(null);
     }
   };
 
   const loadData = async () => {
     try {
-      let dateParams = {};
+      let dateParams: Record<string, string> = {};
       if (!isOverall && selectedMonth) {
         const startDate = selectedMonth.startOf("month").format("YYYY-MM-DD");
         const endDate = selectedMonth.endOf("month").format("YYYY-MM-DD");
         dateParams = { start_date: startDate, end_date: endDate };
       }
 
-      const [summaryRes, overallSummaryRes] =
+      const [summaryRes, overallSummaryRes, monthlyRes, categoryRes] =
         await Promise.all([
           getSummary({ target_currency: currencyCode, ...dateParams }),
           getSummary({ target_currency: currencyCode }),
+          getMonthlySummary({ months: 6, target_currency: currencyCode }),
+          getCategorySummary({
+            target_currency: currencyCode,
+            level: "parent",
+            ...dateParams,
+          }),
         ]);
       setSummary(summaryRes.data);
       setOverallBalance(overallSummaryRes.data.balance);
+      setMonthlyTrend(monthlyRes.data.months || []);
+      setCategoryBreakdown(categoryRes.data.categories || []);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -133,8 +215,40 @@ const Dashboard: React.FC = () => {
   const formatMonth = (date: Dayjs | null) => {
     if (!date) return "";
     const locale = i18n.language === "zh" ? "zh-CN" : "en-US";
-    return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(date.toDate());
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "long",
+    }).format(date.toDate());
   };
+
+  const avgDailyExpense = useMemo(() => {
+    if (!selectedMonth || isOverall) return null;
+    const days = Math.max(
+      1,
+      Math.min(selectedMonth.daysInMonth(), dayjs().diff(selectedMonth.startOf("month"), "day") + 1),
+    );
+    // For past months use full month length
+    const isCurrent = selectedMonth.isSame(dayjs(), "month");
+    const denom = isCurrent ? days : selectedMonth.daysInMonth();
+    return summary.total_expense / denom;
+  }, [summary.total_expense, selectedMonth, isOverall]);
+
+  const getCategoryLabel = (category: CategorySummary): string => {
+    const lang = i18n.language;
+    if (category.translations?.[lang]) return category.translations[lang];
+    if (category.translations?.en) return category.translations.en;
+    return category.name;
+  };
+
+  const pieData = useMemo(
+    () =>
+      categoryBreakdown.slice(0, 8).map((c) => ({
+        name: getCategoryLabel(c),
+        value: c.amount,
+        pct: c.pct,
+      })),
+    [categoryBreakdown, i18n.language],
+  );
 
   if (loading) {
     return (
@@ -174,36 +288,66 @@ const Dashboard: React.FC = () => {
 
       {/* Hero Stats */}
       <div className="hero-stats">
-        <div className="stat-card stat-income" onClick={() => toggleStat("income")}>
+        <div
+          className="stat-card stat-income"
+          onClick={() => toggleStat("income")}
+        >
           <div className="stat-icon">📈</div>
           <Flex direction="column" align="center" gap="1">
-            <Text size="2" color="gray">{t("dashboard.totalIncome")}</Text>
+            <Text size="2" color="gray">
+              {t("dashboard.totalIncome")}
+            </Text>
             <Heading size="7">
-              {revealedStats.has("income") ? summary.total_income.toFixed(2) : "****"}
+              {revealedStats.has("income")
+                ? summary.total_income.toFixed(2)
+                : "****"}
             </Heading>
-            <Text size="1" color="gray">{currencyCode}</Text>
+            <Text size="1" color="gray">
+              {currencyCode}
+            </Text>
           </Flex>
         </div>
 
-        <div className="stat-card stat-expense" onClick={() => toggleStat("expense")}>
+        <div
+          className="stat-card stat-expense"
+          onClick={() => toggleStat("expense")}
+        >
           <div className="stat-icon">📉</div>
           <Flex direction="column" align="center" gap="1">
-            <Text size="2" color="gray">{t("dashboard.totalExpense")}</Text>
+            <Text size="2" color="gray">
+              {t("dashboard.totalExpense")}
+            </Text>
             <Heading size="7">
-              {revealedStats.has("expense") ? summary.total_expense.toFixed(2) : "****"}
+              {revealedStats.has("expense")
+                ? summary.total_expense.toFixed(2)
+                : "****"}
             </Heading>
-            <Text size="1" color="gray">{currencyCode}</Text>
+            <Text size="1" color="gray">
+              {currencyCode}
+              {avgDailyExpense != null && (
+                <> · {t("dashboard.avgDailyExpense")} {avgDailyExpense.toFixed(0)}</>
+              )}
+            </Text>
           </Flex>
         </div>
 
-        <div className="stat-card stat-balance" onClick={() => toggleStat("balance")}>
+        <div
+          className="stat-card stat-balance"
+          onClick={() => toggleStat("balance")}
+        >
           <div className="stat-icon">💰</div>
           <Flex direction="column" align="center" gap="1">
-            <Text size="2" color="gray">{t("dashboard.balance")}</Text>
+            <Text size="2" color="gray">
+              {t("dashboard.balance")}
+            </Text>
             <Heading size="7">
-              {revealedStats.has("balance") ? overallBalance.toFixed(2) : "****"}
+              {revealedStats.has("balance")
+                ? overallBalance.toFixed(2)
+                : "****"}
             </Heading>
-            <Text size="1" color="gray">{currencyCode}</Text>
+            <Text size="1" color="gray">
+              {currencyCode}
+            </Text>
           </Flex>
         </div>
       </div>
@@ -211,23 +355,31 @@ const Dashboard: React.FC = () => {
       {/* Today's Spending */}
       <Card>
         <Flex direction="column" gap="3">
-          <Text size="3" weight="bold">{t("dashboard.todayTitle")}</Text>
+          <Text size="3" weight="bold">
+            {t("dashboard.todayTitle")}
+          </Text>
           <Flex gap="6" wrap="wrap" align="center" justify="between">
             <Flex gap="6" wrap="wrap">
               <Flex direction="column" gap="1">
-                <Text size="2" color="gray">{t("dashboard.todayIncome")}</Text>
+                <Text size="2" color="gray">
+                  {t("dashboard.todayIncome")}
+                </Text>
                 <Heading size="5" color="jade">
                   {todaySummary.total_income.toFixed(2)} {currencyCode}
                 </Heading>
               </Flex>
               <Flex direction="column" gap="1">
-                <Text size="2" color="gray">{t("dashboard.todayExpense")}</Text>
+                <Text size="2" color="gray">
+                  {t("dashboard.todayExpense")}
+                </Text>
                 <Heading size="5" color="tomato">
                   {todaySummary.total_expense.toFixed(2)} {currencyCode}
                 </Heading>
               </Flex>
               <Flex direction="column" gap="1">
-                <Text size="2" color="gray">{t("dashboard.todayNet")}</Text>
+                <Text size="2" color="gray">
+                  {t("dashboard.todayNet")}
+                </Text>
                 <Heading size="5">
                   {todaySummary.balance.toFixed(2)} {currencyCode}
                 </Heading>
@@ -236,24 +388,140 @@ const Dashboard: React.FC = () => {
             <ResponsiveContainer width={180} height={60}>
               <BarChart
                 data={[
-                  { name: t("dashboard.todayIncome"), value: todaySummary.total_income },
-                  { name: t("dashboard.todayExpense"), value: todaySummary.total_expense },
+                  {
+                    name: t("dashboard.todayIncome"),
+                    value: todaySummary.total_income,
+                  },
+                  {
+                    name: t("dashboard.todayExpense"),
+                    value: todaySummary.total_expense,
+                  },
                 ]}
               >
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
                 <Tooltip
-                  formatter={(value: any) =>
-                    [Number(value).toFixed(2), ""]
-                  }
+                  formatter={(value: any) => [Number(value).toFixed(2), ""]}
                   labelFormatter={() => ""}
                 />
-                <Bar dataKey="value" fill="var(--jade-9)" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="value"
+                  fill="var(--jade-9)"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </Flex>
         </Flex>
       </Card>
+
+      {/* Charts row */}
+      <div className="charts-row">
+        <Card className="chart-card">
+          <Text size="3" weight="bold">
+            {t("dashboard.monthlyTrend")}
+          </Text>
+          <div className="chart-body">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={monthlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-5)" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} width={48} />
+                <Tooltip
+                  formatter={(value: any, name: any) => [
+                    Number(value).toFixed(2),
+                    name === "income"
+                      ? t("dashboard.income")
+                      : name === "expense"
+                        ? t("dashboard.expense")
+                        : t("dashboard.net"),
+                  ]}
+                />
+                <Legend
+                  formatter={(value) =>
+                    value === "income"
+                      ? t("dashboard.income")
+                      : value === "expense"
+                        ? t("dashboard.expense")
+                        : t("dashboard.net")
+                  }
+                />
+                <Bar
+                  dataKey="income"
+                  fill="var(--jade-9)"
+                  radius={[4, 4, 0, 0]}
+                />
+                <Bar
+                  dataKey="expense"
+                  fill="var(--tomato-9)"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="chart-card">
+          <Text size="3" weight="bold">
+            {t("dashboard.categoryBreakdown")}
+          </Text>
+          <div className="chart-body">
+            {pieData.length === 0 ? (
+              <Flex align="center" justify="center" style={{ height: 260 }}>
+                <Text size="2" color="gray">
+                  {t("dashboard.noCategoryData")}
+                </Text>
+              </Flex>
+            ) : (
+              <Flex gap="3" align="center" style={{ height: 260 }}>
+                <ResponsiveContainer width="55%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={48}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {pieData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={PIE_COLORS[i % PIE_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: any, _n: any, item: any) => [
+                        `${Number(value).toFixed(2)} (${item?.payload?.pct ?? 0}%)`,
+                        item?.payload?.name ?? "",
+                      ]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="category-legend">
+                  {pieData.map((c, i) => (
+                    <div key={c.name} className="category-legend-item">
+                      <span
+                        className="category-legend-dot"
+                        style={{
+                          background: PIE_COLORS[i % PIE_COLORS.length],
+                        }}
+                      />
+                      <span className="category-legend-name">{c.name}</span>
+                      <span className="category-legend-val">
+                        {c.value.toFixed(0)} · {c.pct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Flex>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* Subscription Management */}
       <div className="subscription-section">
@@ -275,7 +543,9 @@ const Dashboard: React.FC = () => {
         <div className="subscription-scroll">
           {subscriptions.length === 0 ? (
             <div className="subscription-empty">
-              <span>{t("dashboard.noSubscriptions") || "No subscriptions yet"}</span>
+              <span>
+                {t("dashboard.noSubscriptions") || "No subscriptions yet"}
+              </span>
             </div>
           ) : (
             subscriptions.map((sub) => {
@@ -294,7 +564,8 @@ const Dashboard: React.FC = () => {
                       className={`subscription-item ${urgent ? "urgent" : warning ? "warning" : ""}`}
                     >
                       {sub.icon &&
-                      (sub.icon.startsWith("http") || sub.icon.startsWith("//")) ? (
+                      (sub.icon.startsWith("http") ||
+                        sub.icon.startsWith("//")) ? (
                         <img
                           src={
                             sub.icon.startsWith("//")
@@ -322,6 +593,16 @@ const Dashboard: React.FC = () => {
                           {sub.icon || "📦"}
                         </span>
                       )}
+                      <div className="subscription-item-meta">
+                        <span className="subscription-item-name">
+                          {sub.name}
+                        </span>
+                        <span className="subscription-item-amount">
+                          {sub.amount > 0
+                            ? `${sub.amount} ${sub.currency}`
+                            : "—"}
+                        </span>
+                      </div>
                       <Progress
                         value={percent}
                         size="1"
@@ -329,7 +610,7 @@ const Dashboard: React.FC = () => {
                       />
                     </div>
                   </Popover.Trigger>
-                  <Popover.Content style={{ minWidth: 200 }}>
+                  <Popover.Content style={{ minWidth: 220 }}>
                     <Flex direction="column" gap="1">
                       <Text weight="bold">{sub.name}</Text>
                       <Text size="2" color="gray">
@@ -338,11 +619,38 @@ const Dashboard: React.FC = () => {
                       </Text>
                       <Text
                         size="2"
-                        color={urgent ? "red" : warning ? "amber" : undefined}
+                        color={
+                          urgent ? "red" : warning ? "amber" : undefined
+                        }
                       >
-                        {remaining} {t("dashboard.daysRemaining") || "days remaining"}
+                        {remaining}{" "}
+                        {t("dashboard.daysRemaining") || "days remaining"}
                       </Text>
-                      <Flex gap="2" mt="2">
+                      {sub.amount > 0 && (
+                        <Text size="2">
+                          {sub.amount} {sub.currency}
+                          {sub.category_name
+                            ? ` · ${sub.category_name}`
+                            : ""}
+                        </Text>
+                      )}
+                      <Flex gap="2" mt="2" wrap="wrap">
+                        <Button
+                          size="1"
+                          variant="solid"
+                          disabled={renewingId === sub.id}
+                          onClick={() => handleRenew(sub, true)}
+                        >
+                          {t("dashboard.renew") || "Renew"}
+                        </Button>
+                        <Button
+                          size="1"
+                          variant="soft"
+                          disabled={renewingId === sub.id}
+                          onClick={() => handleRenew(sub, false)}
+                        >
+                          {t("dashboard.renewOnly") || "Extend only"}
+                        </Button>
                         <Button
                           size="1"
                           variant="soft"
@@ -386,7 +694,10 @@ const Dashboard: React.FC = () => {
             : undefined
         }
         onCancel={() => setSubscriptionModalVisible(false)}
-        onSuccess={loadSubscriptions}
+        onSuccess={() => {
+          loadSubscriptions();
+          loadData();
+        }}
       />
     </Flex>
   );

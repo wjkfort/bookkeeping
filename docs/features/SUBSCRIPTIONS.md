@@ -27,8 +27,21 @@ CREATE TABLE subscriptions (
     end_date TEXT NOT NULL,          -- YYYY-MM-DD format
     cycle INTEGER NOT NULL DEFAULT 30, -- days
     category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    last_renewed_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(name, user_id)
+);
+
+CREATE TABLE subscription_renewals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    renewed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
@@ -40,7 +53,29 @@ CREATE TABLE subscriptions (
 | GET | `/api/v1/subscriptions/:id` | Get single subscription |
 | POST | `/api/v1/subscriptions` | Create subscription |
 | PUT | `/api/v1/subscriptions/:id` | Update subscription |
+| POST | `/api/v1/subscriptions/:id/renew` | Renew: advance end_date, optionally create expense |
+| GET | `/api/v1/subscriptions/:id/renewals` | Renewal history |
 | DELETE | `/api/v1/subscriptions/:id` | Delete subscription |
+
+### Renew
+
+```json
+POST /api/v1/subscriptions/:id/renew
+{
+  "amount": 6,
+  "currency": "CNY",
+  "date": "2026-07-15",
+  "category_id": 23,
+  "create_transaction": true,
+  "description": "Subscription renewal: iCloud"
+}
+```
+
+All fields optional. Defaults: subscription amount/currency/category, today as date, create transaction when amount > 0.
+
+Requires `category_id` (on the subscription or in the body) when creating a transaction with amount > 0.
+
+Response includes updated `subscription`, `renewal` row, and `transaction_id`.
 
 ### Create/Update Request Body
 
