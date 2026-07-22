@@ -493,7 +493,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                           style={{
                             padding: "8px 12px",
                             cursor: "pointer",
-                            borderBottom: "1px solid var(--gray-4)",
+                            borderBottom: "1px solid var(--gray-5)",
                             fontSize: 14,
                           }}
                         >

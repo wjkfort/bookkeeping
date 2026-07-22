@@ -465,7 +465,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                               {g.items.length > 0 && (
                                 <span
                                   style={{
-                                    color: "var(--gray-9)",
+                                    color: "var(--gray-11)",
                                     fontWeight: 400,
                                     marginLeft: 6,
                                     fontSize: 12,

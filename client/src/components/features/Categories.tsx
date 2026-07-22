@@ -258,7 +258,7 @@ const Categories: React.FC = () => {
                   <Table.Cell>
                     <span style={{ paddingLeft: `${record.level * 24}px` }}>
                       {record.level > 0 && (
-                        <span style={{ color: 'var(--gray-9)', marginRight: '8px' }}>└─</span>
+                        <span style={{ color: 'var(--gray-11)', marginRight: '8px' }}>└─</span>
                       )}
                       {getCategoryName(record)}
                     </span>

@@ -69,7 +69,7 @@ function AppContent() {
             py="3"
             align="center"
             justify="between"
-            style={{ borderBottom: "1px solid var(--gray-5)" }}
+            style={{ borderBottom: "1px solid var(--gray-6)" }}
           >
             <Flex align="center" gap="6">
               <Flex align="center" gap="2" asChild>

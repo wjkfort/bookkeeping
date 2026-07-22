@@ -358,6 +358,14 @@ const Dashboard: React.FC = () => {
     [categoryBreakdown, i18n.language],
   );
 
+  const tooltipStyle = {
+    background: "var(--color-panel-solid)",
+    border: "1px solid var(--gray-6)",
+    borderRadius: "var(--radius-2)",
+    color: "var(--gray-12)",
+    fontSize: 13,
+  };
+
   if (loading) {
     return (
       <Flex justify="center" align="center" style={{ minHeight: "60vh" }}>
@@ -419,19 +427,14 @@ const Dashboard: React.FC = () => {
           </Flex>
         </div>
 
-        <div
-          className="stat-card stat-expense"
-          onClick={() => toggleStat("expense")}
-        >
+        <div className="stat-card stat-expense">
           <div className="stat-icon">📉</div>
           <Flex direction="column" align="center" gap="1">
             <Text size="2" color="gray">
               {t("dashboard.totalExpense")}
             </Text>
             <Heading size="7">
-              {revealedStats.has("expense")
-                ? summary.total_expense.toFixed(2)
-                : "****"}
+              {summary.total_expense.toFixed(2)}
             </Heading>
             <Text size="1" color="gray">
               {currencyCode}
@@ -512,6 +515,7 @@ const Dashboard: React.FC = () => {
                 <XAxis dataKey="name" hide />
                 <YAxis hide />
                 <Tooltip
+                  contentStyle={tooltipStyle}
                   formatter={(value: any) => [Number(value).toFixed(2), ""]}
                   labelFormatter={() => ""}
                 />
@@ -535,10 +539,11 @@ const Dashboard: React.FC = () => {
           <div className="chart-body">
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={monthlyTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-5)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-6)" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} width={48} />
                 <Tooltip
+                  contentStyle={tooltipStyle}
                   formatter={(value: any, name: any) => [
                     Number(value).toFixed(2),
                     name === "income"
@@ -605,6 +610,7 @@ const Dashboard: React.FC = () => {
                       ))}
                     </Pie>
                     <Tooltip
+                      contentStyle={tooltipStyle}
                       formatter={(value: any, _n: any, item: any) => [
                         `${Number(value).toFixed(2)} (${item?.payload?.pct ?? 0}%)`,
                         item?.payload?.name ?? "",
@@ -712,10 +718,11 @@ const Dashboard: React.FC = () => {
                   data={categoryTrend}
                   margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-5)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-6)" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} width={48} />
                   <Tooltip
+                    contentStyle={tooltipStyle}
                     formatter={(value: any) => [
                       Number(value).toFixed(2),
                       t("dashboard.expense"),
@@ -734,7 +741,7 @@ const Dashboard: React.FC = () => {
       </Card>
 
       {/* Subscription Management */}
-      <div className="subscription-section">
+      <Card className="subscription-section">
         <div className="subscription-header">
           <div className="subscription-title">
             <span>📅 {t("subscriptions.title")}</span>
@@ -887,7 +894,7 @@ const Dashboard: React.FC = () => {
             })
           )}
         </div>
-      </div>
+      </Card>
 
       <TransactionFormModal
         open={txModalOpen}

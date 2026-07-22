@@ -46,7 +46,7 @@
 }
 
 .category-picker-section + .category-picker-section {
-  border-top: 1px solid var(--gray-4);
+  border-top: 1px solid var(--gray-6);
   margin-top: 2px;
   padding-top: 4px;
 }
@@ -57,7 +57,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: var(--gray-9);
+  color: var(--gray-11);
 }
 
 .category-picker-item {
@@ -147,7 +147,7 @@
 .category-picker-type {
   flex-shrink: 0;
   font-size: 11px;
-  color: var(--gray-9);
+  color: var(--gray-11);
 }
 
 .category-picker-empty {
@@ -159,5 +159,5 @@
   display: block;
   padding: 6px 12px 8px;
   font-size: 11px;
-  color: var(--gray-9);
+  color: var(--gray-11);
 }

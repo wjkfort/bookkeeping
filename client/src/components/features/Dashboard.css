@@ -161,7 +161,7 @@
     padding: 16px;
     border-radius: 8px;
     border: 1.5px dashed var(--gray-6);
-    color: var(--gray-9);
+    color: var(--gray-11);
     font-size: 0.85rem;
     text-align: center;
 }
@@ -173,7 +173,7 @@
     padding: 8px 14px;
     border-radius: 8px;
     background: var(--gray-2);
-    border: 1.5px solid var(--gray-4);
+    border: 1.5px solid var(--gray-6);
     cursor: pointer;
     transition: all 0.25s ease;
     flex-shrink: 0;
