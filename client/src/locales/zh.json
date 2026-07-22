@@ -14,6 +14,15 @@
     "symbol": "¥",
     "code": "CNY"
   },
+  "categoryPicker": {
+    "placeholder": "搜索分类…",
+    "all": "全部分类",
+    "recent": "最近使用",
+    "results": "搜索结果",
+    "noMatch": "无匹配分类",
+    "withDataOnly": "仅有支出的分类",
+    "expandHint": "搜索，或点击 ▸ 展开分组"
+  },
   "dashboard": {
     "title": "仪表盘",
     "totalIncome": "总收入",
@@ -128,7 +137,8 @@
     "calculatedTotal": "计算总额",
     "unitPlaceholder": "选择单位",
     "unitPricePlaceholder": "例如：3.50",
-    "quantityPlaceholder": "例如：28.57"
+    "quantityPlaceholder": "例如：28.57",
+    "optionalDetails": "描述 / 物品（可选）"
   },
   "categories": {
     "title": "分类管理",
@@ -209,7 +219,9 @@
     "renewOnly": "仅延期",
     "renewSuccess": "订阅已续费",
     "renewError": "续费失败",
-    "categoryRequired": "续费记账前请先设置分类（或金额为 0）"
+    "categoryRequired": "续费记账前请先设置分类（或金额为 0）",
+    "category": "分类",
+    "categoryHint": "续费记账时使用该支出分类"
   },
   "items": {
     "title": "物品购买历史",

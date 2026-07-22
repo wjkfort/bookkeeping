@@ -31,6 +31,8 @@ import {
 } from "../../types";
 import SubscriptionModal from "./SubscriptionModal";
 import MonthPicker from "../ui/MonthPicker";
+import CategoryPicker from "../ui/CategoryPicker";
+import TransactionFormModal from "./TransactionFormModal";
 import { useToast } from "../ui/Toast";
 import dayjs, { Dayjs } from "dayjs";
 import {
@@ -88,6 +90,8 @@ const Dashboard: React.FC = () => {
   const [categoryTrend, setCategoryTrend] = useState<MonthlySummary[]>([]);
   const [trendCategoryId, setTrendCategoryId] = useState<string>("");
   const [trendMonths, setTrendMonths] = useState<number>(6);
+  const [trendWithDataOnly, setTrendWithDataOnly] = useState(true);
+  const [categoryIdsWithData, setCategoryIdsWithData] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
   const [isOverall, setIsOverall] = useState(false);
@@ -98,6 +102,7 @@ const Dashboard: React.FC = () => {
     useState<Subscription | null>(null);
   const [revealedStats, setRevealedStats] = useState<Set<string>>(new Set());
   const [renewingId, setRenewingId] = useState<number | null>(null);
+  const [txModalOpen, setTxModalOpen] = useState(false);
 
   const toggleStat = (key: string) => {
     setRevealedStats((prev) => {
@@ -122,10 +127,56 @@ const Dashboard: React.FC = () => {
     loadCategoryTrend();
   }, [currencyCode, trendCategoryId, trendMonths]);
 
+  useEffect(() => {
+    // Refresh "has spending" set when currency changes
+    (async () => {
+      try {
+        const [catsRes, withDataRes] = await Promise.all([
+          getCategories(true),
+          getCategorySummary({
+            target_currency: currencyCode,
+            level: "leaf",
+          }),
+        ]);
+        const leafIds = (withDataRes.data.categories || []).map(
+          (c) => c.category_id,
+        );
+        setCategoryIdsWithData(collectIdsWithParents(leafIds, catsRes.data));
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [currencyCode]);
+
+
+  const collectIdsWithParents = (
+    leafIds: number[],
+    cats: Category[],
+  ): number[] => {
+    const byId = new Map(cats.map((c) => [c.id, c]));
+    const out = new Set<number>();
+    for (const id of leafIds) {
+      let cur: number | null | undefined = id;
+      while (cur != null) {
+        out.add(cur);
+        cur = byId.get(cur)?.parent_id ?? null;
+      }
+    }
+    return Array.from(out);
+  };
+
   const loadCategories = async () => {
     try {
-      const res = await getCategories(true);
+      const [res, withDataRes] = await Promise.all([
+        getCategories(true),
+        getCategorySummary({
+          target_currency: currencyCode,
+          level: "leaf",
+        }),
+      ]);
       setCategories(res.data);
+      const leafIds = (withDataRes.data.categories || []).map((c) => c.category_id);
+      setCategoryIdsWithData(collectIdsWithParents(leafIds, res.data));
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -339,6 +390,9 @@ const Dashboard: React.FC = () => {
             onClick={() => setIsOverall(!isOverall)}
           >
             {t("dashboard.overall") || "Overall"}
+          </Button>
+          <Button onClick={() => setTxModalOpen(true)}>
+            <PlusIcon /> {t("transactions.addNew")}
           </Button>
         </Flex>
       </Flex>
@@ -587,26 +641,23 @@ const Dashboard: React.FC = () => {
             {t("dashboard.categoryTrend")}
           </Text>
           <Flex gap="2" align="center" wrap="wrap">
-            <Select.Root
-              value={trendCategoryId || "none"}
-              onValueChange={(v) => setTrendCategoryId(v === "none" ? "" : v)}
-            >
-              <Select.Trigger
+            <div style={{ minWidth: 220, width: 260 }}>
+              <CategoryPicker
+                categories={categories}
+                value={trendCategoryId ? Number(trendCategoryId) : null}
+                onChange={(id) => setTrendCategoryId(id == null ? "" : String(id))}
+                typeFilter="expense"
+                onlyIds={trendWithDataOnly && categoryIdsWithData ? categoryIdsWithData : null}
                 placeholder={t("dashboard.selectCategory")}
-                style={{ minWidth: 160 }}
               />
-              <Select.Content>
-                <Select.Item value="none">
-                  {t("dashboard.selectCategory")}
-                </Select.Item>
-                {categories.map((cat) => (
-                  <Select.Item key={cat.id} value={String(cat.id)}>
-                    {cat.parent_id ? "  └─ " : ""}
-                    {getCategoryLabel(cat)}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
+            </div>
+            <Button
+              size="1"
+              variant={trendWithDataOnly ? "solid" : "soft"}
+              onClick={() => setTrendWithDataOnly((v) => !v)}
+            >
+              {t("categoryPicker.withDataOnly")}
+            </Button>
             <Select.Root
               value={String(trendMonths)}
               onValueChange={(v) => setTrendMonths(Number(v))}
@@ -838,6 +889,15 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      <TransactionFormModal
+        open={txModalOpen}
+        onOpenChange={setTxModalOpen}
+        onSuccess={() => {
+          loadData();
+          loadTodayData();
+        }}
+      />
+
       <SubscriptionModal
         visible={subscriptionModalVisible}
         editingId={editingSubscription?.id ?? null}
@@ -849,6 +909,7 @@ const Dashboard: React.FC = () => {
                 cycle: editingSubscription.cycle,
                 amount: editingSubscription.amount,
                 currency: editingSubscription.currency,
+                category_id: editingSubscription.category_id,
               }
             : undefined
         }

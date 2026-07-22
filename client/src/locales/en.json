@@ -14,6 +14,15 @@
     "symbol": "$",
     "code": "USD"
   },
+  "categoryPicker": {
+    "placeholder": "Search categories…",
+    "all": "All categories",
+    "recent": "Recent",
+    "results": "Results",
+    "noMatch": "No matching categories",
+    "withDataOnly": "Only with spending",
+    "expandHint": "Search or expand a group"
+  },
   "dashboard": {
     "title": "Dashboard",
     "totalIncome": "Total Income",
@@ -128,7 +137,8 @@
     "calculatedTotal": "Calculated Total",
     "unitPlaceholder": "Select unit",
     "unitPricePlaceholder": "e.g., 3.50",
-    "quantityPlaceholder": "e.g., 28.57"
+    "quantityPlaceholder": "e.g., 28.57",
+    "optionalDetails": "Description / item (optional)"
   },
   "categories": {
     "title": "Categories",
@@ -207,7 +217,9 @@
     "renewOnly": "Extend only",
     "renewSuccess": "Subscription renewed",
     "renewError": "Failed to renew subscription",
-    "categoryRequired": "Set a category (or amount 0) before renewing with expense"
+    "categoryRequired": "Set a category (or amount 0) before renewing with expense",
+    "category": "Category",
+    "categoryHint": "Used when renewing creates an expense"
   },
   "items": {
     "title": "Item Purchase History",

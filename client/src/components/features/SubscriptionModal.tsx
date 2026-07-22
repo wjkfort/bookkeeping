@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog, Flex, TextField, Button, Text } from "@radix-ui/themes";
-import { createSubscription, updateSubscription } from "../../api";
+import { createSubscription, updateSubscription, getCategories } from "../../api";
+import { Category } from "../../types";
 import { useToast } from "../ui/Toast";
+import CategoryPicker from "../ui/CategoryPicker";
 
 interface SubscriptionModalProps {
   visible: boolean;
@@ -15,6 +17,7 @@ interface SubscriptionModalProps {
     cycle?: number;
     amount?: number;
     currency?: string;
+    category_id?: number | null;
   } | null;
 }
 
@@ -28,14 +31,28 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const { t } = useTranslation();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [name, setName] = useState("");
   const [endDate, setEndDate] = useState("");
   const [cycle, setCycle] = useState("30");
   const [amount, setAmount] = useState("0");
   const [currency, setCurrency] = useState("USD");
+  const [categoryId, setCategoryId] = useState<number | null>(null);
 
   const isEditing = editingId !== null;
+
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      try {
+        const res = await getCategories(true);
+        setCategories(res.data);
+      } catch (e) {
+        console.error("Error loading categories:", e);
+      }
+    })();
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -45,12 +62,14 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         setCycle(String(initialValues.cycle ?? 30));
         setAmount(String(initialValues.amount ?? 0));
         setCurrency(initialValues.currency ?? "USD");
+        setCategoryId(initialValues.category_id ?? null);
       } else {
         setName("");
         setEndDate("");
         setCycle("30");
         setAmount("0");
         setCurrency("USD");
+        setCategoryId(null);
       }
     }
   }, [visible, initialValues]);
@@ -67,6 +86,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         cycle: Number(cycle) || 30,
         amount: Number(amount) || 0,
         currency: currency.trim() || "USD",
+        category_id: categoryId,
       };
 
       if (isEditing && editingId !== null) {
@@ -168,6 +188,24 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               value={currency}
               onChange={(e) => setCurrency((e.target as HTMLInputElement).value)}
             />
+          </label>
+
+          <label>
+            <Text as="div" size="2" mb="1" weight="medium">
+              {t("subscriptions.category") || "Category"}
+            </Text>
+            <CategoryPicker
+              categories={categories}
+              value={categoryId}
+              onChange={setCategoryId}
+              allowClear
+              typeFilter="expense"
+              placeholder={t("subscriptions.category") || "Category"}
+            />
+            <Text as="div" size="1" color="gray" mt="1">
+              {t("subscriptions.categoryHint") ||
+                "Used when renewing creates an expense"}
+            </Text>
           </label>
         </Flex>
 
