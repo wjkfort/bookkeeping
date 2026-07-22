@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Env, HonoVariables, Transaction, CreateTransactionRequest, UpdateTransactionRequest } from '../types';
+import { getAllSubcategoryIds } from '../utils/categories';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -11,28 +12,6 @@ async function ensureOwnedCategory(db: D1Database, categoryId: number, userId: n
 async function ensureOwnedItem(db: D1Database, itemId: number, userId: number): Promise<boolean> {
   const item = await db.prepare('SELECT id FROM items WHERE id = ? AND user_id = ?').bind(itemId, userId).first();
   return !!item;
-}
-
-// Helper function to get all subcategory IDs recursively
-async function getAllSubcategoryIds(db: D1Database, categoryId: number, userId: number): Promise<number[]> {
-  const categoryIds = [categoryId];
-  
-  // Get all categories to build the tree
-  const { results: allCategories } = await db.prepare(
-    'SELECT id, parent_id FROM categories WHERE user_id = ?'
-  ).bind(userId).all<{ id: number; parent_id: number | null }>();
-  
-  // Recursively find all children
-  const findChildren = (parentId: number) => {
-    const children = allCategories.filter(cat => cat.parent_id === parentId);
-    children.forEach(child => {
-      categoryIds.push(child.id);
-      findChildren(child.id); // Recursive call for nested children
-    });
-  };
-  
-  findChildren(categoryId);
-  return categoryIds;
 }
 
 // GET /api/v1/transactions - List transactions with filters

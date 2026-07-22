@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, HonoVariables, Summary, MonthlySummary, CategorySummary } from '../types';
 import { getExchangeRate } from '../utils/currency';
+import { getAllSubcategoryIds } from '../utils/categories';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -73,9 +74,11 @@ app.get('/', async (c) => {
 });
 
 // GET /api/v1/summary/monthly - Monthly income/expense trend
+// Optional category_id: filter to that category + all subcategories
 app.get('/monthly', async (c) => {
   const target_currency = c.req.query('target_currency') || 'USD';
   const months = Math.min(Math.max(parseInt(c.req.query('months') || '6', 10) || 6, 1), 24);
+  const categoryIdRaw = c.req.query('category_id');
   const userId = c.get('userId');
 
   try {
@@ -84,8 +87,8 @@ app.get('/monthly', async (c) => {
     const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - (months - 1), 1));
     const start_date = start.toISOString().slice(0, 10);
 
-    const { results } = await c.env.DB.prepare(
-      `SELECT
+    let query = `
+      SELECT
         strftime('%Y-%m', t.date) as month,
         t.amount,
         t.currency,
@@ -93,9 +96,32 @@ app.get('/monthly', async (c) => {
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
       WHERE t.user_id = ? AND t.date >= ?
-      ORDER BY month`
-    )
-      .bind(userId, start_date)
+    `;
+    const params: any[] = [userId, start_date];
+
+    if (categoryIdRaw) {
+      const categoryId = parseInt(categoryIdRaw, 10);
+      if (Number.isNaN(categoryId)) {
+        return c.json({ error: 'Invalid category_id' }, 400);
+      }
+      const owned = await c.env.DB.prepare(
+        'SELECT id FROM categories WHERE id = ? AND user_id = ?',
+      )
+        .bind(categoryId, userId)
+        .first();
+      if (!owned) {
+        return c.json({ error: 'Category not found' }, 404);
+      }
+      const categoryIds = await getAllSubcategoryIds(c.env.DB, categoryId, userId);
+      const placeholders = categoryIds.map(() => '?').join(',');
+      query += ` AND t.category_id IN (${placeholders})`;
+      params.push(...categoryIds);
+    }
+
+    query += ' ORDER BY month';
+
+    const { results } = await c.env.DB.prepare(query)
+      .bind(...params)
       .all<{ month: string; amount: number; currency: string; type: string }>();
 
     const byMonth = new Map<string, { income: number; expense: number }>();

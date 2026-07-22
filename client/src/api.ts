@@ -98,6 +98,7 @@ export const getSummary = (params?: Record<string, any>): Promise<AxiosResponse<
 export const getMonthlySummary = (params?: {
   months?: number;
   target_currency?: string;
+  category_id?: number;
 }): Promise<AxiosResponse<{ currency: string; months: MonthlySummary[] }>> =>
   api.get("/summary/monthly", { params });
 

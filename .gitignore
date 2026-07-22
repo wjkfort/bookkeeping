@@ -23,6 +23,9 @@ wheels/
 node_modules/
 dist/
 
+# Cloudflare Wrangler local state / cache
+.wrangler/
+
 # IDE
 .vscode/
 .idea/

@@ -8,6 +8,7 @@ import {
   Progress,
   Text,
   Heading,
+  Select,
 } from "@radix-ui/themes";
 import { PlusIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "../../hooks/useCurrency";
@@ -19,12 +20,14 @@ import {
   proxyImage,
   getMonthlySummary,
   getCategorySummary,
+  getCategories,
 } from "../../api";
 import {
   Summary,
   Subscription,
   MonthlySummary,
   CategorySummary,
+  Category,
 } from "../../types";
 import SubscriptionModal from "./SubscriptionModal";
 import MonthPicker from "../ui/MonthPicker";
@@ -58,6 +61,8 @@ const PIE_COLORS = [
   "var(--gray-9)",
 ];
 
+const MONTH_OPTIONS = [3, 6, 12] as const;
+
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { currencyCode } = useCurrency();
@@ -79,6 +84,10 @@ const Dashboard: React.FC = () => {
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategorySummary[]>(
     [],
   );
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryTrend, setCategoryTrend] = useState<MonthlySummary[]>([]);
+  const [trendCategoryId, setTrendCategoryId] = useState<string>("");
+  const [trendMonths, setTrendMonths] = useState<number>(6);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
   const [isOverall, setIsOverall] = useState(false);
@@ -106,7 +115,39 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadSubscriptions();
+    loadCategories();
   }, []);
+
+  useEffect(() => {
+    loadCategoryTrend();
+  }, [currencyCode, trendCategoryId, trendMonths]);
+
+  const loadCategories = async () => {
+    try {
+      const res = await getCategories(true);
+      setCategories(res.data);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
+
+  const loadCategoryTrend = async () => {
+    if (!trendCategoryId) {
+      setCategoryTrend([]);
+      return;
+    }
+    try {
+      const res = await getMonthlySummary({
+        months: trendMonths,
+        target_currency: currencyCode,
+        category_id: Number(trendCategoryId),
+      });
+      setCategoryTrend(res.data.months || []);
+    } catch (error) {
+      console.error("Error loading category trend:", error);
+      setCategoryTrend([]);
+    }
+  };
 
   const loadSubscriptions = async () => {
     try {
@@ -233,12 +274,28 @@ const Dashboard: React.FC = () => {
     return summary.total_expense / denom;
   }, [summary.total_expense, selectedMonth, isOverall]);
 
-  const getCategoryLabel = (category: CategorySummary): string => {
+  const getCategoryLabel = (category: CategorySummary | Category): string => {
     const lang = i18n.language;
     if (category.translations?.[lang]) return category.translations[lang];
     if (category.translations?.en) return category.translations.en;
     return category.name;
   };
+
+  const categoryTrendStats = useMemo(() => {
+    const total = categoryTrend.reduce((s, m) => s + m.expense, 0);
+    const monthsWithData = categoryTrend.filter((m) => m.expense > 0).length;
+    const avg =
+      monthsWithData > 0
+        ? total / monthsWithData
+        : categoryTrend.length > 0
+          ? total / categoryTrend.length
+          : 0;
+    return {
+      total: Math.round(total * 100) / 100,
+      avg: Math.round(avg * 100) / 100,
+      hasData: total > 0,
+    };
+  }, [categoryTrend]);
 
   const pieData = useMemo(
     () =>
@@ -522,6 +579,108 @@ const Dashboard: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Category monthly trend */}
+      <Card className="chart-card">
+        <Flex justify="between" align="center" wrap="wrap" gap="3">
+          <Text size="3" weight="bold">
+            {t("dashboard.categoryTrend")}
+          </Text>
+          <Flex gap="2" align="center" wrap="wrap">
+            <Select.Root
+              value={trendCategoryId || "none"}
+              onValueChange={(v) => setTrendCategoryId(v === "none" ? "" : v)}
+            >
+              <Select.Trigger
+                placeholder={t("dashboard.selectCategory")}
+                style={{ minWidth: 160 }}
+              />
+              <Select.Content>
+                <Select.Item value="none">
+                  {t("dashboard.selectCategory")}
+                </Select.Item>
+                {categories.map((cat) => (
+                  <Select.Item key={cat.id} value={String(cat.id)}>
+                    {cat.parent_id ? "  └─ " : ""}
+                    {getCategoryLabel(cat)}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            <Select.Root
+              value={String(trendMonths)}
+              onValueChange={(v) => setTrendMonths(Number(v))}
+            >
+              <Select.Trigger style={{ minWidth: 100 }} />
+              <Select.Content>
+                {MONTH_OPTIONS.map((m) => (
+                  <Select.Item key={m} value={String(m)}>
+                    {m} {t("dashboard.months")}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </Flex>
+        </Flex>
+
+        {!trendCategoryId ? (
+          <Flex align="center" justify="center" style={{ height: 220 }}>
+            <Text size="2" color="gray">
+              {t("dashboard.selectCategory")}
+            </Text>
+          </Flex>
+        ) : !categoryTrendStats.hasData ? (
+          <Flex align="center" justify="center" style={{ height: 220 }}>
+            <Text size="2" color="gray">
+              {t("dashboard.noCategoryTrendData")}
+            </Text>
+          </Flex>
+        ) : (
+          <Flex direction="column" gap="3">
+            <Flex gap="5" wrap="wrap">
+              <Flex direction="column" gap="1">
+                <Text size="1" color="gray">
+                  {t("dashboard.totalInPeriod")}
+                </Text>
+                <Heading size="4" color="tomato">
+                  {categoryTrendStats.total.toFixed(2)} {currencyCode}
+                </Heading>
+              </Flex>
+              <Flex direction="column" gap="1">
+                <Text size="1" color="gray">
+                  {t("dashboard.avgMonthly")}
+                </Text>
+                <Heading size="4">
+                  {categoryTrendStats.avg.toFixed(2)} {currencyCode}
+                </Heading>
+              </Flex>
+            </Flex>
+            <div className="chart-body">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={categoryTrend}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-5)" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} width={48} />
+                  <Tooltip
+                    formatter={(value: any) => [
+                      Number(value).toFixed(2),
+                      t("dashboard.expense"),
+                    ]}
+                  />
+                  <Bar
+                    dataKey="expense"
+                    fill="var(--cyan-9)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Flex>
+        )}
+      </Card>
 
       {/* Subscription Management */}
       <div className="subscription-section">
