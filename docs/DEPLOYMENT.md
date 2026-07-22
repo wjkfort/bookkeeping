@@ -61,11 +61,8 @@ npx wrangler secret list
 npx wrangler d1 export bookkeeping-db --remote \
   --output=prod-backup-$(date +%Y%m%d).sql
 
-# 执行对应 migration（示例：订阅续费）
-npm run db:migrate:renewals:remote
-
-# 或通用形式：
-# npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/xxx.sql
+# 执行对应增量 migration（有文件时）
+# npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/001_xxx.sql
 ```
 
 校验示例：
@@ -78,8 +75,9 @@ npx wrangler d1 execute bookkeeping-db --remote \
 **注意：**
 
 - 迁移与代码发布顺序：优先 **先 migration，再发会依赖新表的后端**，避免短窗口 500。
-- `schema.sql` 面向新库初始化（`CREATE IF NOT EXISTS`），**不要**指望用它升级已有生产库。
-- 增量变更请使用 `backend-ts/migrations/` 下独立 SQL，并在 `package.json` 中按需加 `db:migrate:…:remote` 脚本。
+- `db/schema.sql` 面向**新库**初始化（`CREATE IF NOT EXISTS`），**不要**用它升级已有生产库。
+- 增量 DDL 放 `backend-ts/migrations/`（序号命名，如 `001_xxx.sql`），并同步更新 `db/schema.sql`。
+- 一次性业务数据脚本不要放进 `migrations/`；跑完可删。
 - 备份文件含用户数据，已在 `backend-ts/.gitignore` 忽略 `prod-backup.sql` 等；勿提交。
 
 ### 3. 发布代码（CI/CD）
@@ -151,16 +149,16 @@ curl -s "https://bookkeeping-backend.stringwjk.workers.dev/api/v1/summary/monthl
 ```text
 [x] secret list 确认 JWT_SECRET、OPEN_EXCHANGE_RATES_API_KEY
 [x] 生产 D1 备份
-[x] npm run db:migrate:renewals:remote
+[x] 订阅续费表 migration（已应用，脚本已清理）
+[x] Food 分类数据同步（已应用，一次性脚本已清理）
 [ ] git push origin main → 等 Cloudflare 部署
 [ ] 生产冒烟（见上）
 ```
-
-本地 Food 分类整理（早餐/饮品等）**未**同步到生产，仅本地 D1。
 
 ## 相关路径
 
 - 功能需求文档：`docs/features/`
 - 后端配置：`backend-ts/wrangler.toml`
-- 迁移脚本：`backend-ts/migrations/`
+- 全量 schema：`backend-ts/db/schema.sql`
+- 增量 migration：`backend-ts/migrations/`（当前无待执行脚本）
 - 本地密钥：`backend-ts/.dev.vars`（勿提交）

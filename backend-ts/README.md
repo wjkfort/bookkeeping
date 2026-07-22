@@ -35,14 +35,16 @@ database_name = "bookkeeping-db"
 database_id = "your-database-id-here"
 ```
 
-### 3. Run Migrations
+### 3. Initialize Schema
+
+Full schema lives in `db/schema.sql` (new local/prod D1). Incremental DDL for existing DBs goes in `migrations/`.
 
 ```bash
 # Local database
-npm run db:migrate:local
+npm run db:schema:local
 
-# Production database (after deployment)
-npm run db:migrate:remote
+# Production database (new empty D1 only — do not use to "upgrade" existing prod)
+npm run db:schema:remote
 ```
 
 ### 4. Set Secrets
@@ -114,8 +116,9 @@ backend-ts/
 │   ├── utils/            # Utility functions
 │   │   └── currency.ts
 │   └── index.ts          # Main application entry
-├── migrations/
-│   └── schema.sql        # D1 database schema
+├── db/
+│   └── schema.sql        # Full D1 schema (new DB init)
+├── migrations/           # Incremental DDL for existing DBs (empty when none pending)
 ├── wrangler.toml         # Cloudflare Workers configuration
 ├── tsconfig.json         # TypeScript configuration
 └── package.json
@@ -160,7 +163,7 @@ curl http://localhost:8787/api/v1/categories
 ## Troubleshooting
 
 ### Database not found
-- Make sure you ran `npm run db:migrate:local`
+- Make sure you ran `npm run db:schema:local`
 - Check `.wrangler/state/` directory exists
 
 ### API key errors

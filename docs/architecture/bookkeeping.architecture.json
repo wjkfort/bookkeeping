@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Bookkeeping Runtime Architecture",
+    "subtitle": "React SPA + Hono on Cloudflare Workers / D1 — multi-currency personal finance",
+    "output": "bookkeeping-runtime.html"
+  },
+  "components": [
+    {
+      "id": "users",
+      "type": "external",
+      "label": "Users",
+      "sublabel": "Browser",
+      "pos": [40, 280],
+      "size": [110, 56]
+    },
+    {
+      "id": "pages",
+      "type": "frontend",
+      "label": "CF Pages",
+      "sublabel": "React + Vite SPA",
+      "pos": [220, 280],
+      "size": [130, 56],
+      "tag": "pages.dev"
+    },
+    {
+      "id": "spa-fn",
+      "type": "cloud",
+      "label": "SPA Fallback",
+      "sublabel": "Pages Function",
+      "pos": [220, 380],
+      "size": [130, 52]
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "CF Worker",
+      "sublabel": "Hono /api/v1",
+      "pos": [450, 280],
+      "size": [130, 56],
+      "tag": "edge"
+    },
+    {
+      "id": "auth-mw",
+      "type": "security",
+      "label": "JWT Auth",
+      "sublabel": "HS256 + bcrypt",
+      "pos": [450, 170],
+      "size": [130, 56],
+      "tag": "7d token"
+    },
+    {
+      "id": "api-core",
+      "type": "backend",
+      "label": "Domain APIs",
+      "sublabel": "tx · cats · items",
+      "pos": [640, 250],
+      "size": [130, 56]
+    },
+    {
+      "id": "api-subs",
+      "type": "backend",
+      "label": "Subscriptions",
+      "sublabel": "renewals → tx",
+      "pos": [640, 340],
+      "size": [130, 56]
+    },
+    {
+      "id": "api-fx",
+      "type": "backend",
+      "label": "FX + Translate",
+      "sublabel": "rates · convert",
+      "pos": [640, 160],
+      "size": [130, 56]
+    },
+    {
+      "id": "proxy",
+      "type": "backend",
+      "label": "Image Proxy",
+      "sublabel": "GET /proxy/image",
+      "pos": [640, 430],
+      "size": [130, 52]
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "D1 SQLite",
+      "sublabel": "bookkeeping-db",
+      "pos": [860, 280],
+      "size": [130, 64],
+      "tag": "binding: DB"
+    },
+    {
+      "id": "oxr",
+      "type": "external",
+      "label": "Open Exchange",
+      "sublabel": "Rates API",
+      "pos": [860, 120],
+      "size": [130, 56]
+    },
+    {
+      "id": "gtx",
+      "type": "external",
+      "label": "Google Translate",
+      "sublabel": "gtx free API",
+      "pos": [860, 40],
+      "size": [130, 52]
+    },
+    {
+      "id": "ext-img",
+      "type": "external",
+      "label": "Remote Images",
+      "sublabel": "favicon / icons",
+      "pos": [860, 430],
+      "size": [130, 52]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Cloudflare Edge",
+      "wraps": ["pages", "spa-fn", "worker", "auth-mw", "api-core", "api-subs", "api-fx", "proxy", "d1"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Auth boundary (Bearer JWT)",
+      "wraps": ["worker", "auth-mw", "api-core", "api-subs"]
+    }
+  ],
+  "connections": [
+    {
+      "from": "users",
+      "to": "pages",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "from": "pages",
+      "to": "spa-fn",
+      "label": "404 → index",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 42
+    },
+    {
+      "from": "pages",
+      "to": "worker",
+      "label": "Axios REST",
+      "variant": "emphasis"
+    },
+    {
+      "from": "worker",
+      "to": "auth-mw",
+      "label": "verify",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [515, 166]
+    },
+    {
+      "from": "worker",
+      "to": "api-core",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "from": "worker",
+      "to": "api-fx",
+      "fromSide": "top",
+      "toSide": "left",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "worker",
+      "to": "api-subs",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "worker",
+      "to": "proxy",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "left",
+      "route": "orthogonal-h"
+    },
+    {
+      "from": "api-core",
+      "to": "d1",
+      "label": "SQL",
+      "variant": "emphasis"
+    },
+    {
+      "from": "api-subs",
+      "to": "d1",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "label": "renewals",
+      "labelDy": 12
+    },
+    {
+      "from": "api-fx",
+      "to": "d1",
+      "label": "rate cache",
+      "fromSide": "right",
+      "toSide": "top",
+      "labelDy": -8
+    },
+    {
+      "from": "api-fx",
+      "to": "oxr",
+      "label": "fetch if stale",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "from": "api-fx",
+      "to": "gtx",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "proxy",
+      "to": "ext-img",
+      "label": "fetch",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Frontend",
+      "items": [
+        "React 19 + Vite + Radix Themes",
+        "i18n EN/ZH · currency via locale",
+        "Routes: dashboard, tx, categories, items",
+        "JWT in localStorage → Authorization"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "API surface",
+      "items": [
+        "Public: /auth, /proxy, FX, translate",
+        "Protected: categories, transactions,",
+        "summary (monthly/category), items,",
+        "subscriptions + renewals → ledger"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Data model (D1)",
+      "items": [
+        "users · categories (tree) · transactions",
+        "items · subscriptions · renewals",
+        "exchange_rates (24h cache)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Secrets & deploy",
+      "items": [
+        "JWT_SECRET · OPEN_EXCHANGE_RATES_API_KEY",
+        "Pages + Workers Git deploy from main",
+        "D1 migrations via wrangler (manual)"
+      ]
+    }
+  ]
+}

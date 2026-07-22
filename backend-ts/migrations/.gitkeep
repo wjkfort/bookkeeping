@@ -1,0 +1,4 @@
+-- Incremental DDL for existing D1 databases goes here.
+-- Numbered files, e.g. 001_add_something.sql
+-- Keep db/schema.sql in sync with the final structure.
+-- Do not put one-off data scripts here.

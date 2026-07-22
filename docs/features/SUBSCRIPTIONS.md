@@ -132,7 +132,7 @@ Modal form for creating/editing subscriptions:
 ## Files Modified
 
 ### Backend
-- `backend-ts/migrations/add_subscriptions_table.sql`
+- `backend-ts/db/schema.sql`（subscriptions / subscription_renewals 表定义）
 - `backend-ts/src/api/subscriptions.ts`
 - `backend-ts/src/index.ts`
 - `backend-ts/src/types/index.ts`
@@ -153,12 +153,15 @@ Modal form for creating/editing subscriptions:
 3. Click Create to save
 4. Hover over subscription to view details, edit, or delete
 
-## Migration
+## Schema
 
-To add the subscriptions table to an existing database:
+Subscriptions tables are part of the full schema in `backend-ts/db/schema.sql`.
+For a **new** local/prod D1:
 
 ```bash
 cd backend-ts
-npx wrangler d1 execute bookkeeping-db --local --file=./migrations/add_subscriptions_table.sql
-npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/add_subscriptions_table.sql
+npm run db:schema:local
+# npm run db:schema:remote   # empty D1 only
 ```
+
+Existing production already has these tables; do not re-run one-off DDL from history.

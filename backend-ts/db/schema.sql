@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     date TEXT NOT NULL, -- ISO 8601 format: YYYY-MM-DD
     category_id INTEGER NOT NULL,
     item_id INTEGER,
+    unit_price REAL,
+    quantity REAL,
+    unit TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE,
@@ -51,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_transactions_currency ON transactions(currency);
 CREATE INDEX IF NOT EXISTS idx_transactions_item_id ON transactions(item_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_unit_price ON transactions(unit_price);
 
 -- Exchange rates table
 CREATE TABLE IF NOT EXISTS exchange_rates (
