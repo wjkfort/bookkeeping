@@ -27,9 +27,11 @@
   cursor: not-allowed;
 }
 
-/* Portaled inside [data-radix-themes] so CSS vars resolve; position:fixed stays viewport-relative */
+/* Portaled (dialog content / theme root / body); position:fixed is viewport-relative.
+   pointer-events:auto is required inside modal dialogs (body gets pointer-events:none). */
 .category-picker-dropdown {
-  z-index: 9999;
+  z-index: 100000;
+  pointer-events: auto;
   max-height: min(50vh, 360px);
   overflow-y: auto;
   overflow-x: hidden;

@@ -117,7 +117,19 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
   return (
     <Dialog.Root open={visible} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <Dialog.Content style={{ maxWidth: 480 }}>
+      <Dialog.Content
+        style={{ maxWidth: 480 }}
+        // CategoryPicker portals its menu outside the dialog; treat those
+        // clicks as inside so selecting a category doesn't dismiss the modal.
+        onPointerDownOutside={(e) => {
+          const t = e.target as HTMLElement | null;
+          if (t?.closest?.(".category-picker-dropdown")) e.preventDefault();
+        }}
+        onInteractOutside={(e) => {
+          const t = e.target as HTMLElement | null;
+          if (t?.closest?.(".category-picker-dropdown")) e.preventDefault();
+        }}
+      >
         <Dialog.Title>{title}</Dialog.Title>
 
         <Flex direction="column" gap="3" mt="4">

@@ -358,6 +358,16 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             maxHeight: "90vh",
             overflow: "auto",
           }}
+          // CategoryPicker portals its menu outside the dialog; treat those
+          // clicks as inside so selecting a category doesn't dismiss the modal.
+          onPointerDownOutside={(e) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest?.(".category-picker-dropdown")) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest?.(".category-picker-dropdown")) e.preventDefault();
+          }}
         >
           <Dialog.Title>
             {isEditing ? t("transactions.edit") : t("transactions.addNew")}

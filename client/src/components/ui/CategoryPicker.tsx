@@ -115,15 +115,19 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
     maxHeight: number;
   } | null>(null);
 
-  // Portal inside [data-radix-themes] so CSS variables resolve correctly.
-  // position:fixed coordinates come from getBoundingClientRect (viewport-relative)
-  // so DOM location doesn't affect positioning.
-  const portalTarget = React.useMemo(
-    () =>
-      (document.querySelector("[data-radix-themes]") as HTMLElement | null) ??
-      document.body,
-    [],
-  );
+  // Portal the menu into the nearest open Dialog content when present so that:
+  // 1) it sits above the modal overlay (portaling to body/[data-radix-themes]
+  //    leaves the menu under the dialog portal → clicks hit the overlay and
+  //    dismiss the modal),
+  // 2) Theme CSS variables still resolve.
+  // position:fixed is still viewport-relative (dialog content has no transform
+  // after the open animation). Outside dialogs, fall back to theme root / body.
+  const getPortalTarget = (): HTMLElement =>
+    (rootRef.current?.closest(
+      ".rt-BaseDialogContent, .rt-DialogContent",
+    ) as HTMLElement | null) ??
+    (document.querySelector("[data-radix-themes]") as HTMLElement | null) ??
+    document.body;
 
   const byId = useMemo(() => {
     const m = new Map<number, Category>();
@@ -346,12 +350,16 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
             ref={dropdownRef}
             className="category-picker-dropdown"
             role="listbox"
+            // Modal dialogs set body { pointer-events: none }; re-enable so
+            // the menu is clickable when portaled outside Dialog.Content.
             style={{
               position: "fixed",
               top: menuPos.top,
               left: menuPos.left,
               width: menuPos.width,
               maxHeight: menuPos.maxHeight,
+              pointerEvents: "auto",
+              zIndex: 100000,
             }}
           >
             {allowClear && (
@@ -534,7 +542,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
               </Text>
             )}
           </div>,
-          portalTarget,
+          getPortalTarget(),
         )
       : null;
 
