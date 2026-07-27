@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Flex, Table, IconButton, Text, Badge, Card } from '@radix-ui/themes';
 import { Pencil1Icon, TrashIcon } from '@radix-ui/react-icons';
 import { useCurrency } from '../../hooks/useCurrency';
-import { Transaction, Category, Item, TransactionListTotals } from '../../types';
+import { Transaction, Category, TransactionListTotals } from '../../types';
 
 interface TransactionTableProps {
   transactions: Transaction[];
   categories: Category[];
-  items: Item[];
   loading?: boolean;
   showActions?: boolean;
   pagination?: boolean | object;
@@ -23,7 +22,6 @@ interface TransactionTableProps {
 const TransactionTable: React.FC<TransactionTableProps> = ({
   transactions,
   categories,
-  items: _items,
   loading: _loading = false,
   showActions = false,
   pagination: _pagination = false,

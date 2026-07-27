@@ -333,9 +333,10 @@ const Transactions: React.FC = () => {
           <TransactionTable
             transactions={transactions}
             categories={categories}
+            showActions
             onEdit={handleEdit}
             onDelete={handleDelete}
-            onViewItemHistory={handleViewItemHistory}
+            onItemClick={handleViewItemHistory}
             summaryTotals={summaryTotals}
             summaryCount={totalCount}
           />
