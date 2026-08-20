@@ -137,13 +137,13 @@ export const deleteItem = (id: number): Promise<AxiosResponse<void>> => api.dele
 export const searchItems = (query: string): Promise<AxiosResponse<Item[]>> => api.get(`/items/search/${query}`);
 
 // Subscriptions
-export const getSubscriptions = (): Promise<AxiosResponse<Subscription[]>> => api.get("/subscriptions");
+export const getSubscriptions = (params?: { include_archived?: boolean }): Promise<AxiosResponse<Subscription[]>> => api.get("/subscriptions", { params });
 
 export const getSubscription = (id: number): Promise<AxiosResponse<Subscription>> => api.get(`/subscriptions/${id}`);
 
 export const createSubscription = (data: {
   name: string;
-  icon?: string;
+  icon?: string | null;
   amount?: number;
   currency?: string;
   end_date: string;
@@ -173,6 +173,13 @@ export const renewSubscription = (
   }
 ): Promise<AxiosResponse<RenewSubscriptionResult>> =>
   api.post(`/subscriptions/${id}/renew`, data ?? {});
+
+export const archiveSubscription = (id: number): Promise<AxiosResponse<Subscription>> => api.post(`/subscriptions/${id}/archive`);
+
+export const restoreSubscription = (
+  id: number,
+  data: { end_date: string; cycle?: number }
+): Promise<AxiosResponse<Subscription>> => api.post(`/subscriptions/${id}/restore`, data);
 
 export const deleteSubscription = (id: number): Promise<AxiosResponse<void>> => api.delete(`/subscriptions/${id}`);
 

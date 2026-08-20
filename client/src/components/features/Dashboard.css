@@ -237,6 +237,34 @@
     flex-shrink: 0;
 }
 
+/* Archived (paused) subscriptions */
+.subscription-archived {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1.5px dashed var(--gray-6);
+    margin-top: 4px;
+}
+
+.subscription-archived-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-10);
+    display: flex;
+    align-items: center;
+}
+
+.subscription-item.archived {
+    background: var(--gray-3);
+    border-style: dashed;
+    opacity: 0.75;
+}
+
+.subscription-item.archived:hover {
+    opacity: 1;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .charts-row {

@@ -189,5 +189,6 @@ export interface Subscription {
   category_id: number | null;
   category_name?: string | null;
   last_renewed_at?: string | null;
+  archived_at?: string | null;
   created_at: string;
 }

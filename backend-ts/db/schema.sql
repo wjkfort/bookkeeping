@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     cycle INTEGER NOT NULL DEFAULT 30, -- days
     category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
     last_renewed_at TEXT,
+    archived_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(name, user_id)
 );

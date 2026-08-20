@@ -9,14 +9,18 @@ import {
   Text,
   Heading,
   Select,
+  Dialog,
+  TextField,
 } from "@radix-ui/themes";
-import { PlusIcon } from "@radix-ui/react-icons";
+import { PlusIcon, ArchiveIcon, ResetIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "../../hooks/useCurrency";
 import {
   getSummary,
   getSubscriptions,
   deleteSubscription,
   renewSubscription,
+  archiveSubscription,
+  restoreSubscription,
   proxyImage,
   getMonthlySummary,
   getCategorySummary,
@@ -96,13 +100,22 @@ const Dashboard: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<Dayjs | null>(dayjs());
   const [isOverall, setIsOverall] = useState(false);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [archivedSubscriptions, setArchivedSubscriptions] = useState<Subscription[]>([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] =
     useState(false);
   const [editingSubscription, setEditingSubscription] =
     useState<Subscription | null>(null);
   const [revealedStats, setRevealedStats] = useState<Set<string>>(new Set());
   const [renewingId, setRenewingId] = useState<number | null>(null);
+  const [archivingId, setArchivingId] = useState<number | null>(null);
   const [txModalOpen, setTxModalOpen] = useState(false);
+  const [openPopoverId, setOpenPopoverId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<Subscription | null>(null);
+  const [restoreEndDate, setRestoreEndDate] = useState("");
+  const [restoreCycle, setRestoreCycle] = useState("30");
+  const [restoring, setRestoring] = useState(false);
 
   const toggleStat = (key: string) => {
     setRevealedStats((prev) => {
@@ -202,8 +215,10 @@ const Dashboard: React.FC = () => {
 
   const loadSubscriptions = async () => {
     try {
-      const res = await getSubscriptions();
-      setSubscriptions(res.data);
+      const res = await getSubscriptions({ include_archived: true });
+      const all = res.data;
+      setSubscriptions(all.filter((s) => !s.archived_at));
+      setArchivedSubscriptions(all.filter((s) => !!s.archived_at));
     } catch (error) {
       console.error("Error loading subscriptions:", error);
     }
@@ -213,12 +228,67 @@ const Dashboard: React.FC = () => {
     try {
       await deleteSubscription(id);
       toast.success(t("subscriptions.deleteSuccess") || "Subscription deleted");
+      setDeleteTarget(null);
       loadSubscriptions();
     } catch (error) {
       console.error("Error deleting subscription:", error);
       toast.error(
         t("subscriptions.deleteError") || "Failed to delete subscription",
       );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleArchive = async (sub: Subscription) => {
+    setArchivingId(sub.id);
+    try {
+      await archiveSubscription(sub.id);
+      toast.success(t("subscriptions.archiveSuccess") || "Subscription archived");
+      loadSubscriptions();
+    } catch (error) {
+      console.error("Error archiving subscription:", error);
+      toast.error(
+        t("subscriptions.archiveError") || "Failed to archive subscription",
+      );
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const openRestoreDialog = (sub: Subscription) => {
+    setRestoreTarget(sub);
+    setRestoreEndDate(sub.end_date);
+    setRestoreCycle(String(sub.cycle));
+    setOpenPopoverId(null);
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTarget) return;
+    if (!restoreEndDate) {
+      toast.error(
+        t("subscriptions.restoreEndDateRequired") || "Please choose the new end date",
+      );
+      return;
+    }
+    setRestoring(true);
+    try {
+      await restoreSubscription(restoreTarget.id, {
+        end_date: restoreEndDate,
+        cycle: Number(restoreCycle) || restoreTarget.cycle,
+      });
+      toast.success(t("subscriptions.restoreSuccess") || "Subscription restored");
+      setRestoreTarget(null);
+      loadSubscriptions();
+    } catch (error: any) {
+      console.error("Error restoring subscription:", error);
+      toast.error(
+        error.response?.data?.error ||
+          t("subscriptions.restoreError") ||
+          "Failed to restore subscription",
+      );
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -775,7 +845,11 @@ const Dashboard: React.FC = () => {
               const warning = remaining <= 10;
 
               return (
-                <Popover.Root key={sub.id}>
+                <Popover.Root
+                  key={sub.id}
+                  open={openPopoverId === sub.id}
+                  onOpenChange={(open) => setOpenPopoverId(open ? sub.id : null)}
+                >
                   <Popover.Trigger>
                     <div
                       className={`subscription-item ${urgent ? "urgent" : warning ? "warning" : ""}`}
@@ -872,6 +946,133 @@ const Dashboard: React.FC = () => {
                           size="1"
                           variant="soft"
                           onClick={() => {
+                            setOpenPopoverId(null);
+                            setEditingSubscription(sub);
+                            setSubscriptionModalVisible(true);
+                          }}
+                        >
+                          {t("common.edit") || "Edit"}
+                        </Button>
+                        <Button
+                          size="1"
+                          variant="soft"
+                          disabled={archivingId === sub.id}
+                          onClick={() => {
+                            setOpenPopoverId(null);
+                            handleArchive(sub);
+                          }}
+                        >
+                          <ArchiveIcon />
+                          {archivingId === sub.id
+                            ? t("common.loading") || "..."
+                            : t("subscriptions.archive") || "Archive"}
+                        </Button>
+                        <Button
+                          size="1"
+                          variant="soft"
+                          color="red"
+                          onClick={() => {
+                            setOpenPopoverId(null);
+                            setDeleteTarget(sub);
+                          }}
+                        >
+                          {t("common.delete") || "Delete"}
+                        </Button>
+                      </Flex>
+                    </Flex>
+                  </Popover.Content>
+                </Popover.Root>
+              );
+            })
+          )}
+
+          {archivedSubscriptions.length > 0 && (
+            <div className="subscription-archived">
+              <div className="subscription-archived-header">
+                <span>
+                  📦 {t("subscriptions.archivedTitle") || "Archived"} (
+                  {archivedSubscriptions.length})
+                </span>
+              </div>
+              {archivedSubscriptions.map((sub) => (
+                <Popover.Root
+                  key={sub.id}
+                  open={openPopoverId === sub.id}
+                  onOpenChange={(open) => setOpenPopoverId(open ? sub.id : null)}
+                >
+                  <Popover.Trigger>
+                    <div className="subscription-item archived">
+                      {sub.icon &&
+                      (sub.icon.startsWith("http") ||
+                        sub.icon.startsWith("//")) ? (
+                        <img
+                          src={
+                            sub.icon.startsWith("//")
+                              ? "https:" + sub.icon
+                              : sub.icon
+                          }
+                          alt={sub.name}
+                          className="subscription-item-img"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.retried) {
+                              img.dataset.retried = "1";
+                              img.src = proxyImage(
+                                sub.icon!.startsWith("//")
+                                  ? "https:" + sub.icon!
+                                  : sub.icon!,
+                              );
+                            } else {
+                              img.style.display = "none";
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span className="subscription-item-icon">
+                          {sub.icon || "📦"}
+                        </span>
+                      )}
+                      <div className="subscription-item-meta">
+                        <span className="subscription-item-name">
+                          {sub.name}
+                        </span>
+                        <span className="subscription-item-amount">
+                          {sub.amount > 0
+                            ? `${sub.amount} ${sub.currency}`
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </Popover.Trigger>
+                  <Popover.Content style={{ minWidth: 220 }}>
+                    <Flex direction="column" gap="1">
+                      <Text weight="bold">{sub.name}</Text>
+                      <Text size="2" color="gray">
+                        {t("subscriptions.archivedOn") || "Archived on"}:{" "}
+                        {dayjs(sub.archived_at).format("YYYY-MM-DD")}
+                      </Text>
+                      {sub.amount > 0 && (
+                        <Text size="2">
+                          {sub.amount} {sub.currency}
+                          {sub.category_name
+                            ? ` · ${sub.category_name}`
+                            : ""}
+                        </Text>
+                      )}
+                      <Flex gap="2" mt="2" wrap="wrap">
+                        <Button
+                          size="1"
+                          variant="solid"
+                          onClick={() => openRestoreDialog(sub)}
+                        >
+                          <ResetIcon />
+                          {t("subscriptions.restore") || "Restore"}
+                        </Button>
+                        <Button
+                          size="1"
+                          variant="soft"
+                          onClick={() => {
+                            setOpenPopoverId(null);
                             setEditingSubscription(sub);
                             setSubscriptionModalVisible(true);
                           }}
@@ -882,7 +1083,10 @@ const Dashboard: React.FC = () => {
                           size="1"
                           variant="soft"
                           color="red"
-                          onClick={() => handleDeleteSubscription(sub.id)}
+                          onClick={() => {
+                            setOpenPopoverId(null);
+                            setDeleteTarget(sub);
+                          }}
                         >
                           {t("common.delete") || "Delete"}
                         </Button>
@@ -890,8 +1094,8 @@ const Dashboard: React.FC = () => {
                     </Flex>
                   </Popover.Content>
                 </Popover.Root>
-              );
-            })
+              ))}
+            </div>
           )}
         </div>
       </Card>
@@ -912,6 +1116,7 @@ const Dashboard: React.FC = () => {
           editingSubscription
             ? {
                 name: editingSubscription.name,
+                icon: editingSubscription.icon,
                 end_date: editingSubscription.end_date,
                 cycle: editingSubscription.cycle,
                 amount: editingSubscription.amount,
@@ -926,6 +1131,117 @@ const Dashboard: React.FC = () => {
           loadData();
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog.Root
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>
+            {t("subscriptions.deleteConfirmTitle") || "Delete Subscription"}
+          </Dialog.Title>
+          <Text size="2" mt="2">
+            {t("subscriptions.deleteConfirm", {
+              name: deleteTarget?.name ?? "",
+            }) || "Delete this subscription? Its renewal history will be deleted too."}
+          </Text>
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              {t("common.cancel") || "Cancel"}
+            </Button>
+            <Button
+              color="red"
+              disabled={deleting}
+              onClick={() => {
+                if (!deleteTarget) return;
+                setDeleting(true);
+                handleDeleteSubscription(deleteTarget.id);
+              }}
+            >
+              {deleting
+                ? t("common.loading") || "..."
+                : t("common.delete") || "Delete"}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* Restore Dialog */}
+      <Dialog.Root
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreTarget(null);
+        }}
+      >
+        <Dialog.Content style={{ maxWidth: 400 }}>
+          <Dialog.Title>
+            {t("subscriptions.restoreTitle") || "Restore Subscription"}
+          </Dialog.Title>
+          <Flex direction="column" gap="3" mt="4">
+            <Text size="2" color="gray" weight="medium">
+              {restoreTarget?.name}
+            </Text>
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("subscriptions.restoreEndDate") || "New end date"}
+              </Text>
+              <input
+                type="date"
+                value={restoreEndDate}
+                onChange={(e) => setRestoreEndDate(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: 32,
+                  padding: "4px 8px",
+                  borderRadius: "var(--radius-2)",
+                  border: "1px solid var(--gray-7)",
+                  background: "var(--color-surface)",
+                  color: "var(--gray-12)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+            </label>
+            <label>
+              <Text as="div" size="2" mb="1" weight="medium">
+                {t("subscriptions.cycle") || "Cycle (days)"}
+              </Text>
+              <TextField.Root
+                type="number"
+                placeholder="30"
+                value={restoreCycle}
+                onChange={(e) =>
+                  setRestoreCycle((e.target as HTMLInputElement).value)
+                }
+              />
+            </label>
+          </Flex>
+          <Flex gap="3" mt="4" justify="end">
+            <Button
+              variant="soft"
+              color="gray"
+              onClick={() => setRestoreTarget(null)}
+              disabled={restoring}
+            >
+              {t("common.cancel") || "Cancel"}
+            </Button>
+            <Button onClick={handleRestore} disabled={restoring}>
+              {restoring
+                ? t("common.loading") || "..."
+                : t("subscriptions.restore") || "Restore"}
+            </Button>
+          </Flex>
+        </Dialog.Content>
+      </Dialog.Root>
     </Flex>
   );
 };

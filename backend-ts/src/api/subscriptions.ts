@@ -28,8 +28,10 @@ async function fetchSubscription(
 }
 
 // GET /api/v1/subscriptions - List all subscriptions for user
+// ?include_archived=true to include archived (paused) subscriptions
 app.get("/", async (c) => {
   const userId = c.get("userId");
+  const includeArchived = c.req.query("include_archived") === "true";
 
   try {
     const { results } = await c.env.DB.prepare(
@@ -39,7 +41,8 @@ app.get("/", async (c) => {
       FROM subscriptions s
       LEFT JOIN categories c ON s.category_id = c.id
       WHERE s.user_id = ?
-      ORDER BY s.end_date ASC`
+        ${includeArchived ? "" : "AND s.archived_at IS NULL"}
+      ORDER BY s.archived_at IS NOT NULL, s.end_date ASC`
     )
       .bind(userId)
       .all<Subscription & { category_name: string | null }>();
@@ -158,6 +161,13 @@ app.post("/:id/renew", async (c) => {
 
     if (!subscription) {
       return c.json({ error: "Subscription not found" }, 404);
+    }
+
+    if (subscription.archived_at) {
+      return c.json(
+        { error: "Cannot renew an archived subscription. Restore it first." },
+        400
+      );
     }
 
     const amount = body.amount !== undefined ? body.amount : subscription.amount;
@@ -376,6 +386,78 @@ app.put("/:id", async (c) => {
     }
     console.error("Error updating subscription:", error);
     return c.json({ error: "Failed to update subscription" }, 500);
+  }
+});
+
+// POST /api/v1/subscriptions/:id/archive - Archive (pause) a subscription without deleting
+app.post("/:id/archive", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const userId = c.get("userId");
+
+  try {
+    const result = await c.env.DB.prepare(
+      "UPDATE subscriptions SET archived_at = ? WHERE id = ? AND user_id = ? RETURNING id"
+    )
+      .bind(new Date().toISOString(), id, userId)
+      .first();
+
+    if (!result) {
+      return c.json({ error: "Subscription not found" }, 404);
+    }
+
+    const full = await fetchSubscription(c.env.DB, id, userId);
+    return c.json(full);
+  } catch (error) {
+    console.error("Error archiving subscription:", error);
+    return c.json({ error: "Failed to archive subscription" }, 500);
+  }
+});
+
+// POST /api/v1/subscriptions/:id/restore - Restore an archived subscription with a new end date
+app.post("/:id/restore", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const userId = c.get("userId");
+
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      end_date?: string;
+      cycle?: number;
+    };
+    const { end_date, cycle } = body;
+
+    if (!end_date || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
+      return c.json(
+        { error: "end_date is required and must be in YYYY-MM-DD format" },
+        400
+      );
+    }
+    if (cycle !== undefined && (typeof cycle !== "number" || cycle < 1)) {
+      return c.json({ error: "cycle must be at least 1 day" }, 400);
+    }
+
+    // Only archived subscriptions can be restored
+    const existing = await c.env.DB.prepare(
+      "SELECT id FROM subscriptions WHERE id = ? AND user_id = ? AND archived_at IS NOT NULL"
+    )
+      .bind(id, userId)
+      .first();
+    if (!existing) {
+      return c.json({ error: "Subscription not found or not archived" }, 404);
+    }
+
+    await c.env.DB.prepare(
+      `UPDATE subscriptions
+       SET end_date = ?, cycle = COALESCE(?, cycle), archived_at = NULL
+       WHERE id = ? AND user_id = ?`
+    )
+      .bind(end_date, cycle ?? null, id, userId)
+      .run();
+
+    const full = await fetchSubscription(c.env.DB, id, userId);
+    return c.json(full);
+  } catch (error) {
+    console.error("Error restoring subscription:", error);
+    return c.json({ error: "Failed to restore subscription" }, 500);
   }
 });
 

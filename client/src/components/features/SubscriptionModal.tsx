@@ -13,6 +13,7 @@ interface SubscriptionModalProps {
   editingId: number | null;
   initialValues?: {
     name?: string;
+    icon?: string | null;
     end_date?: string;
     cycle?: number;
     amount?: number;
@@ -34,6 +35,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [categories, setCategories] = useState<Category[]>([]);
 
   const [name, setName] = useState("");
+  const [icon, setIcon] = useState("");
   const [endDate, setEndDate] = useState("");
   const [cycle, setCycle] = useState("30");
   const [amount, setAmount] = useState("0");
@@ -58,6 +60,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     if (visible) {
       if (initialValues) {
         setName(initialValues.name ?? "");
+        setIcon(initialValues.icon ?? "");
         setEndDate(initialValues.end_date ?? "");
         setCycle(String(initialValues.cycle ?? 30));
         setAmount(String(initialValues.amount ?? 0));
@@ -65,6 +68,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         setCategoryId(initialValues.category_id ?? null);
       } else {
         setName("");
+        setIcon("");
         setEndDate("");
         setCycle("30");
         setAmount("0");
@@ -82,6 +86,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     try {
       const data = {
         name: name.trim(),
+        icon: icon.trim() || null,
         end_date: endDate,
         cycle: Number(cycle) || 30,
         amount: Number(amount) || 0,
@@ -141,6 +146,17 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               placeholder={t("subscriptions.namePlaceholder") || "e.g., Netflix, Spotify"}
               value={name}
               onChange={(e) => setName((e.target as HTMLInputElement).value)}
+            />
+          </label>
+
+          <label>
+            <Text as="div" size="2" mb="1" weight="medium">
+              {t("subscriptions.icon") || "Icon (optional)"}
+            </Text>
+            <TextField.Root
+              placeholder={t("subscriptions.iconPlaceholder") || "Emoji or image URL"}
+              value={icon}
+              onChange={(e) => setIcon((e.target as HTMLInputElement).value)}
             />
           </label>
 
