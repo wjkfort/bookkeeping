@@ -1,13 +1,6 @@
 /* Dashboard Styles */
 
-/* Hero Stats */
-.hero-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 24px;
-    margin-bottom: 8px;
-}
-
+/* Stat cards */
 .stat-card {
     position: relative;
     padding: 28px;
@@ -50,6 +43,10 @@
 }
 .stat-expense::before { background: var(--tomato-9); }
 .stat-expense .stat-icon { color: var(--tomato-9); }
+/* Keep the figure from jittering horizontally when the month changes. */
+.stat-expense .rt-Heading {
+    font-variant-numeric: tabular-nums;
+}
 
 .stat-balance {
     background: var(--indigo-3);
@@ -71,14 +68,24 @@
     flex-shrink: 0;
 }
 
-/* Charts */
-.charts-row {
+/* Spending card: total expense (left) + category breakdown (right).
+   This class sits on an inner div, NOT on the Radix <Card> itself: `.rt-BaseCard
+   { display: block }` has the same specificity (one class) as `.spending-card`,
+   and the Radix stylesheet is bundled ahead of this file, so `display: grid` on
+   the Card loses the cascade and the two children stack full width. Wrapping is
+   deliberate — please keep it that way rather than adding !important. */
+.spending-card {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 16px;
+    grid-template-columns: minmax(200px, 260px) 1fr;
+    gap: 24px;
+    align-items: center;
 }
 
-.chart-card {
+.spending-left {
+    min-width: 0;
+}
+
+.spending-right {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -267,15 +274,13 @@
 
 /* Responsive */
 @media (max-width: 900px) {
-    .charts-row {
+    .spending-card {
         grid-template-columns: 1fr;
+        align-items: stretch;
     }
 }
 
 @media (max-width: 768px) {
-    .hero-stats {
-        grid-template-columns: 1fr;
-    }
     .stat-card {
         padding: 24px;
     }
