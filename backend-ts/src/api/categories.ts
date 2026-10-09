@@ -190,6 +190,22 @@ app.delete('/:id', async (c) => {
   const userId = c.get('userId');
   
   try {
+    // v2 changed this foreign key from ON DELETE CASCADE to RESTRICT, so
+    // deleting a category no longer silently destroys its transactions. Report
+    // the conflict instead of letting the constraint surface as a 500.
+    const inUse = await c.env.DB.prepare(
+      `SELECT COUNT(*) as count FROM transactions
+       WHERE category_id = ? AND user_id = ?`
+    ).bind(id, userId).first<{ count: number }>();
+
+    if (inUse && inUse.count > 0) {
+      return c.json({
+        error: 'Category still has transactions',
+        code: 'CATEGORY_IN_USE',
+        transaction_count: inUse.count,
+      }, 409);
+    }
+
     const result = await c.env.DB.prepare(
       'DELETE FROM categories WHERE id = ? AND user_id = ? RETURNING id'
     ).bind(id, userId).first();
@@ -199,7 +215,15 @@ app.delete('/:id', async (c) => {
     }
 
     return c.json({ message: 'Category deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    // A child category can still reference transactions, which blocks the
+    // parent's cascade. Same conflict, different path.
+    if (error?.message?.includes('FOREIGN KEY constraint')) {
+      return c.json({
+        error: 'Category still has transactions',
+        code: 'CATEGORY_IN_USE',
+      }, 409);
+    }
     return c.json({ error: 'Failed to delete category' }, 500);
   }
 });

@@ -11,6 +11,7 @@ import authRouter from "./api/auth";
 import { authMiddleware } from "./middleware/auth";
 import subscriptionsRouter from "./api/subscriptions";
 import proxyRouter from "./api/proxy";
+import pricesRouter from "./api/prices";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -61,6 +62,15 @@ api.use("/items", authMiddleware);
 api.use("/items/*", authMiddleware);
 api.use("/subscriptions", authMiddleware);
 api.use("/subscriptions/*", authMiddleware);
+api.use("/prices", authMiddleware);
+api.use("/prices/*", authMiddleware);
+// These two were reachable without a token, which let anyone spend the
+// exchange-rate quota and use the translation proxy. Both are only called from
+// pages behind ProtectedRoute, so requiring auth changes nothing for the client.
+api.use("/exchange-rates", authMiddleware);
+api.use("/exchange-rates/*", authMiddleware);
+api.use("/translate", authMiddleware);
+api.use("/translate/*", authMiddleware);
 
 api.route("/categories", categoriesRouter);
 api.route("/transactions", transactionsRouter);
@@ -69,6 +79,7 @@ api.route("/exchange-rates", exchangeRatesRouter);
 api.route("/translate", translateRouter);
 api.route("/items", itemsRouter);
 api.route("/subscriptions", subscriptionsRouter);
+api.route("/prices", pricesRouter);
 
 app.route("/api/v1", api);
 

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "test": "bash scripts/check.sh",
+    "test:full": "bash scripts/check.sh /tmp/prod-fixtures/prod-v1.sqlite /tmp/prod-fixtures/prod-v2.sqlite",
     "db:schema:local": "wrangler d1 execute bookkeeping-db --local --file=./db/schema.sql",
     "db:schema:remote": "wrangler d1 execute bookkeeping-db --remote --file=./db/schema.sql"
   },

@@ -1,17 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Flex, Tabs, IconButton, Text, Heading, Separator } from "@radix-ui/themes";
-import {
-  DashboardIcon,
-  ListBulletIcon,
-  MixerHorizontalIcon,
-  ArchiveIcon,
-  ExitIcon,
-} from "@radix-ui/react-icons";
+import { DashboardIcon, ExitIcon } from "@radix-ui/react-icons";
 import Dashboard from "./components/features/Dashboard";
-import Transactions from "./components/features/Transactions";
-import Categories from "./components/features/Categories";
-import Items from "./components/features/Items";
 
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
@@ -19,12 +10,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LanguageSwitcher from "./components/ui/LanguageSwitcher";
 import { useAuth } from "./contexts/AuthContext";
 
-const navItems = [
-  { path: "/", icon: DashboardIcon },
-  { path: "/transactions", icon: ListBulletIcon },
-  { path: "/categories", icon: MixerHorizontalIcon },
-  { path: "/items", icon: ArchiveIcon },
-] as const;
+const navItems = [{ path: "/", icon: DashboardIcon }] as const;
 
 function AppContent() {
   const { t } = useTranslation();
@@ -85,11 +71,7 @@ function AppContent() {
                   {navItems.map((item) => (
                     <Tabs.Trigger
                       key={item.path}
-                      value={
-                        item.path === "/"
-                          ? "dashboard"
-                          : item.path.replace("/", "")
-                      }
+                      value={item.path.replace("/", "") || "dashboard"}
                       asChild
                     >
                       <Link to={item.path}>
@@ -124,31 +106,10 @@ function AppContent() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/transactions"
-              element={
-                <ProtectedRoute>
-                  <Transactions />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/categories"
-              element={
-                <ProtectedRoute>
-                  <Categories />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/items"
-              element={
-                <ProtectedRoute>
-                  <Items />
-                </ProtectedRoute>
-              }
-            />
-
+            {/* The app is homepage-only now. A bookmark or link to a page that
+                was removed must land on the dashboard instead of rendering the
+                shell with no route matched. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
       </Flex>
     </Flex>

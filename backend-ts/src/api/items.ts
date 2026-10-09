@@ -1,7 +1,68 @@
 import { Hono } from 'hono';
-import type { Env, HonoVariables, Item, ItemWithStats, Transaction } from '../types';
+import type { Env, HonoVariables, Item, ItemWithStats, Transaction, TransactionRow } from '../types';
+import { toAmount } from '../utils/money';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
+
+/** `items?with_stats=true` row: money still in cents, the rest already shaped. */
+interface ItemStatsRow {
+  id: number;
+  user_id: number;
+  name: string;
+  created_at: string;
+  total_purchases: number;
+  total_spent_cents: number | null;
+  average_price_cents: number | null;
+  last_purchase_date: string | null;
+  last_unit_price_cents: number | null;
+  average_unit_price_cents: number | null;
+  total_quantity: number | null;
+  unit: string | null;
+}
+
+function toItemWithStats(row: ItemStatsRow): ItemWithStats {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    created_at: row.created_at,
+    total_purchases: row.total_purchases,
+    total_spent: toAmount(row.total_spent_cents) ?? 0,
+    average_price: toAmount(row.average_price_cents) ?? 0,
+    last_purchase_date: row.last_purchase_date as string,
+    last_unit_price: toAmount(row.last_unit_price_cents),
+    average_unit_price: toAmount(row.average_unit_price_cents),
+    total_quantity: row.total_quantity,
+    unit: row.unit,
+  };
+}
+
+/** A history row: a transaction plus the price observation it carried. */
+interface TxHistoryRow extends TransactionRow {
+  item_name: string | null;
+  item_id: number | null;
+  unit_price_cents: number | null;
+  quantity: number | null;
+  unit: string | null;
+}
+
+function toHistoryTransaction(row: TxHistoryRow): Transaction {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    amount: row.amount_cents / 100,
+    currency: row.currency,
+    description: row.description,
+    date: row.date,
+    category_id: row.category_id,
+    item_id: row.item_id,
+    unit_price: toAmount(row.unit_price_cents),
+    quantity: row.quantity,
+    unit: row.unit,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
 
 // GET /api/v1/items - List all items with optional stats
 app.get('/', async (c) => {
@@ -10,7 +71,9 @@ app.get('/', async (c) => {
   
   try {
     if (withStats) {
-      // Get items with purchase statistics
+      // Item/price data lives in item_prices in v2. `total_spent` and
+      // `average_price` remain transaction-amount figures, so they are summed
+      // in cents here and converted once at the boundary.
       const { results } = await c.env.DB.prepare(`
         SELECT 
           i.id,
@@ -18,21 +81,22 @@ app.get('/', async (c) => {
           i.name,
           i.created_at,
           COUNT(t.id) as total_purchases,
-          SUM(t.amount) as total_spent,
-          AVG(t.amount) as average_price,
+          SUM(t.amount_cents) as total_spent_cents,
+          AVG(t.amount_cents) as average_price_cents,
           MAX(t.date) as last_purchase_date,
-          (SELECT t2.unit_price FROM transactions t2 WHERE t2.item_id = i.id AND t2.user_id = i.user_id AND t2.unit_price IS NOT NULL ORDER BY t2.date DESC, t2.created_at DESC LIMIT 1) as last_unit_price,
-          AVG(CASE WHEN t.unit_price IS NOT NULL THEN t.unit_price ELSE NULL END) as average_unit_price,
-          SUM(CASE WHEN t.quantity IS NOT NULL THEN t.quantity ELSE 0 END) as total_quantity,
-          (SELECT t3.unit FROM transactions t3 WHERE t3.item_id = i.id AND t3.user_id = i.user_id AND t3.unit IS NOT NULL ORDER BY t3.date DESC, t3.created_at DESC LIMIT 1) as unit
+          (SELECT ip2.unit_price_cents FROM item_prices ip2 WHERE ip2.item_id = i.id AND ip2.user_id = i.user_id AND ip2.unit_price_cents IS NOT NULL ORDER BY ip2.observed_on DESC, ip2.created_at DESC LIMIT 1) as last_unit_price_cents,
+          AVG(CASE WHEN ip.unit_price_cents IS NOT NULL THEN ip.unit_price_cents ELSE NULL END) as average_unit_price_cents,
+          SUM(CASE WHEN ip.quantity IS NOT NULL THEN ip.quantity ELSE 0 END) as total_quantity,
+          (SELECT ip3.unit FROM item_prices ip3 WHERE ip3.item_id = i.id AND ip3.user_id = i.user_id AND ip3.unit IS NOT NULL ORDER BY ip3.observed_on DESC, ip3.created_at DESC LIMIT 1) as unit
         FROM items i
-        LEFT JOIN transactions t ON t.item_id = i.id AND t.user_id = i.user_id
+        LEFT JOIN item_prices ip ON ip.item_id = i.id
+        LEFT JOIN transactions t ON t.id = ip.transaction_id AND t.user_id = i.user_id
         WHERE i.user_id = ?
         GROUP BY i.id
         ORDER BY last_purchase_date DESC, i.name ASC
-      `).bind(userId).all<ItemWithStats>();
+      `).bind(userId).all<ItemStatsRow>();
       
-      return c.json(results);
+      return c.json(results.map(toItemWithStats));
     } else {
       // Get simple item list
       const { results } = await c.env.DB.prepare(
@@ -81,14 +145,26 @@ app.get('/:id/history', async (c) => {
       return c.json({ error: 'Item not found' }, 404);
     }
 
-    // Get all transactions for this item
-    const { results: transactions } = await c.env.DB.prepare(
-      'SELECT * FROM transactions WHERE item_id = ? AND user_id = ? ORDER BY date DESC, created_at DESC'
-    ).bind(id, userId).all<Transaction>();
+    // Purchase history comes from the item's price observations, joined to the
+    // transaction they came from. Ordered newest first, as before.
+    const { results: rows } = await c.env.DB.prepare(
+      `SELECT t.*, ip.item_id as item_id, ip.unit_price_cents as unit_price_cents,
+              ip.quantity as quantity, ip.unit as unit, i.name as item_name
+       FROM item_prices ip
+       JOIN transactions t ON t.id = ip.transaction_id
+       LEFT JOIN items i ON i.id = ip.item_id AND i.user_id = ip.user_id
+       WHERE ip.item_id = ? AND t.user_id = ?
+       ORDER BY t.date DESC, t.created_at DESC`
+    ).bind(id, userId).all<TxHistoryRow>();
 
-    // Calculate statistics
+    const transactions = rows.map(toHistoryTransaction);
+
+    // Calculate statistics. Note `unit` is taken from the newest row that HAS a
+    // unit, not simply the newest row: a later purchase can record no unit, and
+    // v1 filtered those out with `unit IS NOT NULL`. Same for the price fields.
     const transactionsWithUnitPrice = transactions.filter(t => t.unit_price !== null);
     const transactionsWithQuantity = transactions.filter(t => t.quantity !== null);
+    const transactionsWithUnit = transactions.filter(t => t.unit !== null);
     
     const stats = {
       total_purchases: transactions.length,
@@ -103,7 +179,7 @@ app.get('/:id/history', async (c) => {
         ? transactionsWithUnitPrice.reduce((sum, t) => sum + (t.unit_price || 0), 0) / transactionsWithUnitPrice.length
         : null,
       total_quantity: transactionsWithQuantity.reduce((sum, t) => sum + (t.quantity || 0), 0),
-      unit: transactionsWithUnitPrice.length > 0 ? transactionsWithUnitPrice[0].unit : null,
+      unit: transactionsWithUnit.length > 0 ? transactionsWithUnit[0].unit : null,
     };
 
     return c.json({

@@ -41,8 +41,62 @@ export interface Transaction {
   item?: Item;
 }
 
-export interface ExchangeRate {
+/**
+ * A `transactions` row as stored in schema v2. Money is integer cents; the
+ * item columns moved to `item_prices`. Handlers read this shape, convert at the
+ * boundary, and return `Transaction` — the wire format stays decimal.
+ */
+export interface TransactionRow {
   id: number;
+  user_id: number;
+  category_id: number;
+  amount_cents: number;
+  currency: string;
+  date: string;
+  description: string | null;
+  subscription_id: number | null;
+  source: "manual" | "ai";
+  created_at: string;
+  updated_at: string;
+}
+
+/** Item/price columns the transaction list joins in from `item_prices`. */
+export interface TransactionPriceFields {
+  item_id: number | null;
+  unit_price_cents: number | null;
+  quantity: number | null;
+  unit: string | null;
+}
+
+/**
+ * A transaction as the API returns it: the fields above plus the joined item
+ * name. Kept identical to the pre-v2 response shape on purpose.
+ *
+ * `item_name` is deliberately `string | null` rather than optional: the v1
+ * handler selected `i.name as item_name` unconditionally, so the key was
+ * always present and serialised as null when the item was absent.
+ */
+export interface TransactionWithItemName extends Transaction {
+  item_name: string | null;
+}
+
+/** A row of `item_prices`: one observed price, optionally from a transaction. */
+export interface ItemPrice {
+  id: number;
+  user_id: number;
+  item_id: number;
+  transaction_id: number | null;
+  unit_price_cents: number;
+  quantity: number | null;
+  unit: string | null;
+  currency: string;
+  merchant: string | null;
+  observed_on: string;
+  created_at: string;
+}
+
+/** One row per currency pair in v2 (composite PK, no surrogate id). */
+export interface ExchangeRate {
   base_currency: string;
   target_currency: string;
   rate: number;
@@ -190,5 +244,24 @@ export interface Subscription {
   category_name?: string | null;
   last_renewed_at?: string | null;
   archived_at?: string | null;
+  created_at: string;
+}
+
+/**
+ * A `subscriptions` row as stored in v2: money is integer cents, `cycle` was
+ * renamed `cycle_days`, and `last_renewed_at` was dropped (it is MAX(date) over
+ * the subscription's renewal transactions).
+ */
+export interface SubscriptionRow {
+  id: number;
+  user_id: number;
+  name: string;
+  icon: string | null;
+  amount_cents: number;
+  currency: string;
+  cycle_days: number;
+  end_date: string;
+  category_id: number | null;
+  archived_at: string | null;
   created_at: string;
 }

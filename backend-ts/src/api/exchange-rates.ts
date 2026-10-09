@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env, ExchangeRatesResponse, ConvertCurrencyRequest } from '../types';
 import { getExchangeRate, fetchAndCacheRates } from '../utils/currency';
+import { roundMoney } from '../utils/money';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -35,7 +36,7 @@ app.get('/convert', async (c) => {
 
   try {
     const rate = await getExchangeRate(c.env, from_currency, to_currency);
-    const converted_amount = Math.round(amount * rate * 100) / 100;
+    const converted_amount = roundMoney(amount * rate);
     
     return c.json({
       amount,

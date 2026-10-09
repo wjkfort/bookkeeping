@@ -175,7 +175,15 @@ const Categories: React.FC = () => {
       loadCategories();
     } catch (error) {
       console.error('Error deleting category:', error);
-      toast.error(t('categories.errorDeleting'));
+      // The backend now refuses to delete a category that still has
+      // transactions (it used to delete them along with it) and says how many.
+      const data = (error as { response?: { data?: { code?: string; transaction_count?: number } } })
+        ?.response?.data;
+      if (data?.code === 'CATEGORY_IN_USE') {
+        toast.error(t('categories.errorInUse', { count: data.transaction_count ?? 0 }));
+      } else {
+        toast.error(t('categories.errorDeleting'));
+      }
     }
   };
 

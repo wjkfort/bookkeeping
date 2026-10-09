@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env, HonoVariables, Summary, MonthlySummary, CategorySummary } from '../types';
 import { getExchangeRate } from '../utils/currency';
 import { getAllSubcategoryIds } from '../utils/categories';
+import { centsToAmount, roundMoney } from '../utils/money';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -15,7 +16,7 @@ app.get('/', async (c) => {
   try {
     let query = `
       SELECT
-        t.amount,
+        t.amount_cents,
         t.currency,
         c.type
       FROM transactions t
@@ -36,7 +37,7 @@ app.get('/', async (c) => {
 
     const stmt = c.env.DB.prepare(query);
     const { results } = await stmt.bind(...params).all<{
-      amount: number;
+      amount_cents: number;
       currency: string;
       type: string;
     }>();
@@ -45,7 +46,7 @@ app.get('/', async (c) => {
     let total_expense = 0;
 
     for (const row of results) {
-      let amount = row.amount;
+      let amount = centsToAmount(row.amount_cents);
 
       if (row.currency !== target_currency) {
         const rate = await getExchangeRate(c.env, row.currency, target_currency);
@@ -60,9 +61,9 @@ app.get('/', async (c) => {
     }
 
     const summary: Summary = {
-      total_income: Math.round(total_income * 100) / 100,
-      total_expense: Math.round(total_expense * 100) / 100,
-      balance: Math.round((total_income - total_expense) * 100) / 100,
+      total_income: roundMoney(total_income),
+      total_expense: roundMoney(total_expense),
+      balance: roundMoney(total_income - total_expense),
       currency: target_currency,
     };
 
@@ -90,7 +91,7 @@ app.get('/monthly', async (c) => {
     let query = `
       SELECT
         strftime('%Y-%m', t.date) as month,
-        t.amount,
+        t.amount_cents,
         t.currency,
         c.type
       FROM transactions t
@@ -122,7 +123,7 @@ app.get('/monthly', async (c) => {
 
     const { results } = await c.env.DB.prepare(query)
       .bind(...params)
-      .all<{ month: string; amount: number; currency: string; type: string }>();
+      .all<{ month: string; amount_cents: number; currency: string; type: string }>();
 
     const byMonth = new Map<string, { income: number; expense: number }>();
 
@@ -134,7 +135,7 @@ app.get('/monthly', async (c) => {
     }
 
     for (const row of results) {
-      let amount = row.amount;
+      let amount = centsToAmount(row.amount_cents);
       if (row.currency !== target_currency) {
         const rate = await getExchangeRate(c.env, row.currency, target_currency);
         amount = amount * rate;
@@ -149,9 +150,9 @@ app.get('/monthly', async (c) => {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, v]) => ({
         month,
-        income: Math.round(v.income * 100) / 100,
-        expense: Math.round(v.expense * 100) / 100,
-        net: Math.round((v.income - v.expense) * 100) / 100,
+        income: roundMoney(v.income),
+        expense: roundMoney(v.expense),
+        net: roundMoney(v.income - v.expense),
       }));
 
     return c.json({ currency: target_currency, months: data });
@@ -180,7 +181,7 @@ app.get('/by-category', async (c) => {
         p.id as parent_category_id,
         p.name as parent_name,
         p.translations as parent_translations,
-        t.amount,
+        t.amount_cents,
         t.currency
       FROM transactions t
       JOIN categories c ON t.category_id = c.id
@@ -208,7 +209,7 @@ app.get('/by-category', async (c) => {
         parent_category_id: number | null;
         parent_name: string | null;
         parent_translations: string | null;
-        amount: number;
+        amount_cents: number;
         currency: string;
       }>();
 
@@ -233,7 +234,7 @@ app.get('/by-category', async (c) => {
     >();
 
     for (const row of results) {
-      let amount = row.amount;
+      let amount = centsToAmount(row.amount_cents);
       if (row.currency !== target_currency) {
         const rate = await getExchangeRate(c.env, row.currency, target_currency);
         amount = amount * rate;
@@ -269,13 +270,13 @@ app.get('/by-category', async (c) => {
         category_id: b.category_id,
         name: b.name,
         parent_id: b.parent_id,
-        amount: Math.round(b.amount * 100) / 100,
+        amount: roundMoney(b.amount),
         pct: total > 0 ? Math.round((b.amount / total) * 1000) / 10 : 0,
         translations: b.translations,
       }))
       .sort((a, b) => b.amount - a.amount);
 
-    return c.json({ currency: target_currency, total: Math.round(total * 100) / 100, categories: data });
+    return c.json({ currency: target_currency, total: roundMoney(total), categories: data });
   } catch (error) {
     console.error('Category summary error:', error);
     return c.json({ error: 'Failed to calculate category summary' }, 500);

@@ -1,4 +1,5 @@
 import type { Env, ExchangeRate } from '../types';
+import { roundMoney } from './money';
 
 const CACHE_HOURS = 24;
 
@@ -13,16 +14,19 @@ export async function fetchAndCacheRates(
   const cacheHours = parseInt(env.EXCHANGE_RATE_CACHE_HOURS || '24');
   const cacheExpiry = new Date(Date.now() - cacheHours * 60 * 60 * 1000).toISOString();
 
-  // Check cache first (unless force refresh)
+  // Check cache first (unless force refresh). v2 keeps one row per pair, so
+  // freshness is a property of the stored row's fetched_at rather than a
+  // filter that selects the newest of many.
   if (!forceRefresh) {
     const cached = await env.DB.prepare(
-      `SELECT target_currency, rate FROM exchange_rates 
-       WHERE base_currency = ? AND fetched_at > ?`
-    ).bind(base, cacheExpiry).all<{ target_currency: string; rate: number }>();
+      `SELECT target_currency, rate, fetched_at FROM exchange_rates 
+       WHERE base_currency = ?`
+    ).bind(base).all<{ target_currency: string; rate: number; fetched_at: string }>();
 
-    if (cached.results.length > 0) {
+    const fresh = cached.results.filter(row => row.fetched_at > cacheExpiry);
+    if (fresh.length > 0) {
       const rates: Record<string, number> = {};
-      cached.results.forEach(row => {
+      fresh.forEach(row => {
         rates[row.target_currency] = row.rate;
       });
       return rates;
@@ -45,14 +49,19 @@ export async function fetchAndCacheRates(
   const data = await response.json<{ rates: Record<string, number> }>();
   const rates = data.rates;
 
-  // Cache the rates
+  // Cache the rates: one row per pair, refreshed in place. v2 makes
+  // (base_currency, target_currency) the primary key, so a plain INSERT would
+  // abort on the second fetch with a constraint error.
   const now = new Date().toISOString();
   const batch = [];
 
   for (const [currency, rate] of Object.entries(rates)) {
     batch.push(
       env.DB.prepare(
-        'INSERT INTO exchange_rates (base_currency, target_currency, rate, fetched_at) VALUES (?, ?, ?, ?)'
+        `INSERT INTO exchange_rates (base_currency, target_currency, rate, fetched_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (base_currency, target_currency)
+         DO UPDATE SET rate = excluded.rate, fetched_at = excluded.fetched_at`
       ).bind(base, currency, rate, now)
     );
   }
@@ -105,5 +114,5 @@ export async function convertCurrency(
   toCurrency: string
 ): Promise<number> {
   const rate = await getExchangeRate(env, fromCurrency, toCurrency);
-  return Math.round(amount * rate * 100) / 100;
+  return roundMoney(amount * rate);
 }

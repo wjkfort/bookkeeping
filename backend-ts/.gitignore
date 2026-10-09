@@ -1,6 +1,11 @@
 node_modules
 dist
 .wrangler
+# Separate local D1 directory holding the migrated (v2) copy, used to develop
+# against the new schema. Built by scripts/build_local_v2.py. Contains real data.
+.wrangler-v2
+.wrangler-home
+scripts/.build
 .dev.vars
 *.log
 .DS_Store
@@ -9,3 +14,8 @@ dist
 prod-backup.sql
 prod-backup-*.sql
 *.sql.backup
+
+# API captures: real endpoint payloads, including user emails and transaction
+# descriptions. Regenerate locally rather than committing.
+scripts/baseline/*.json
+capture-*.json
