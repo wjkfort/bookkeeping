@@ -131,11 +131,17 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
     PRIMARY KEY (base_currency, target_currency)
 ) WITHOUT ROWID;
 
--- AI: one continuous conversation per user. Token counts live here, so no
--- separate usage table is needed; daily caps are SUM(tokens_*) over a day.
+-- AI: one row per conversational turn, grouped into conversations by
+-- `session_id`. The model is only ever shown the current session's turns, so a
+-- new conversation starts clean while older ones stay on disk for cost
+-- accounting and a future history view. Token counts live here, so no separate
+-- usage table is needed; daily caps are SUM(tokens_*) over a day.
 CREATE TABLE IF NOT EXISTS ai_messages (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- Which conversation this turn belongs to. Existing rows predating
+    -- migration 005 were attributed to 'legacy'.
+    session_id TEXT NOT NULL DEFAULT 'default',
     role       TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'tool')),
     content    TEXT,   -- nullable: a tool-call turn has no text
     tool_calls TEXT,
@@ -180,5 +186,6 @@ CREATE INDEX IF NOT EXISTS idx_item_prices_merchant ON item_prices (merchant_id)
 CREATE INDEX IF NOT EXISTS idx_merchant_aliases_m   ON merchant_aliases (user_id, alias);
 CREATE INDEX IF NOT EXISTS idx_item_prices_tx          ON item_prices (transaction_id) WHERE transaction_id IS NOT NULL;
 -- chat window: latest N messages per user
-CREATE INDEX IF NOT EXISTS idx_ai_messages_user        ON ai_messages (user_id, id);
+-- chat window: latest N messages of ONE conversation, which is what is loaded
+CREATE INDEX IF NOT EXISTS idx_ai_messages_session     ON ai_messages (user_id, session_id, id);
 -- audit lookups: history of one row

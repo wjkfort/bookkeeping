@@ -1,5 +1,21 @@
 # Example .dev.vars file for local development
 # Copy this to .dev.vars and fill in your values
+#
+# .dev.vars is gitignored, so real keys never enter the repository.
 
 OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
 JWT_SECRET=YOUR_JWT_SECRET_HERE_CHANGE_ME
+
+# DeepSeek (R2). Every AI call happens server-side; this key never reaches the
+# browser and must never be put in `wrangler.toml` `[vars]`.
+#
+# In production it is a Worker secret:
+#   npx wrangler secret put DEEPSEEK_API_KEY
+#
+# Leave it unset and the app still works: `/ai/*` reports itself unavailable
+# (503) while every other feature keeps functioning (R6).
+DEEPSEEK_API_KEY=
+
+# Optional overrides; both have sensible defaults.
+# DEEPSEEK_BASE_URL=https://api.deepseek.com
+# DEEPSEEK_MODEL=deepseek-chat

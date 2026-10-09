@@ -381,5 +381,26 @@
     "loginLink": "立即登录",
     "success": "注册成功！",
     "error": "注册失败"
+  },
+  "assistant": {
+    "title": "助手",
+    "open": "打开助手",
+    "close": "关闭助手",
+    "placeholder": "说说你花了什么…",
+    "thinking": "思考中…",
+    "empty": "可以问花销，也可以直接说买了什么。",
+    "unavailableTitle": "助手不可用",
+    "unavailableBody": "服务端未配置 AI 密钥。其余功能不受影响。",
+    "errorTitle": "出了点问题",
+    "failed": "未记录",
+    "truncated": "助手提前停止，回复可能不完整。",
+    "reminders": "待补提醒",
+    "missingDay": "{{date}} 没有记录",
+    "overdue": "{{name}} 已于 {{date}} 到期",
+    "markNoSpend": "那天没花钱",
+    "markPartial": "只记了一部分",
+    "markedNoSpend": "{{date}} 已标记为无支出",
+    "markedPartial": "{{date}} 保持待补",
+    "writes": "已保存 {{count}} 项变更"
   }
 }

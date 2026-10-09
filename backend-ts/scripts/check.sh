@@ -75,15 +75,44 @@ fi
 # the staging directory on purpose: that database is the one a human is clicking
 # through, so transactions appear and disappear in it and every comparison
 # against a stored baseline would show spurious differences.
+#
+# They are DERIVED, not kept: `prod-backup-*.sql` is the single source of real
+# data in the repo and everything else is rebuilt from it, which is why they live
+# in /tmp. When they are absent this rebuilds them from the newest export, using
+# `setup_prod_staging.py` — the same script a human runs, and importantly one
+# that applies migrations/001 first. Building straight from the raw export
+# instead produces a database that is subtly wrong (the five unlinked priced rows
+# stay unlinked) and the money layer then reports four differences that look like
+# regressions. One definition of how the migrated database is produced, reused.
 V1="${1:-}"
 V2="${2:-}"
 STAGING_V1=/tmp/prod-staging/preflight-v1.sqlite
+
+if [ -z "$V1" ] && [ -z "$V2" ] && [ ! -f /tmp/prod-fixtures/prod-v2.sqlite ]; then
+  EXPORT=$(ls -t prod-backup-*.sql 2>/dev/null | head -1)
+  if [ -n "$EXPORT" ]; then
+    note "fixtures absent — rebuilding from $EXPORT"
+    if python3 -I scripts/setup_prod_staging.py "$EXPORT" >/tmp/check-fixtures.log 2>&1; then
+      ok "fixtures rebuilt"
+    else
+      bad "fixtures could not be rebuilt (see /tmp/check-fixtures.log)"
+    fi
+  fi
+fi
+
+# Adopt whatever fixtures exist. Setting V1/V2 here (rather than only at the
+# rebuild site) is what keeps the layers below running on every invocation
+# instead of only on the one that happened to rebuild.
+if [ -z "$V1" ] && [ -z "$V2" ] && [ -f /tmp/prod-fixtures/prod-v2.sqlite ]; then
+  V1=/tmp/prod-fixtures/prod-v1.sqlite
+  V2=/tmp/prod-fixtures/prod-v2.sqlite
+fi
 
 if [ -f "$STAGING_V1" ]; then
   run_layer "migration invariants: repaired staging database" \
     python3 -I scripts/verify_migration.py "$STAGING_V1"
 else
-  skip "migration invariants on a repaired database (run setup_prod_staging.py)"
+  skip "migration invariants on a repaired database (rebuild with scripts/setup_prod_staging.py)"
 fi
 
 # --------------------------------------------------------------- 3. write paths
@@ -125,6 +154,44 @@ then
   fi
 else
   bad "could not build a fresh database from db/schema.sql"
+fi
+
+# ------------------------------------------------------- 3b. service layer
+#
+# The handlers are thin adapters over src/services/, which is also what the AI
+# tools call. This suite drives the services directly, so it can assert things
+# the HTTP contract does not expose — notably `transactions.source` (the AI path
+# must record 'ai'; nothing checked that column before) and the merchant being
+# carried onto the price observation. It needs no fixtures, so it reuses $FRESH.
+note "service layer (src/services, the code the AI tools call)"
+if npx esbuild scripts/services_test.ts --bundle --platform=node --format=esm \
+    --outfile=scripts/.build/services_test.mjs --log-level=warning; then
+  if node scripts/.build/services_test.mjs "$FRESH" 2>&1 | grep -v Experimental | grep -v trace-warnings | tail -20; then
+    ok "service layer"
+  else
+    bad "service layer"
+  fi
+else
+  bad "service layer (esbuild)"
+fi
+
+# ------------------------------------------------------- 3c. AI endpoints over HTTP
+#
+# services_test.ts drives the service functions directly, so it cannot catch a
+# route that was never mounted, a path shadowed by another route, or an endpoint
+# reachable without a token. Those are precisely the failure modes of the
+# `api.route(...)` wiring, and the stored API-contract capture predates these
+# routes. This suite goes through the real app and auth middleware.
+note "AI support endpoints over HTTP (routing + auth)"
+if npx esbuild scripts/ai_endpoints_test.ts --bundle --platform=node --format=esm \
+    --outfile=scripts/.build/ai_endpoints_test.mjs --log-level=warning; then
+  if node scripts/.build/ai_endpoints_test.mjs "$FRESH" 2>&1 | grep -v Experimental | grep -v trace-warnings | tail -20; then
+    ok "AI support endpoints"
+  else
+    bad "AI support endpoints"
+  fi
+else
+  bad "AI support endpoints (esbuild)"
 fi
 
 # ------------------------------------------------------------ 4. money arithmetic

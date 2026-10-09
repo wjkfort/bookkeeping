@@ -11,9 +11,15 @@ database_id = "81d99dfc-618f-408f-8e28-d2752a807d45"
 # Environment variables
 [vars]
 EXCHANGE_RATE_CACHE_HOURS = "24"
+# DEEPSEEK_API_KEY deliberately does NOT belong here (R2): `[vars]` is committed.
+# Use a secret instead —
+#   npx wrangler secret put DEEPSEEK_API_KEY
+# Optional DEEPSEEK_BASE_URL / DEEPSEEK_MODEL are plain vars if you ever need to
+# override the defaults (https://api.deepseek.com, deepseek-chat).
 
-# Secrets (set via: wrangler secret put OPEN_EXCHANGE_RATES_API_KEY)
-# OPEN_EXCHANGE_RATES_API_KEY = "your_key_here"
+# Secrets (set via: wrangler secret put <NAME>)
+# OPEN_EXCHANGE_RATES_API_KEY
+# DEEPSEEK_API_KEY
 
 [observability]
 enabled = false

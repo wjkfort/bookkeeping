@@ -5,6 +5,32 @@ export interface Env {
   OPEN_EXCHANGE_RATES_API_KEY: string;
   EXCHANGE_RATE_CACHE_HOURS: string;
   JWT_SECRET: string;
+  /**
+   * DeepSeek API key, stored as a Worker secret (R2):
+   *   npx wrangler secret put DEEPSEEK_API_KEY
+   * It is never written to `wrangler.toml` `[vars]` and never reaches the
+   * browser. Missing means the AI endpoints report themselves unavailable and
+   * every other feature keeps working (R6).
+   */
+  DEEPSEEK_API_KEY?: string;
+  /** Defaults to https://api.deepseek.com. */
+  DEEPSEEK_BASE_URL?: string;
+  /** Defaults to deepseek-chat. */
+  DEEPSEEK_MODEL?: string;
+}
+
+/** One turn of the stored conversation. `content` is null on a tool-call turn. */
+export interface AiMessage {
+  id: number;
+  user_id: number;
+  /** Which conversation this turn belongs to (migration 005). */
+  session_id: string;
+  role: 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  created_at: string;
 }
 
 export interface Category {
@@ -88,9 +114,15 @@ export interface ItemPrice {
   transaction_id: number | null;
   unit_price_cents: number;
   quantity: number | null;
+  /** A `units.code`, or null when the user's wording mapped to nothing. */
   unit: string | null;
+  /** The wording the user actually used, e.g. "个". Kept even when `unit` is set. */
+  unit_raw: string | null;
   currency: string;
+  /** Raw shop text as heard; kept even when `merchant_id` resolved. */
   merchant: string | null;
+  /** The resolved merchant entity (migration 004). */
+  merchant_id: number | null;
   observed_on: string;
   created_at: string;
 }

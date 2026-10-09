@@ -61,30 +61,49 @@ this directory:
 #    unit_price still having a price, FK integrity, and that new constraints bite.
 python3 -I scripts/verify_migration.py prod-backup-<date>.sql
 
-# 2. Build a local migrated database to develop against, kept separate from the
-#    v1 state in .wrangler/ so both remain available.
-python3 -I scripts/build_local_v2.py              # from the local v1 clone
-python3 -I scripts/build_local_v2.py --empty      # schema.sql only, fresh install
+# 2. Build the local database to develop against. There is only one now — the
+#    migrated (v2) schema — and it lives where wrangler looks by default, so no
+#    --persist-to flag is needed anywhere. `db:rebuild` takes the newest
+#    prod-backup-*.sql and runs the whole chain including the 001 preflight
+#    repair, so the result is what the verifier checked in step 1.
+npm run db:rebuild
+npx wrangler dev       # or: npm run dev
 
-# 3. Capture what the real handlers return. It imports the Hono app and shims D1
-#    over node:sqlite, so it needs no server. JWT_SECRET comes from .dev.vars and
-#    tokens are minted locally, so no login is needed. Outbound network is
-#    answered from a fixed rate payload so captures are deterministic.
+#    Nothing here is irreplaceable: rebuilding from the same export reproduces
+#    the same database. The /tmp fixtures the harness uses are rebuilt on demand
+#    by `npm run test`, so they need not be kept either.
+
+# 3. Run the whole harness — typecheck, migration invariants, write paths, the
+#    service layer, the AI endpoints, money arithmetic, and the API contract.
+#    See scripts/check.sh for what each layer guards.
+npm run test
+
+#    The API-contract baseline inside that harness is a capture of the OLD (v1)
+#    code against an un-repaired v1 database. It cannot be regenerated — that
+#    code is gone — so it is only ever compared against, never rebuilt.
+#    Differences it reports are either failures or entries listed in
+#    scripts/api_diff.py's ACCEPTED_DIFFS.
+
+# 4. (Only if you want a capture in hand.) The capture imports the Hono app and
+#    shims D1 over node:sqlite, so it needs no server. JWT_SECRET comes from
+#    .dev.vars and tokens are minted locally, so no login is needed.
 npx esbuild scripts/api_capture.ts --bundle --platform=node --format=esm \
   --outfile=scripts/.build/api_capture.mjs
-node scripts/.build/api_capture.mjs .wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite > /tmp/baseline.json
-node scripts/.build/api_capture.mjs .wrangler-v2/state/v3/d1/miniflare-D1DatabaseObject/bookkeeping-v2.sqlite > /tmp/candidate.json
+node scripts/.build/api_capture.mjs \
+  "$(ls .wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite | grep -v metadata | head -1)" \
+  > /tmp/candidate.json
 
-# 4. Compare. Money and status changes are failures; price fields going from
-#    null to a value are the expected §3.3 enrichment and are reported apart.
-python3 -I scripts/api_diff.py /tmp/baseline.json /tmp/candidate.json
+# 5. Compare a capture against the stored baseline. Money and status changes are
+#    failures; price fields going from null to a value are the expected §3.3
+#    enrichment and are reported apart.
+python3 -I scripts/api_diff.py scripts/baseline/api-contract-baseline.json /tmp/candidate.json
 
 # 5. Write paths. The capture above only reads; this creates, updates and
 #    deletes transactions against a COPY of the given database and checks the
 #    item_prices bookkeeping each path is responsible for.
 npx esbuild scripts/api_write_test.ts --bundle --platform=node --format=esm \
   --outfile=scripts/.build/api_write_test.mjs
-node scripts/.build/api_write_test.mjs .wrangler-v2/state/v3/d1/miniflare-D1DatabaseObject/bookkeeping-v2.sqlite
+node scripts/.build/api_write_test.mjs "$V2DB"
 ```
 
 Run every layer at once, against fixtures built from a real export:

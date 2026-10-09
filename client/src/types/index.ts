@@ -153,3 +153,65 @@ export interface Subscription {
   archived_at?: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------- AI layer
+
+/** One stored turn. `content` is null on a turn that only requested tools. */
+export interface AiMessage {
+  id: number;
+  user_id: number;
+  /** Which conversation this turn belongs to. */
+  session_id: string;
+  role: "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  created_at: string;
+}
+
+/** A tool the assistant ran, and whether it succeeded. */
+export interface AiWrite {
+  tool: string;
+  ok: boolean;
+  code?: string;
+  error?: string;
+}
+
+export interface AiChatResponse {
+  reply: string | null;
+  writes: AiWrite[];
+  usage: { tokens_in: number; tokens_out: number; rounds: number };
+  truncated: boolean;
+}
+
+export interface AiGaps {
+  window: { from: string; to: string; days: number };
+  missing_days: { date: string; has_transactions: false; status: null }[];
+  overdue_subscriptions: {
+    subscription_id: number;
+    name: string;
+    end_date: string;
+    amount: number;
+    currency: string;
+    archived_at: string | null;
+  }[];
+  errors: { check: string; message: string }[];
+  /** The zone these dates are in, as the server resolved it. */
+  timezone: string;
+}
+
+/**
+ * `configured: false` means the server has no DeepSeek key. The UI must still
+ * work in that case — R6 requires every other feature to be unaffected.
+ */
+export interface AiStatus {
+  configured: boolean;
+  tools: string[];
+  usage: {
+    today: { tokens_in: number; tokens_out: number; messages: number };
+    total: { tokens_in: number; tokens_out: number; messages: number };
+  };
+  /** Deliberately null: no daily cap is enforced. */
+  daily_token_limit: number | null;
+}

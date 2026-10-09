@@ -36,19 +36,26 @@ function shimStatement(db: any, sql: string) {
         // handlers rely on `INSERT ... RETURNING *` through .first(), so
         // treating only SELECT as row-returning made every create look failed.
         const isQuery = /^\s*(select|with|pragma)/i.test(sql);
-        if (isQuery || /\breturning\b/i.test(sql)) {
+        const isReturning = /\breturning\b/i.test(sql);
+        // `all()` on a statement with RETURNING already performs the write in
+        // node:sqlite, so it must not be followed by `run()`: doing both
+        // inserted every row twice. A RETURNING row is therefore taken as the
+        // proof of a single successful write.
+        if (isQuery || isReturning) {
           const results = stmt.all(...args);
-          if (isQuery) return { results };
-          // Also report the write metadata where node:sqlite allows it.
-          let meta = { changes: results.length, last_row_id: 0 };
-          try {
-            const info = stmt.run(...args);
-            meta = { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) };
-          } catch { /* RETURNING already executed the statement */ }
-          return { results, success: true, meta };
+          return {
+            results,
+            success: true,
+            meta: { changes: isQuery ? 0 : results.length, last_row_id: 0 },
+          };
         }
-        const info = stmt.run(...args);
-        return { success: true, meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) } };
+        stmt.run(...args);
+        // node:sqlite does not expose changes/lastInsertRowid on StatementSync,
+        // so a plain write reports no metadata rather than re-running itself.
+        // auth.ts reads meta.last_row_id after an INSERT, so it is recovered
+        // from the connection instead of left at 0.
+        const lastRow = db.prepare('SELECT last_insert_rowid() AS id').get() as any;
+        return { success: true, meta: { changes: 0, last_row_id: Number(lastRow?.id ?? 0) } };
       } catch (e: any) {
         throw new Error(`${e.message} [sql: ${sql.replace(/\s+/g, ' ').slice(0, 160)}]`);
       } finally { try { stmt.finalize?.(); } catch { /* ignore */ } }

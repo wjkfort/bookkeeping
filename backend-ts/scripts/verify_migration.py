@@ -30,7 +30,8 @@ SCHEMA = "migrations/002_schema_v2.sql"
 # Applied after SCHEMA, in order. Each is a separate file because it targets a
 # database already on the previous version.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
-                    "migrations/004_normalise_units_merchants.sql"]
+                    "migrations/004_normalise_units_merchants.sql",
+                    "migrations/005_ai_message_sessions.sql"]
 # The full schema for new/empty databases; must match what the migration builds.
 SCHEMA_SQL = "db/schema.sql"
 

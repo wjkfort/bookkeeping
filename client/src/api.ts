@@ -11,6 +11,10 @@ import {
   CategorySummary,
   RenewSubscriptionResult,
   TransactionListResponse,
+  AiMessage,
+  AiChatResponse,
+  AiGaps,
+  AiStatus,
 } from "./types";
 
 // Use environment variable in production, localhost in development
@@ -183,9 +187,92 @@ export const restoreSubscription = (
 
 export const deleteSubscription = (id: number): Promise<AxiosResponse<void>> => api.delete(`/subscriptions/${id}`);
 
+// ------------------------------------------------------------------ AI layer
+//
+// Every one of these runs server-side against DeepSeek; the browser never sees
+// the API key (R2). `getAiStatus` is what lets the UI hide the chat affordance
+// when the server has no key, instead of offering something that always fails.
+
+/**
+ * The browser's IANA zone, sent with everything date-related.
+ *
+ * The server cannot know it: `Date` there is UTC, and at 01:00 in UTC+8 that is
+ * still yesterday, which would move the reminder window and file entries under
+ * the wrong day. Detected once here so no caller has to remember; falls back to
+ * Asia/Shanghai, the server's own default.
+ */
+export const clientTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
+  } catch {
+    return "Asia/Shanghai";
+  }
+};
+
+/**
+ * The conversation id for this page load.
+ *
+ * A page load is a new conversation, so the id is generated once per load and
+ * never persisted: refreshing produces a new one, which is exactly the intended
+ * lifecycle. The server stores every conversation under its own id, so earlier
+ * conversations are kept rather than deleted — they can be listed later, and the
+ * cost that was spent on them stays on the record.
+ */
+const conversationId = (): string => {
+  const fresh = (): string =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  // In-memory for the page's lifetime: a new load gets a new id by definition.
+  return fresh();
+};
+
+let sessionId = conversationId();
+
+/** The id of the conversation currently in view. */
+export const currentSessionId = (): string => sessionId;
+
+/** Start a new conversation without reloading the page. */
+export const startNewConversation = (): string => {
+  sessionId = conversationId();
+  return sessionId;
+};
+
+export const getAiStatus = (): Promise<AxiosResponse<AiStatus>> => api.get("/ai/status");
+
+/** The current conversation's messages. Newest first, as the cursor expects. */
+export const getAiMessages = (params?: { before?: number; limit?: number }): Promise<AxiosResponse<AiMessage[]>> =>
+  api.get("/ai/messages", { params: { ...params, session: sessionId } });
+
+/** Past conversations, newest first. Nothing renders this yet. */
+export const getAiSessions = (): Promise<AxiosResponse<{ session_id: string; messages: number; last_at: string }[]>> =>
+  api.get("/ai/sessions");
+
+/** Send a message. `writes` reports what the assistant recorded. */
+export const sendAiMessage = (message: string): Promise<AxiosResponse<AiChatResponse>> =>
+  api.post("/ai/chat", { message, timezone: clientTimezone(), session: sessionId });
+
+/**
+ * Ask the assistant to open with the outstanding reminders (R3). The gaps are
+ * computed server-side; this only produces the wording, and the server does not
+ * store a synthetic user turn for it.
+ */
+export const openAiConversation = (): Promise<AxiosResponse<AiChatResponse>> =>
+  api.post("/ai/chat", { opening: true, timezone: clientTimezone(), session: sessionId });
+
+/** The raw reminder data, independent of the model. */
+export const getAiGaps = (params?: { today?: string }): Promise<AxiosResponse<AiGaps>> =>
+  api.get("/ai/gaps", { params: { ...params, timezone: clientTimezone() } });
+
+/** Record the user's answer about a day. `partial` keeps the day open. */
+export const markAiNoSpend = (
+  date: string,
+  status: "no_spend" | "partial" = "no_spend",
+): Promise<AxiosResponse<unknown>> =>
+  api.post("/ai/gaps/no-spend", { date, status });
+
 // Proxy
-export const proxyImage = (imageUrl: string): string => {
-  const baseUrl = import.meta.env.PROD
+export const proxyImage = (imageUrl: string): string => {  const baseUrl = import.meta.env.PROD
     ? "https://bookkeeping-backend.stringwjk.workers.dev/api/v1"
     : "http://localhost:8787/api/v1";
   return `${baseUrl}/proxy/image?url=${encodeURIComponent(imageUrl)}`;

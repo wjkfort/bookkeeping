@@ -1,59 +1,20 @@
 import { Hono } from 'hono';
-import type { Env, HonoVariables, Transaction, TransactionRow, TransactionWithItemName, ItemPrice, CreateTransactionRequest, UpdateTransactionRequest } from '../types';
+import type { Env, HonoVariables, CreateTransactionRequest, UpdateTransactionRequest } from '../types';
 import { getAllSubcategoryIds } from '../utils/categories';
-import { toCents, toAmount, centsToAmount, roundMoney } from '../utils/money';
+import { centsToAmount, roundMoney } from '../utils/money';
+import {
+  TX_SELECT,
+  toTransaction,
+  type TxRow,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+  type ItemObservationInput,
+} from '../services/transactions';
+import { toErrorResponse } from '../services/errors';
+import { requireTimezone } from '../utils/time';
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
-
-// Item and price columns come from item_prices rather than from transactions
-// (v2 moved them). The API contract is unchanged, so they are folded back into
-// the transaction object on the way out.
-const TX_SELECT = `
-  SELECT t.*, i.name as item_name,
-         ip.item_id as item_id, ip.unit_price_cents as unit_price_cents,
-         ip.quantity as quantity, ip.unit as unit
-  FROM transactions t
-  LEFT JOIN item_prices ip ON ip.transaction_id = t.id
-  LEFT JOIN items i ON i.id = ip.item_id AND i.user_id = t.user_id
-`;
-
-interface TxRow extends TransactionRow {
-  item_name: string | null;
-  item_id: number | null;
-  unit_price_cents: number | null;
-  quantity: number | null;
-  unit: string | null;
-}
-
-/** Storage row -> wire shape: money back to decimals, price fields reattached. */
-function toTransaction(row: TxRow): TransactionWithItemName {
-  return {
-    id: row.id,
-    user_id: row.user_id,
-    amount: centsToAmount(row.amount_cents),
-    currency: row.currency,
-    description: row.description,
-    date: row.date,
-    category_id: row.category_id,
-    item_id: row.item_id,
-    unit_price: toAmount(row.unit_price_cents),
-    quantity: row.quantity,
-    unit: row.unit,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    item_name: row.item_name,
-  };
-}
-
-async function ensureOwnedCategory(db: D1Database, categoryId: number, userId: number): Promise<boolean> {
-  const category = await db.prepare('SELECT id FROM categories WHERE id = ? AND user_id = ?').bind(categoryId, userId).first();
-  return !!category;
-}
-
-async function ensureOwnedItem(db: D1Database, itemId: number, userId: number): Promise<boolean> {
-  const item = await db.prepare('SELECT id FROM items WHERE id = ? AND user_id = ?').bind(itemId, userId).first();
-  return !!item;
-}
 
 // GET /api/v1/transactions - List transactions with filters
 // Optional: page + page_size for pagination (default page_size=20 when page is sent)
@@ -174,90 +135,41 @@ app.get('/:id', async (c) => {
 });
 
 // POST /api/v1/transactions - Create transaction
+//
+// The business logic lives in src/services/transactions.ts so that the AI tool
+// `add_transaction` executes exactly this code instead of a parallel copy. The
+// handler's job is the HTTP part: parse the body, delegate, map the result (or
+// a ServiceError) onto a response.
 app.post('/', async (c) => {
+  const userId = c.get('userId');
+
   try {
-    const userId = c.get('userId');
-    const body = await c.req.json<CreateTransactionRequest>();
+    const body = await c.req.json<CreateTransactionRequest & { timezone?: string }>();
     const { amount, currency, description, date, category_id, item_id, item_name, unit_price, quantity, unit } = body;
 
-    if (!amount || !currency || !date || !category_id) {
-      return c.json({ error: 'Amount, currency, date, and category_id are required' }, 400);
-    }
+    // Optional, and only used when no date is supplied: an explicit date is the
+    // caller's and is never moved. Defaults to UTC+8 (see utils/time.ts).
+    const timezone = requireTimezone(body.timezone);
 
-    if (currency.length !== 3) {
-      return c.json({ error: 'Currency must be a 3-letter code' }, 400);
-    }
+    // Only forwarded when something price/item-shaped was sent, so the service
+    // can tell "no item" from "clear the item".
+    const item: ItemObservationInput | null =
+      item_id !== undefined || item_name !== undefined || unit_price !== undefined ||
+      quantity !== undefined || unit !== undefined
+        ? { item_id, item_name, unit_price, quantity, unit }
+        : null;
 
-    if (!(await ensureOwnedCategory(c.env.DB, category_id, userId))) {
-      return c.json({ error: 'Category not found' }, 404);
-    }
+    const transaction = await createTransaction(c.env.DB, userId, {
+      amount, currency, date, category_id, description, item, timezone,
+    });
 
-    let finalItemId = item_id || null;
-
-    if (finalItemId && !(await ensureOwnedItem(c.env.DB, finalItemId, userId))) {
-      return c.json({ error: 'Item not found' }, 404);
-    }
-
-    // If item_name is provided, create or find the item
-    if (item_name && item_name.trim().length > 0) {
-      // Check if item already exists
-      const existingItem = await c.env.DB.prepare(
-        'SELECT id FROM items WHERE name = ? AND user_id = ?'
-      ).bind(item_name.trim(), userId).first<{ id: number }>();
-
-      if (existingItem) {
-        finalItemId = existingItem.id;
-      } else {
-        // Create new item
-        const newItem = await c.env.DB.prepare(
-          'INSERT INTO items (name, user_id, created_at) VALUES (?, ?, ?) RETURNING id'
-        ).bind(item_name.trim(), userId, new Date().toISOString()).first<{ id: number }>();
-        
-        if (newItem) {
-          finalItemId = newItem.id;
-        }
-      }
-    }
-
-    const now = new Date().toISOString();
-
-    const result = await c.env.DB.prepare(
-      `INSERT INTO transactions (user_id, amount_cents, currency, description, date, category_id, source, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?) RETURNING *`
-    ).bind(userId, toCents(amount), currency, description || null, date, category_id, now, now).first<TransactionRow>();
-
-    if (!result) {
-      return c.json({ error: 'Failed to create transaction' }, 500);
-    }
-
-    // The item and its price live in item_prices now. Without an item there is
-    // nothing to attach the observation to, so the fields are dropped — that is
-    // the same information the v1 schema kept in these columns.
-    if (finalItemId) {
-      await c.env.DB.prepare(
-        `INSERT INTO item_prices
-           (user_id, item_id, transaction_id, unit_price_cents, quantity, unit, currency, merchant, observed_on, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-      ).bind(
-        userId, finalItemId, result.id,
-        toCents(unit_price ?? amount), quantity ?? null, unit || null,
-        currency, date, now,
-      ).run();
-    }
-
-    const full = await c.env.DB.prepare(
-      `${TX_SELECT} WHERE t.id = ? AND t.user_id = ?`
-    ).bind(result.id, userId).first<TxRow>();
-
-    return c.json(full ? toTransaction(full) : toTransaction({
-      ...result, item_name: null, item_id: null, unit_price_cents: null,
-      quantity: null, unit: null,
-    }), 201);
+    return c.json(transaction, 201);
   } catch (error: any) {
-    if (error.message?.includes('FOREIGN KEY constraint')) {
+    if (error?.message?.includes('FOREIGN KEY constraint')) {
       return c.json({ error: 'Category not found' }, 404);
     }
-    return c.json({ error: 'Failed to create transaction' }, 500);
+    const { status, body } = toErrorResponse(error, 'Failed to create transaction');
+    return c.json(body, status);
   }
 });
 
@@ -265,158 +177,14 @@ app.post('/', async (c) => {
 app.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   const userId = c.get('userId');
-  
+
   try {
     const body = await c.req.json<UpdateTransactionRequest>();
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    if (body.amount !== undefined) {
-      updates.push('amount_cents = ?');
-      values.push(toCents(body.amount));
-    }
-    if (body.currency !== undefined) {
-      if (body.currency.length !== 3) {
-        return c.json({ error: 'Currency must be a 3-letter code' }, 400);
-      }
-      updates.push('currency = ?');
-      values.push(body.currency);
-    }
-    if (body.description !== undefined) {
-      updates.push('description = ?');
-      values.push(body.description);
-    }
-    if (body.date !== undefined) {
-      updates.push('date = ?');
-      values.push(body.date);
-    }
-    if (body.category_id !== undefined) {
-      if (!(await ensureOwnedCategory(c.env.DB, body.category_id, userId))) {
-        return c.json({ error: 'Category not found' }, 404);
-      }
-      updates.push('category_id = ?');
-      values.push(body.category_id);
-    }
-    
-    // Item and price fields are no longer columns on transactions; they are
-    // resolved here and written to item_prices after the transaction row.
-    let nextItemId: number | null | undefined;
-
-    // Handle item_id and item_name
-    if (body.item_name !== undefined) {
-      if (body.item_name && body.item_name.trim().length > 0) {
-        // Check if item already exists
-        const existingItem = await c.env.DB.prepare(
-          'SELECT id FROM items WHERE name = ? AND user_id = ?'
-        ).bind(body.item_name.trim(), userId).first<{ id: number }>();
-
-        if (existingItem) {
-          nextItemId = existingItem.id;
-        } else {
-          // Create new item
-          const newItem = await c.env.DB.prepare(
-            'INSERT INTO items (name, user_id, created_at) VALUES (?, ?, ?) RETURNING id'
-          ).bind(body.item_name.trim(), userId, new Date().toISOString()).first<{ id: number }>();
-          
-          if (newItem) {
-            nextItemId = newItem.id;
-          }
-        }
-      } else {
-        // Clear the item link if item_name is empty
-        nextItemId = null;
-      }
-    } else if (body.item_id !== undefined) {
-      if (body.item_id !== null && !(await ensureOwnedItem(c.env.DB, body.item_id, userId))) {
-        return c.json({ error: 'Item not found' }, 404);
-      }
-      nextItemId = body.item_id;
-    }
-
-    const hasPriceUpdate =
-      nextItemId !== undefined ||
-      body.unit_price !== undefined ||
-      body.quantity !== undefined ||
-      body.unit !== undefined;
-
-    if (!hasPriceUpdate && updates.length === 0) {
-      return c.json({ error: 'No fields to update' }, 400);
-    }
-
-    const now = new Date().toISOString();
-
-    let result: TransactionRow | null = null;
-    if (updates.length > 0) {
-      updates.push('updated_at = ?');
-      values.push(now);
-      values.push(id, userId);
-
-      result = await c.env.DB.prepare(
-        `UPDATE transactions SET ${updates.join(', ')} WHERE id = ? AND user_id = ? RETURNING *`
-      ).bind(...values).first<TransactionRow>();
-
-      if (!result) {
-        return c.json({ error: 'Transaction not found' }, 404);
-      }
-    } else {
-      result = await c.env.DB.prepare(
-        'SELECT * FROM transactions WHERE id = ? AND user_id = ?'
-      ).bind(id, userId).first<TransactionRow>();
-
-      if (!result) {
-        return c.json({ error: 'Transaction not found' }, 404);
-      }
-    }
-
-    if (hasPriceUpdate) {
-      const existing = await c.env.DB.prepare(
-        'SELECT * FROM item_prices WHERE transaction_id = ?'
-      ).bind(id).first<ItemPrice>();
-
-      const itemId = nextItemId !== undefined ? nextItemId
-        : (existing ? existing.item_id : null);
-
-      if (itemId === null) {
-        // Nothing to attach a price to: remove any existing observation.
-        await c.env.DB.prepare('DELETE FROM item_prices WHERE transaction_id = ?')
-          .bind(id).run();
-      } else if (existing) {
-        await c.env.DB.prepare(
-          `UPDATE item_prices
-             SET item_id = ?, unit_price_cents = ?, quantity = ?, unit = ?, observed_on = ?
-           WHERE transaction_id = ?`
-        ).bind(
-          itemId,
-          body.unit_price !== undefined ? toCents(body.unit_price) : existing.unit_price_cents,
-          body.quantity !== undefined ? body.quantity : existing.quantity,
-          body.unit !== undefined ? body.unit : existing.unit,
-          body.date !== undefined ? body.date : existing.observed_on,
-          id,
-        ).run();
-      } else {
-        await c.env.DB.prepare(
-          `INSERT INTO item_prices
-             (user_id, item_id, transaction_id, unit_price_cents, quantity, unit, currency, merchant, observed_on, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-        ).bind(
-          userId, itemId, id,
-          body.unit_price !== undefined ? toCents(body.unit_price) : result.amount_cents,
-          body.quantity ?? null, body.unit ?? null,
-          result.currency, result.date, now,
-        ).run();
-      }
-    }
-
-    const full = await c.env.DB.prepare(
-      `${TX_SELECT} WHERE t.id = ? AND t.user_id = ?`
-    ).bind(id, userId).first<TxRow>();
-
-    return c.json(full ? toTransaction(full) : toTransaction({
-      ...result, item_name: null, item_id: null, unit_price_cents: null,
-      quantity: null, unit: null,
-    }));
+    const transaction = await updateTransaction(c.env.DB, userId, id, body);
+    return c.json(transaction);
   } catch (error) {
-    return c.json({ error: 'Failed to update transaction' }, 500);
+    const { status, body } = toErrorResponse(error, 'Failed to update transaction');
+    return c.json(body, status);
   }
 });
 
@@ -424,30 +192,13 @@ app.put('/:id', async (c) => {
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   const userId = c.get('userId');
-  
+
   try {
-    // The price observation this transaction recorded has to go with it. Its
-    // foreign key is ON DELETE SET NULL (a price can legitimately exist without
-    // a transaction, so CASCADE is not appropriate), which would otherwise
-    // leave an orphan indistinguishable from a price the user logged by hand —
-    // and that phantom would keep counting towards the item's last/average
-    // price. v1 stored the price on the transaction, so deleting the
-    // transaction removed it; this preserves that.
-    await c.env.DB.prepare(
-      'DELETE FROM item_prices WHERE transaction_id = ? AND user_id = ?'
-    ).bind(id, userId).run();
-
-    const result = await c.env.DB.prepare(
-      'DELETE FROM transactions WHERE id = ? AND user_id = ? RETURNING id'
-    ).bind(id, userId).first();
-
-    if (!result) {
-      return c.json({ error: 'Transaction not found' }, 404);
-    }
-
+    await deleteTransaction(c.env.DB, userId, id);
     return c.json({ message: 'Transaction deleted successfully' });
   } catch (error) {
-    return c.json({ error: 'Failed to delete transaction' }, 500);
+    const { status, body } = toErrorResponse(error, 'Failed to delete transaction');
+    return c.json(body, status);
   }
 });
 

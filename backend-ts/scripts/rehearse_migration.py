@@ -35,7 +35,8 @@ PREFLIGHT_LINK = "migrations/001_link_priced_rows_to_items.sql"
 MIGRATION = "migrations/002_schema_v2.sql"
 # Applied after MIGRATION, in order.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
-                    "migrations/004_normalise_units_merchants.sql"]
+                    "migrations/004_normalise_units_merchants.sql",
+                    "migrations/005_ai_message_sessions.sql"]
 VERIFIER = "scripts/verify_migration.py"
 
 failures = []
@@ -185,6 +186,42 @@ def main():
                 check("status rejects unknown values", False, "insert succeeded")
             except sqlite3.IntegrityError:
                 check("status rejects unknown values", True)
+            db.rollback()
+
+        # What 005 is for: every turn must state which conversation it belongs
+        # to, so the model can be shown one conversation instead of all of them.
+        # Existing rows are attributed to 'legacy' rather than dropped.
+        msg_cols = {r[1]: r for r in db.execute("PRAGMA table_info(ai_messages)")}
+        check("ai_messages gained session_id after 005",
+              "session_id" in msg_cols, str(sorted(msg_cols)))
+        if "session_id" in msg_cols:
+            check("session_id is NOT NULL after 005",
+                  msg_cols["session_id"][3] == 1, f"notnull={msg_cols['session_id'][3]}")
+            idx = [r[1] for r in db.execute(
+                "SELECT type, name FROM sqlite_master WHERE type='index' "
+                "AND tbl_name='ai_messages'")]
+            check("the conversation index is present after 005",
+                  "idx_ai_messages_session" in idx, str(idx))
+            try:
+                db.execute("INSERT INTO ai_messages (user_id, role, content) VALUES (?,?,?)",
+                           (uid, "user", "no session given"))
+                got = db.execute(
+                    "SELECT session_id FROM ai_messages WHERE content='no session given'"
+                ).fetchone()[0]
+                check("a turn written without a session is still recorded",
+                      got == "default", str(got))
+                db.execute("DELETE FROM ai_messages WHERE content='no session given'")
+                db.commit()
+            except sqlite3.Error as exc:
+                check("a turn written without a session is still recorded", False,
+                      f"{type(exc).__name__}: {exc}")
+                db.rollback()
+            try:
+                db.execute("INSERT INTO ai_messages (user_id, session_id, role, content) "
+                           "VALUES (?,?,?,?)", (uid, None, "user", "null session"))
+                check("session_id rejects NULL", False, "insert succeeded")
+            except sqlite3.IntegrityError:
+                check("session_id rejects NULL", True)
             db.rollback()
 
         step(6, "a repeated 002 must be refused, and the backup must restore")

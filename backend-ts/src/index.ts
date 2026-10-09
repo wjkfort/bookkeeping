@@ -12,6 +12,8 @@ import { authMiddleware } from "./middleware/auth";
 import subscriptionsRouter from "./api/subscriptions";
 import proxyRouter from "./api/proxy";
 import pricesRouter from "./api/prices";
+import aiRouter from "./api/ai";
+import unitsRouter from "./api/units";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoVariables }>();
 
@@ -64,6 +66,10 @@ api.use("/subscriptions", authMiddleware);
 api.use("/subscriptions/*", authMiddleware);
 api.use("/prices", authMiddleware);
 api.use("/prices/*", authMiddleware);
+api.use("/ai", authMiddleware);
+api.use("/ai/*", authMiddleware);
+api.use("/units", authMiddleware);
+api.use("/units/*", authMiddleware);
 // These two were reachable without a token, which let anyone spend the
 // exchange-rate quota and use the translation proxy. Both are only called from
 // pages behind ProtectedRoute, so requiring auth changes nothing for the client.
@@ -80,6 +86,11 @@ api.route("/translate", translateRouter);
 api.route("/items", itemsRouter);
 api.route("/subscriptions", subscriptionsRouter);
 api.route("/prices", pricesRouter);
+// Mounted at both paths: /units because the vocabulary is not AI-specific, and
+// /prices/units next to the routes that consume it, where the tool points.
+api.route("/prices/units", unitsRouter);
+api.route("/units", unitsRouter);
+api.route("/ai", aiRouter);
 
 app.route("/api/v1", api);
 

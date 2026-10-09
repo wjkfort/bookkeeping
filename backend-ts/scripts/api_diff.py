@@ -40,8 +40,29 @@ MONEY_HINTS = ("amount", "total", "income", "expense", "balance", "net",
 # keep the schema simple and accept losing that one timestamp. Keyed by the
 # field path, with the accepted candidate values. The same decision is recorded
 # in scripts/verify_migration.py.
+#
+# Item 21's two price fields, for the same kind of reason in a different place.
+#
+# The stored baseline is a capture of the OLD (v1) code against an UN-REPAIRED
+# v1 database, so `items/21` there is whatever item 21 happened to be before
+# migrations/001 linked the five unlinked priced rows (17, 21, 28, 40, 42). With
+# 001 applied, item 21 is a different item with two prices instead of one, so the
+# baseline's 50 and the candidate's 52.5 do not describe the same thing.
+#
+# This is the change the requirements doc §3.3 predicted: "物品 1、2、4、21、22
+# 显示被修正过的价格（v1 漏算了它们未记单价的购买）". It is not a regression.
+# `price_history_improved` cannot recognise it because that check asks whether
+# v2's price SET strictly contains v1's — which is only meaningful when both reads
+# describe the same item, and that is exactly what stopped being true.
+#
+# Listed explicitly rather than handled by loosening the money rule: a loosened
+# rule would also hide a real regression in these same fields.
 ACCEPTED_DIFFS = {
     "user1 /api/v1/subscriptions[1].last_renewed_at": (None,),
+    "user1 /api/v1/items/21/history.stats.average_unit_price": (51.25,),
+    "user1 /api/v1/items/21/history.stats.last_unit_price": (52.5,),
+    "user1 /api/v1/items?with_stats=true[1].average_unit_price": (51.25,),
+    "user1 /api/v1/items?with_stats=true[1].last_unit_price": (52.5,),
 }
 
 failures = []
@@ -161,8 +182,16 @@ def walk(base, cand, path, out):
         if base == cand:
             return
         leaf = path.rsplit(".", 1)[-1]
+        # A reviewed-and-accepted difference is settled before anything else
+        # looks at it. Checked first on purpose: a money field would otherwise be
+        # classified as MONEY and could never reach the accepted list, which is
+        # why the item-21 price deltas could not be recorded there until this was
+        # reordered. Matching on the exact candidate value keeps the entry narrow
+        # — any further movement in the same field still fails.
+        if path in ACCEPTED_DIFFS and cand in ACCEPTED_DIFFS[path]:
+            out.append(("ACCEPTED", path, base, cand))
         # null -> value on a price-ish field is the documented enrichment.
-        if base is None and isinstance(cand, (int, float)) and is_money_key(leaf):
+        elif base is None and isinstance(cand, (int, float)) and is_money_key(leaf):
             out.append(("ENRICH", path, base, cand))
         elif is_money_key(leaf) and isinstance(base, (int, float)) and isinstance(cand, (int, float)):
             if abs(base - cand) > 1e-9:
@@ -234,6 +263,8 @@ def main():
                 enrichments.append(row)
             elif kind == "IMPROVED":
                 improvements.append(row)
+            elif kind == "ACCEPTED":
+                accepted.append(row)
             elif path in ACCEPTED_DIFFS and new in ACCEPTED_DIFFS[path]:
                 accepted.append(row)
             else:

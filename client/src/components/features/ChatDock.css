@@ -1,0 +1,167 @@
+/* Conversational surface for the AI layer.
+   Styled from the same tokens as the rest of the app (src/theme/globalStyles.css)
+   so the dock reads as part of the page rather than a bolted-on widget. */
+
+.chat-dock-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 40;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--app-coral);
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(90, 50, 34, .26);
+  transition: transform .16s ease, background .16s ease;
+}
+.chat-dock-fab:hover { transform: translateY(-2px); background: var(--app-coral-dark); }
+.chat-dock-fab:focus-visible { outline: 2px solid var(--app-ink); outline-offset: 3px; }
+.chat-dock-fab.is-open { background: var(--app-ink); }
+
+/* A dot, not a count: the requirement is to surface that something is open,
+   and the exact number is visible the moment the panel opens. */
+.chat-dock-badge {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--app-paper);
+  border: 2px solid var(--app-coral);
+}
+
+.chat-dock {
+  position: fixed;
+  right: 28px;
+  bottom: 96px;
+  z-index: 41;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  background: var(--app-paper);
+  border: 1px solid var(--app-line);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px rgba(62, 40, 26, .18);
+  overflow: hidden;
+}
+
+.chat-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid var(--app-line);
+  background: var(--app-paper-deep);
+}
+.chat-dock-title {
+  font-family: Newsreader, Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.chat-dock-muted { color: var(--app-muted); }
+
+.chat-dock-unavailable { padding: 22px 18px; display: flex; flex-direction: column; gap: 8px; }
+.chat-dock-unavailable-title { font-weight: 600; color: var(--app-ink); }
+
+.chat-dock-reminders {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--app-line);
+  background: rgba(217, 104, 75, .06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-dock-reminders-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--app-coral-dark);
+}
+.chat-dock-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--app-ink);
+}
+.chat-dock-reminder.is-overdue { color: var(--app-muted); }
+
+.chat-dock-log {
+  flex: 1;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-dock-bubble {
+  max-width: 86%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-dock-bubble.is-user {
+  align-self: flex-end;
+  background: var(--app-ink);
+  color: var(--app-paper);
+  border-bottom-right-radius: 4px;
+}
+.chat-dock-bubble.is-assistant {
+  align-self: flex-start;
+  background: var(--app-paper-deep);
+  color: var(--app-ink);
+  border-bottom-left-radius: 4px;
+}
+.chat-dock-bubble.is-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--app-muted);
+}
+.chat-dock-spin { animation: chat-dock-spin 1.1s linear infinite; }
+@keyframes chat-dock-spin { to { transform: rotate(360deg); } }
+
+.chat-dock-warning { color: var(--app-muted); }
+.chat-dock-error { color: var(--app-coral-dark); }
+
+.chat-dock-composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--app-line);
+  background: var(--app-paper);
+}
+.chat-dock-input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 9px;
+  background: white;
+  color: var(--app-ink);
+  font-size: 14px;
+}
+.chat-dock-input:focus-visible { outline: 2px solid var(--app-coral); outline-offset: 1px; }
+.chat-dock-input:disabled { background: var(--app-paper-deep); }
+
+@media (max-width: 560px) {
+  .chat-dock { right: 16px; left: 16px; width: auto; bottom: 88px; }
+  .chat-dock-fab { right: 16px; bottom: 16px; }
+}

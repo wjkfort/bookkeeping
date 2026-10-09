@@ -381,5 +381,26 @@
     "loginLink": "Log in",
     "success": "Registration successful!",
     "error": "Registration failed"
+  },
+  "assistant": {
+    "title": "Assistant",
+    "open": "Open the assistant",
+    "close": "Close the assistant",
+    "placeholder": "Tell me what you spent…",
+    "thinking": "Thinking…",
+    "empty": "Ask about your spending, or just say what you bought.",
+    "unavailableTitle": "Assistant unavailable",
+    "unavailableBody": "The server has no AI key configured. Everything else keeps working.",
+    "errorTitle": "Something went wrong",
+    "failed": "Not recorded",
+    "truncated": "The assistant stopped early — the reply may be incomplete.",
+    "reminders": "Reminders",
+    "missingDay": "No records for {{date}}",
+    "overdue": "{{name}} ended {{date}}",
+    "markNoSpend": "Nothing spent",
+    "markPartial": "Partly recorded",
+    "markedNoSpend": "{{date}} marked as no spending",
+    "markedPartial": "{{date}} kept open",
+    "writes": "{{count}} change(s) saved"
   }
 }

@@ -25,6 +25,7 @@ import {
 } from "../../api";
 import { Summary, Subscription, CategorySummary } from "../../types";
 import SubscriptionModal from "./SubscriptionModal";
+import ChatDock from "./ChatDock";
 import MonthPicker from "../ui/MonthPicker";
 import { useToast } from "../ui/toastContext";
 import dayjs, { Dayjs } from "dayjs";
@@ -80,11 +81,7 @@ const Dashboard: React.FC = () => {
   const [restoreCycle, setRestoreCycle] = useState("30");
   const [restoring, setRestoring] = useState(false);
 
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
-
-  const loadSubscriptions = async () => {
+  const loadSubscriptions = useCallback(async () => {
     try {
       const res = await getSubscriptions({ include_archived: true });
       const all = res.data;
@@ -93,7 +90,11 @@ const Dashboard: React.FC = () => {
     } catch (error) {
       console.error("Error loading subscriptions:", error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void loadSubscriptions();
+  }, [loadSubscriptions]);
 
   const handleDeleteSubscription = async (id: number) => {
     try {
@@ -816,6 +817,17 @@ const Dashboard: React.FC = () => {
           </Flex>
         </Dialog.Content>
       </Dialog.Root>
+
+      {/* The AI layer's only surface. It sits outside the page flow so it never
+          shifts the report, and refreshes the same loaders the page uses after
+          the assistant records something — the report is the check on a write
+          (R2), so the figures must move immediately. */}
+      <ChatDock
+        onChanged={() => {
+          void loadData();
+          void loadSubscriptions();
+        }}
+      />
     </Flex>
   );
 };

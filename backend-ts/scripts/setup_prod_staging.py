@@ -6,14 +6,16 @@ production.
 
     python3 -I scripts/setup_prod_staging.py prod-backup-<date>.sql
 
-Then serve it (wrangler's global registry path must be writable; if
-`wrangler dev` fails with EPERM on ~/Library/Preferences, redirect it):
+An optional second argument sets where the migrated database is placed. The
+default is the throwaway staging directory, served with an explicit
+`--persist-to`. Passing `.wrangler/state` instead puts it exactly where
+`wrangler dev` and `wrangler d1 execute --local` look by DEFAULT, so no flags are
+needed anywhere:
 
-    WRANGLER_REGISTRY_PATH=/tmp/wrhome/registry \
-    WRANGLER_LOG_PATH=/tmp/wrhome/logs \
-    npx wrangler dev --local --port 8788 --persist-to /tmp/prod-staging/persist
+    python3 -I scripts/setup_prod_staging.py prod-backup-<date>.sql .wrangler/state
+    npx wrangler dev
 
-and open http://localhost:8788 — sign in with your real account.
+Then open http://localhost:8787 and sign in with your real account.
 
 What it does, in the order migration 002 documents:
   1. load the export into a fresh v1 database
@@ -41,7 +43,16 @@ import sqlite3
 import sys
 
 STAGING = "/tmp/prod-staging"
-PERSIST = os.path.join(STAGING, "persist")
+
+# Where the migrated database is placed.
+#
+# The value is the *persist root* — the directory that will contain `v3/d1/...`.
+# With no second argument it is `/tmp/prod-staging/persist`, served with an
+# explicit `--persist-to`; passed `.wrangler/state` it is exactly the directory
+# `wrangler dev` and `wrangler d1 execute --local` use by DEFAULT, so no flags are
+# needed anywhere. Overridable so one script builds the migrated database for both
+# the test harness and a developer, instead of two definitions drifting apart.
+PERSIST = sys.argv[2] if len(sys.argv) > 2 else os.path.join(STAGING, "persist")
 FIXTURES = "/tmp/prod-fixtures"
 # wrangler derives this filename from a hash of the database id in
 # wrangler.toml; it is stable for this project.
@@ -59,11 +70,13 @@ PREFLIGHT = [
 MIGRATION = "migrations/002_schema_v2.sql"
 # Applied after MIGRATION, in order, each targeting the previous version.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
-                    "migrations/004_normalise_units_merchants.sql"]
+                    "migrations/004_normalise_units_merchants.sql",
+                    "migrations/005_ai_message_sessions.sql"]
 
 
 def main():
-    if len(sys.argv) != 2:
+    # argv[1] = the export, argv[2] = optional target root (see the docstring).
+    if len(sys.argv) not in (2, 3):
         print(__doc__)
         return 2
     export = sys.argv[1]
@@ -83,6 +96,7 @@ def main():
     print(f"loading {export}")
     src = sqlite3.connect(":memory:")
     src.executescript(open(export, encoding="utf-8").read())
+    os.makedirs(os.path.dirname(work), exist_ok=True)
     dst = sqlite3.connect(work)
     src.backup(dst)
     dst.close()
