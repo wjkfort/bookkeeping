@@ -47,6 +47,80 @@ npm run db:schema:local
 npm run db:schema:remote
 ```
 
+### Schema v2 migration and its verification net
+
+`migrations/002_schema_v2.sql` upgrades a v1 database in place (integer cents,
+`item_prices`, `cycle_days`, `subscription_id` renewals, upserted
+`exchange_rates`). It is breaking: old code cannot read the new schema, so the
+code and the database must move together. Four scripts support it, all run from
+this directory:
+
+```bash
+# 1. Check the migration against a copy of real data (never modifies the input).
+#    Gates on: row counts, money to the cent, category tree, every v1 row with a
+#    unit_price still having a price, FK integrity, and that new constraints bite.
+python3 -I scripts/verify_migration.py prod-backup-<date>.sql
+
+# 2. Build a local migrated database to develop against, kept separate from the
+#    v1 state in .wrangler/ so both remain available.
+python3 -I scripts/build_local_v2.py              # from the local v1 clone
+python3 -I scripts/build_local_v2.py --empty      # schema.sql only, fresh install
+
+# 3. Capture what the real handlers return. It imports the Hono app and shims D1
+#    over node:sqlite, so it needs no server. JWT_SECRET comes from .dev.vars and
+#    tokens are minted locally, so no login is needed. Outbound network is
+#    answered from a fixed rate payload so captures are deterministic.
+npx esbuild scripts/api_capture.ts --bundle --platform=node --format=esm \
+  --outfile=scripts/.build/api_capture.mjs
+node scripts/.build/api_capture.mjs .wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite > /tmp/baseline.json
+node scripts/.build/api_capture.mjs .wrangler-v2/state/v3/d1/miniflare-D1DatabaseObject/bookkeeping-v2.sqlite > /tmp/candidate.json
+
+# 4. Compare. Money and status changes are failures; price fields going from
+#    null to a value are the expected §3.3 enrichment and are reported apart.
+python3 -I scripts/api_diff.py /tmp/baseline.json /tmp/candidate.json
+
+# 5. Write paths. The capture above only reads; this creates, updates and
+#    deletes transactions against a COPY of the given database and checks the
+#    item_prices bookkeeping each path is responsible for.
+npx esbuild scripts/api_write_test.ts --bundle --platform=node --format=esm \
+  --outfile=scripts/.build/api_write_test.mjs
+node scripts/.build/api_write_test.mjs .wrangler-v2/state/v3/d1/miniflare-D1DatabaseObject/bookkeeping-v2.sqlite
+```
+
+Run every layer at once, against fixtures built from a real export:
+
+```bash
+# build a migrated staging database (served by wrangler) plus isolated fixtures
+python3 -I scripts/setup_prod_staging.py prod-backup-<date>.sql
+
+npm run test:full   # typecheck + migration invariants + write paths
+                    # + fresh install + money arithmetic + API contract
+npm test            # the cheap subset: typecheck + whatever fixtures exist
+```
+
+Serve the staging database and click through it:
+
+```bash
+# WRANGLER_* only needed if `wrangler dev` hits EPERM writing ~/Library/Preferences
+WRANGLER_REGISTRY_PATH=/tmp/wrhome/registry \
+WRANGLER_LOG_PATH=/tmp/wrhome/logs \
+npx wrangler dev --local --port 8787 --persist-to /tmp/prod-staging/persist
+```
+
+Before a breaking migration, rehearse the whole sequence on a copy — it walks
+load → `001` → verify → `002`/`003`/`004` → repeat-refusal → restore, and checks
+that the backup actually restores:
+
+```bash
+python3 -I scripts/rehearse_migration.py prod-backup-<date>.sql
+```
+
+Note on the API-contract baseline: it is a capture of the **old (v1) code against
+the v1 database**, stored as a gitignored JSON. It cannot be regenerated once the
+migration ships, because the old code is gone. When the code change landed, the
+baseline was captured against v1 and the candidate against v2; they had to be
+identical apart from the reported enrichments.
+
 ### 4. Set Secrets
 
 ```bash
