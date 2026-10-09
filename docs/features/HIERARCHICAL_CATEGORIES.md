@@ -1,141 +1,61 @@
-# Hierarchical Categories Implementation
+# 层级分类
 
-This document describes the hierarchical (nested) categories feature that allows you to create subcategories under main categories.
-
-## Overview
-
-Categories now support a parent-child relationship, allowing you to organize them hierarchically. For example:
+分类支持父子嵌套（深度 ≤ 2）：
 
 ```
 Food (parent)
   ├── Restaurant (child)
   ├── Groceries (child)
   └── Takeout (child)
-
-Transportation (parent)
-  ├── Gas (child)
-  ├── Public Transit (child)
-  └── Parking (child)
 ```
 
-## Database Changes
+## 约束（由 schema 与 API 共同保证）
 
-The `categories` table now includes:
-- `parent_id`: Foreign key reference to parent category (NULL for top-level categories)
-- Unique constraint on `(name, parent_id)` to allow same names in different parent categories
-- Cascade delete: Deleting a parent category will delete all its subcategories
+- `parent_id` 指向同表的父分类，`NULL` 表示顶级。删除父分类会**级联删除其子分类**
+  （`ON DELETE CASCADE`）。
+- **唯一性**用的是表达式索引：
 
-## Migration
+  ```sql
+  CREATE UNIQUE INDEX idx_categories_unique
+      ON categories (user_id, COALESCE(parent_id, 0), name);
+  ```
 
-Run the migration to add the hierarchical structure:
+  用 `COALESCE(parent_id, 0)` 而不是 `UNIQUE(name, parent_id, user_id)`，因为 SQLite 认为
+  NULL 互不相等——旧的写法**约束不到顶级分类**，可以重复建同名顶级分类（v2 之前确实如此）。
+- **顶级分类与同名的子分类可以共存**（"Food" 下也能再有一个 "Food"）。
+- 父与子必须同 `type`（都收入或都支出）。
+- 分类不能以自己为父。
+- 深度上限 2：**由 API 校验**，不是数据库约束。
 
-```bash
-cd backend
-psql "$DATABASE_URL" -f migrations/add_parent_id_to_categories.sql
-```
+## 删除分类的行为（v2 已改变）
 
-## API Changes
+`transactions.category_id` 是 **`ON DELETE RESTRICT`**，v1 时是 `ON DELETE CASCADE`。
 
-### GET /api/v1/categories
+- v1：删一个分类会**连带删掉它名下的所有交易**（实测：42 个分类里有 33 个会被牵连同删）。
+- v2：只要分类本身**或其任一子分类**下还有交易，删除请求就被拒绝，返回 **409**：
 
-Now supports a `flat` query parameter:
-- `GET /api/v1/categories` - Returns hierarchical structure (only top-level categories with nested children)
-- `GET /api/v1/categories?flat=true` - Returns all categories in a flat list
+  ```json
+  { "error": "Category still has transactions", "code": "CATEGORY_IN_USE", "transaction_count": 6 }
+  ```
 
-### POST /api/v1/categories
+  客户端据此提示用户先移动或删除那些交易。没有交易（也没有子分类交易）的分类可正常删除。
 
-Create a category with optional parent:
+## API
 
-```json
-{
-  "name": "Restaurant",
-  "type": "expense",
-  "parent_id": 1  // Optional: ID of parent category
-}
-```
+前缀 `/api/v1`，全部需要 JWT。
 
-**Validation:**
-- Parent category must exist
-- Parent and child must have the same type (both income or both expense)
-- Name must be unique within the same parent
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/categories` | 树形返回（顶级分类含 `children`）；`?flat=true` 返回扁平列表 |
+| GET | `/categories/:id` | 单个分类 |
+| POST | `/categories` | `{ name, type, parent_id? }`。父分类必须属于当前用户且同 `type` |
+| PUT | `/categories/:id` | 部分更新，含 `parent_id` |
+| DELETE | `/categories/:id` | 仍有交易时 **409**（见上） |
 
-### PUT /api/v1/categories/{id}
+重名返回 **409**（`Category with this name already exists`），依据就是上面那条表达式索引。
 
-Update a category (new endpoint):
+## 界面状态
 
-```json
-{
-  "name": "Fast Food",
-  "parent_id": 1
-}
-```
-
-### DELETE /api/v1/categories/{id}
-
-Deleting a category will cascade delete all its subcategories.
-
-## Frontend Changes
-
-### Categories Page
-
-The Categories page now includes:
-
-1. **Parent Category Selector**: When creating a new category, you can optionally select a parent category
-   - Only shows top-level categories of the same type
-   - Leave empty to create a top-level category
-
-2. **Hierarchical Display**: Categories are displayed in a tree structure with visual indentation
-   - Subcategories are indented with a `└─` prefix
-   - Shows the full hierarchy at a glance
-
-3. **Delete Warning**: When deleting a category with subcategories, a warning is shown
-
-### Transactions Page
-
-The transaction form will show all categories (both parent and subcategories) in the dropdown. You can assign transactions to either parent categories or subcategories.
-
-## Usage Examples
-
-### Creating a Hierarchical Structure
-
-1. Create a top-level category:
-   - Name: "Food"
-   - Type: "Expense"
-   - Parent Category: None
-
-2. Create subcategories:
-   - Name: "Restaurant", Type: "Expense", Parent: "Food"
-   - Name: "Groceries", Type: "Expense", Parent: "Food"
-   - Name: "Takeout", Type: "Expense", Parent: "Food"
-
-### Assigning Transactions
-
-You can assign transactions to either:
-- Top-level categories (e.g., "Food")
-- Subcategories (e.g., "Restaurant", "Groceries")
-
-This allows for both broad and detailed expense tracking.
-
-## Benefits
-
-1. **Better Organization**: Group related categories together
-2. **Flexible Tracking**: Track at both high-level and detailed level
-3. **Easy Navigation**: Visual hierarchy makes it easy to understand category relationships
-4. **Scalability**: Add more detail as needed without cluttering the top level
-
-## Constraints
-
-- A category cannot be its own parent
-- Parent and child must have the same type (income/expense)
-- Deleting a parent deletes all children (cascade delete)
-- Currently supports one level of nesting (can be extended to multiple levels if needed)
-
-## Testing
-
-1. Start the backend and frontend servers
-2. Navigate to the Categories page
-3. Create a top-level category (e.g., "Food")
-4. Create a subcategory under it (e.g., "Restaurant")
-5. Verify the hierarchical display shows proper indentation
-6. Try creating a transaction with the subcategory
-7. Test deleting a parent category (should warn about subcategories)
+**分类页面已随界面改为"仅首页"而移除**（R1），组件文件仍在磁盘上但已无路由。因此本文档只描述
+API 与数据层现状：分类的增删改查目前**没有可用的界面入口**，将来由 AI 层通过工具调用完成
+（见 [AI_BOOKKEEPING_ASSISTANT.md](AI_BOOKKEEPING_ASSISTANT.md) §5.1）。

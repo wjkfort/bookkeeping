@@ -1,201 +1,103 @@
-# Currency Conversion Setup Guide
+# 货币换算
 
-## Overview
+## 概览
 
-The bookkeeping app now supports automatic currency conversion between USD and CNY based on the selected language. Exchange rates are fetched from Open Exchange Rates API and cached for 24 hours to minimize API usage.
+应用的展示货币跟随界面语言：**English → USD，中文 → CNY**。汇率取自 Open Exchange Rates，
+缓存 24 小时以节省额度（免费档 1000 次/月）。
 
-## Features
+所有 API 返回的都是**小数金额**；数据库存的是整数分（`amount_cents`），换算在 API 边界完成。
+详见 [AI_BOOKKEEPING_ASSISTANT.md](AI_BOOKKEEPING_ASSISTANT.md) §3.5。
 
-- **Automatic Currency Detection**: 
-  - English (EN) → USD ($)
-  - Chinese (中文) → CNY (¥)
+## 配置
 
-- **Smart Caching**: 
-  - Exchange rates cached for 24 hours in database
-  - Minimizes API calls (stays under 1000/month free tier limit)
-  - Fallback to stale cache if API fails
-
-- **Automatic Conversion**:
-  - Dashboard summary converts all transactions to selected currency
-  - Transaction list shows converted amount with original in parentheses
-  - New transactions save with current language's currency
-
-## Setup Instructions
-
-### 1. Get API Key
-
-Sign up for a free account at [Open Exchange Rates](https://openexchangerates.org/signup/free) to get your API key (1000 requests/month free).
-
-### 2. Configure Backend
-
-Add your API key to `/backend/.env`:
+密钥是 Worker secret，**不是** `.env`，也绝不放进 `wrangler.toml` 的 `[vars]`：
 
 ```bash
-OPEN_EXCHANGE_RATES_API_KEY=your_api_key_here
+cd backend-ts
+npx wrangler secret put OPEN_EXCHANGE_RATES_API_KEY
 ```
 
-### 3. Install Dependencies
+本地开发放在 `backend-ts/.dev.vars`（已被 gitignore）：
 
-```bash
-cd backend
-pip install httpx==0.26.0
+```
+OPEN_EXCHANGE_RATES_API_KEY=your_key_here
+JWT_SECRET=any_local_value
 ```
 
-Or if using uv:
-```bash
-cd backend
-uv sync
+后台依赖只有 `hono` 与 `bcryptjs`，没有额外的 Python 包；`npx wrangler dev` 即起本地服务。
+
+## 行为
+
+- **自动检测**：English → USD，中文 → CNY（前端 `useCurrency` 随语言切换）。
+- **缓存**：汇率存 `exchange_rates`，24 小时内直接命中缓存；API 失败时沿用旧值。
+- **自动换算**：概要接口按 `target_currency` 换算后返回；交易列表同时显示换算值与原币金额；
+  新建交易以当前语言的货币保存。
+
+## API
+
+两个接口都需要 JWT（原先无鉴权，v2 起已加上）。
+
+### `GET /api/v1/exchange-rates/rates`
+
+```
+?base=USD&force_refresh=false
 ```
 
-### 4. Database Migration
-
-The exchange_rates table should already be created. If not, run:
-
-```bash
-cd backend
-psql "$DATABASE_URL" -f migrations/create_exchange_rates_table.sql
-```
-
-### 5. Start the Application
-
-**Backend:**
-```bash
-cd backend
-uvicorn app.main:app --reload
-```
-
-**Frontend:**
-```bash
-cd client
-npm run dev
-```
-
-## How It Works
-
-### Backend
-
-1. **Exchange Rate API** (`/api/v1/exchange-rates/rates`):
-   - Fetches USD/CNY rates from Open Exchange Rates
-   - Caches rates in `exchange_rates` table for 24 hours
-   - Returns cached rates if still fresh
-
-2. **Summary API** (`/api/v1/summary`):
-   - Accepts `target_currency` parameter (USD or CNY)
-   - Converts all transaction amounts to target currency
-   - Returns totals in requested currency
-
-3. **Transaction Model**:
-   - Each transaction stores its original currency
-   - Currency field defaults to USD
-
-### Frontend
-
-1. **Currency Hook** (`useCurrency.js`):
-   - Loads exchange rates when language changes
-   - Provides conversion functions
-   - Caches rates in component state
-
-2. **Dashboard**:
-   - Summary cards show totals in current language currency
-   - Recent transactions show converted amounts with original in parentheses
-
-3. **Transactions Page**:
-   - New transactions save with current language's currency
-   - List shows converted amounts for all transactions
-
-## API Endpoints
-
-### Get Exchange Rates
-```
-GET /api/v1/exchange-rates/rates?base=USD&force_refresh=false
-```
-
-Response:
 ```json
 {
-  "base_currency": "USD",
-  "rates": {
-    "USD": 1.0,
-    "CNY": 6.8672
-  },
-  "fetched_at": "2026-02-25T08:54:06.096531"
+  "base": "USD",
+  "rates": { "USD": 1.0, "CNY": 6.8672 },
+  "last_updated": "2026-02-25T08:54:06.096Z"
 }
 ```
 
-### Convert Currency
+### `GET /api/v1/exchange-rates/convert`
+
 ```
-GET /api/v1/exchange-rates/convert?amount=100&from_currency=USD&to_currency=CNY
+?amount=100&from_currency=USD&to_currency=CNY
 ```
 
-Response:
 ```json
 {
   "amount": 100,
   "from_currency": "USD",
   "to_currency": "CNY",
-  "converted_amount": 686.72,
-  "rate": 6.8672
+  "rate": 6.8672,
+  "converted_amount": 686.72
 }
 ```
 
-### Get Summary with Currency
-```
-GET /api/v1/summary?target_currency=CNY
-```
+### `GET /api/v1/summary?target_currency=CNY`
 
-Response:
 ```json
 {
-  "income": 6867.20,
-  "expense": 3433.60,
-  "balance": 3433.60
+  "total_income": 6867.20,
+  "total_expense": 3433.60,
+  "balance": 3433.60,
+  "currency": "CNY"
 }
 ```
 
-## Usage Example
+## 数据
 
-1. Create a transaction in English: Amount $100 (saved as USD)
-2. Switch to Chinese (中文)
-3. Dashboard automatically shows: ¥686.72
-4. Transaction list shows: ¥686.72 ($100.00)
-5. Create new transaction in Chinese: Amount ¥500 (saved as CNY)
-6. Switch back to English
-7. Dashboard converts both transactions to USD
+`exchange_rates` 是**每个币种对一行**，通过 UPSERT 更新（v2 之前是每次抓取追加一行，读时只取最新
+一条）：
 
-## Troubleshooting
-
-### Exchange rates not loading
-- Check that `OPEN_EXCHANGE_RATES_API_KEY` is set in `.env`
-- Verify backend is running and accessible
-- Check browser console for API errors
-- Test endpoint directly: `http://localhost:8000/api/v1/exchange-rates/rates`
-
-### Conversions not working
-- Ensure exchange rates are cached (visit rates endpoint first)
-- Check that transactions have currency field populated
-- Verify database migration ran successfully
-
-### API limit exceeded
-- Free tier allows 1000 requests/month
-- Rates are cached for 24 hours to minimize usage
-- Check `exchange_rates` table to see cached rates
-- Use `force_refresh=false` (default) to use cache
-
-## Database Schema
-
-### exchange_rates table
 ```sql
 CREATE TABLE exchange_rates (
-    id SERIAL PRIMARY KEY,
-    base_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    target_currency VARCHAR(3) NOT NULL,
-    rate FLOAT NOT NULL,
-    fetched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+    base_currency   TEXT NOT NULL CHECK (length(base_currency) = 3),
+    target_currency TEXT NOT NULL CHECK (length(target_currency) = 3),
+    rate            REAL NOT NULL,
+    fetched_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (base_currency, target_currency)
+) WITHOUT ROWID;
 ```
 
-### transactions table (updated)
-```sql
-ALTER TABLE transactions 
-ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'USD';
-```
+`transactions.currency` 每个交易各存一份（默认 `CNY`），因此历史记录一直保留其原始币种。
+
+## 排查
+
+- **汇率取不到**：确认 Worker secret 已设；未设时接口返回 500 且概要接口会失败——已有功能不受影响，
+  但换算类视图会报错。缺密钥时的报错是 `OPEN_EXCHANGE_RATES_API_KEY not configured`。
+- **没有换算**：确认交易本身有 `currency`；确认缓存里有该币种对（缓存是每对一行）。
+- **超出额度**：免费档 1000 次/月；默认 `force_refresh=false` 会走缓存。
