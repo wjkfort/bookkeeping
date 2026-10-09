@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Flex, Card, TextField, Button, Text, Heading, Link as RadixLink } from "@radix-ui/themes";
-import { EnvelopeClosedIcon, LockClosedIcon } from "@radix-ui/react-icons";
+import { EnvelopeClosedIcon, LockClosedIcon, BarChartIcon } from "@radix-ui/react-icons";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { useToast } from "../ui/Toast";
+import { useAuth } from "../../contexts/authContext";
+import { useToast } from "../ui/toastContext";
 import LanguageSwitcher from "../ui/LanguageSwitcher";
+import "./Auth.css";
 
 export const Login: React.FC = () => {
   const { t } = useTranslation();
@@ -23,46 +24,31 @@ export const Login: React.FC = () => {
       await login(email, password);
       toast.success(t("login.success"));
       navigate("/");
-    } catch (err: any) {
-      toast.error(err.message || t("login.error"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("login.error"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Flex
-      direction="column"
-      align="center"
-      justify="center"
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(180deg, var(--indigo-2) 0%, var(--color-background) 40%)",
-      }}
-    >
+    <Flex direction="column" align="center" justify="center" className="auth-page">
       {/* Language switcher — page-level, matches app header position */}
-      <Flex
-        justify="end"
-        style={{
-          position: "absolute",
-          top: 16,
-          right: 24,
-        }}
-      >
+      <Flex justify="end" className="auth-language">
         <LanguageSwitcher />
       </Flex>
 
       {/* Brand */}
-      <Flex align="center" gap="2" mb="6" style={{ cursor: "default" }}>
-        <Text size="6">💰</Text>
-        <Heading size="5" style={{ letterSpacing: "-0.02em" }}>
+      <Flex align="center" gap="3" mb="6" className="auth-brand-row">
+        <span className="brand-mark"><BarChartIcon /></span>
+        <Heading size="5" className="auth-brand-name">
           {t("nav.title")}
         </Heading>
       </Flex>
 
-      <Card size="3" style={{ width: 400 }}>
+      <Card size="3" className="auth-form-card">
         <Flex direction="column" gap="4" p="4">
-          <Flex direction="column" gap="1" align="center" mb="2">
+          <Flex direction="column" gap="1" align="center" mb="2" className="auth-form-heading">
             <Heading size="5">{t("login.title")}</Heading>
             <Text size="2" color="gray">{t("login.subtitle")}</Text>
           </Flex>
@@ -88,13 +74,13 @@ export const Login: React.FC = () => {
             <TextField.Slot><LockClosedIcon /></TextField.Slot>
           </TextField.Root>
 
-          <Button size="3" onClick={handleSubmit} disabled={loading || !email || !password}>
+          <Button size="3" className="auth-primary-button" onClick={handleSubmit} disabled={loading || !email || !password}>
             {loading ? t("common.loading") : t("login.button")}
           </Button>
 
           <Text size="2" align="center" color="gray">
             {t("login.noAccount")}{" "}
-            <RadixLink asChild>
+            <RadixLink asChild className="auth-link">
               <Link to="/register">{t("login.registerLink")}</Link>
             </RadixLink>
           </Text>

@@ -29,7 +29,7 @@ import {
 } from "../../types";
 import CategoryPicker from "../ui/CategoryPicker";
 import { useCurrency } from "../../hooks/useCurrency";
-import { useToast } from "../ui/Toast";
+import { useToast } from "../ui/toastContext";
 
 export interface TransactionFormModalProps {
   open: boolean;
@@ -300,7 +300,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 
     setSaving(true);
     try {
-      const data: Record<string, unknown> = {
+      const data: Partial<Transaction> = {
         amount: parseFloat(amount),
         currency: currencyCode,
         category_id: categoryId,
@@ -313,24 +313,23 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
       if (unit) data.unit = unit;
 
       if (isEditing && editingId != null) {
-        await updateTransaction(editingId, data as any);
+        await updateTransaction(editingId, data);
         toast.success(t("transactions.successUpdating"));
       } else {
-        await createTransaction(data as any);
+        await createTransaction(data);
         toast.success(t("transactions.successCreating"));
       }
 
       resetForm();
       onOpenChange(false);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving transaction:", error);
+      const detail = (error as { response?: { data?: { detail?: string; error?: string } } }).response?.data;
       toast.error(
         t("transactions.errorSaving") +
           ": " +
-          (error.response?.data?.detail ||
-            error.response?.data?.error ||
-            error.message),
+          (detail?.detail || detail?.error || (error instanceof Error ? error.message : "")),
       );
     } finally {
       setSaving(false);

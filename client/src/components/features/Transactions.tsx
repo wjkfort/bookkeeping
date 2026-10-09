@@ -36,7 +36,7 @@ import {
 import TransactionTable from "./TransactionTable";
 import CategoryPicker from "../ui/CategoryPicker";
 import TransactionFormModal from "./TransactionFormModal";
-import { useToast } from "../ui/Toast";
+import { useToast } from "../ui/toastContext";
 import dayjs from "dayjs";
 import "./Transactions.css";
 
@@ -45,6 +45,7 @@ const PAGE_SIZE = 20;
 const Transactions: React.FC = () => {
   const { t } = useTranslation();
   const toast = useToast();
+  const toastError = toast.error;
   const { formatWithConversion } = useCurrency();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,14 +73,6 @@ const Transactions: React.FC = () => {
     null,
   );
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  useEffect(() => {
-    loadTransactions();
-  }, [page]);
-
   const sortCategoriesWithChildren = (cats: Category[]): Category[] => {
     const result: Category[] = [];
     const parentCategories = cats.filter((cat) => !cat.parent_id);
@@ -102,7 +95,7 @@ const Transactions: React.FC = () => {
       setCategories(sortCategoriesWithChildren(response.data));
     } catch (error) {
       console.error("Error loading categories:", error);
-      toast.error(t("categories.errorLoading"));
+      toastError(t("categories.errorLoading"));
     }
   };
 
@@ -120,7 +113,7 @@ const Transactions: React.FC = () => {
       if (pageOverride !== undefined && pageOverride !== page) {
         setPage(pageOverride);
       }
-      const params: Record<string, unknown> = {
+      const params: Record<string, string | number> = {
         page: activePage,
         page_size: PAGE_SIZE,
       };
@@ -138,11 +131,23 @@ const Transactions: React.FC = () => {
       setSummaryTotals(data.totals || null);
     } catch (error) {
       console.error("Error loading transactions:", error);
-      toast.error(t("transactions.errorLoading"));
+      toastError(t("transactions.errorLoading"));
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void loadCategories();
+    // Initial category fetch only; later refreshes are explicit after mutations.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    void loadTransactions();
+    // Draft filter edits must not trigger a fetch before Apply is clicked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const handleViewItemHistory = async (itemId: number) => {
     try {
@@ -449,9 +454,9 @@ const Transactions: React.FC = () => {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip
-                        formatter={(value: number, _: string, props: any) => [
+                        formatter={(value, _, props) => [
                           formatWithConversion(
-                            value,
+                            Number(value),
                             props.payload?.currency || "USD",
                           ),
                           t("transactions.amount"),

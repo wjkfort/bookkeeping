@@ -27,13 +27,14 @@ import {
   deleteCategory,
   translateText,
 } from '../../api';
-import { Category, CategoryFormData } from '../../types';
-import { useToast } from '../ui/Toast';
+import { Category } from '../../types';
+import { useToast } from '../ui/toastContext';
 import './Categories.css';
 
 const Categories: React.FC = () => {
   const { t, i18n } = useTranslation();
   const toast = useToast();
+  const toastError = toast.error;
   const [categories, setCategories] = useState<Category[]>([]);
   const [flatCategories, setFlatCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,23 @@ const Categories: React.FC = () => {
   };
 
   useEffect(() => {
-    loadCategories();
-  }, []);
+    async function loadInitialCategories() {
+      try {
+        const [hierarchicalRes, flatRes] = await Promise.all([
+          getCategories(false),
+          getCategories(true),
+        ]);
+        setCategories(hierarchicalRes.data);
+        setFlatCategories(flatRes.data);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        toastError(t('categories.errorLoading'));
+      } finally {
+        setLoading(false);
+      }
+    }
+    void loadInitialCategories();
+  }, [t, toastError]);
 
   const loadCategories = async () => {
     try {
@@ -155,10 +171,10 @@ const Categories: React.FC = () => {
       setDialogOpen(false);
       setEditingCategory(null);
       loadCategories();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving category:', error);
       toast.error(
-        error.response?.data?.detail ||
+        (error as { response?: { data?: { detail?: string } } }).response?.data?.detail ||
           t(editingCategory ? 'categories.errorUpdating' : 'categories.errorCreating'),
       );
     } finally {
@@ -196,8 +212,8 @@ const Categories: React.FC = () => {
     );
   };
 
-  const flattenCategories = (cats: Category[], level: number = 0): any[] => {
-    const result: any[] = [];
+  const flattenCategories = (cats: Category[], level: number = 0): (Category & { level: number })[] => {
+    const result: (Category & { level: number })[] = [];
     cats.forEach((cat) => {
       const { children, ...catWithoutChildren } = cat;
       result.push({ ...catWithoutChildren, level });
@@ -261,7 +277,7 @@ const Categories: React.FC = () => {
                 </Table.Cell>
               </Table.Row>
             ) : (
-              flatData.map((record: any) => (
+              flatData.map((record) => (
                 <Table.Row key={record.id}>
                   <Table.Cell>
                     <span style={{ paddingLeft: `${record.level * 24}px` }}>
@@ -291,7 +307,7 @@ const Categories: React.FC = () => {
                         onClick={() =>
                           setDeleteTarget({
                             id: record.id,
-                            hasChildren: record.children && record.children.length > 0,
+                            hasChildren: Boolean(record.children?.length),
                           })
                         }
                       >

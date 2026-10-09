@@ -1,6 +1,8 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
+import { ToastCtx } from './toastContext'
 import * as ToastPrimitive from '@radix-ui/react-toast'
 import { Flex, Text, IconButton } from '@radix-ui/themes'
+import './Toast.css'
 import { Cross1Icon, CheckCircledIcon, CrossCircledIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 
 type ToastType = 'success' | 'error' | 'info'
@@ -11,20 +13,12 @@ interface Toast {
   type: ToastType
 }
 
-interface ToastContextType {
-  success: (message: string) => void
-  error: (message: string) => void
-  info: (message: string) => void
-}
-
-const ToastCtx = createContext<ToastContextType | null>(null)
-
 let toastId = 0
 
-const typeConfig: Record<ToastType, { color: 'jade' | 'tomato' | 'indigo'; Icon: typeof CheckCircledIcon }> = {
-  success: { color: 'jade', Icon: CheckCircledIcon },
-  error: { color: 'tomato', Icon: CrossCircledIcon },
-  info: { color: 'indigo', Icon: InfoCircledIcon },
+const typeConfig: Record<ToastType, { Icon: typeof CheckCircledIcon }> = {
+  success: { Icon: CheckCircledIcon },
+  error: { Icon: CrossCircledIcon },
+  info: { Icon: InfoCircledIcon },
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -47,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <ToastPrimitive.Provider swipeDirection="right" duration={4000}>
         {children}
         {toasts.map(t => {
-          const { color, Icon } = typeConfig[t.type]
+          const { Icon } = typeConfig[t.type]
           return (
             <ToastPrimitive.Root
               key={t.id}
@@ -55,21 +49,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               onOpenChange={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
               asChild
             >
-              <Flex
-                align="center"
-                gap="2"
-                style={{
-                  background: `var(--${color}-3)`,
-                  border: `1px solid var(--${color}-6)`,
-                  borderRadius: 'var(--radius-3)',
-                  padding: '12px 16px',
-                  boxShadow: 'var(--shadow-3)',
-                }}
-              >
-                <Icon style={{ color: `var(--${color}-9)`, flexShrink: 0 }} />
-                <Text size="2">{t.message}</Text>
+              <Flex align="center" gap="3" className={`app-toast app-toast--${t.type}`}>
+                <Icon className="app-toast-icon" />
+                <Text size="2" className="app-toast-message">{t.message}</Text>
                 <ToastPrimitive.Close asChild>
-                  <IconButton size="1" variant="ghost" color={color}>
+                  <IconButton size="1" variant="ghost" className="app-toast-close" aria-label="Close notification">
                     <Cross1Icon />
                   </IconButton>
                 </ToastPrimitive.Close>
@@ -77,26 +61,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             </ToastPrimitive.Root>
           )
         })}
-        <ToastPrimitive.Viewport
-          style={{
-            position: 'fixed',
-            top: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            zIndex: 9999,
-            maxWidth: 360,
-          }}
-        />
+        <ToastPrimitive.Viewport className="app-toast-viewport" />
       </ToastPrimitive.Provider>
     </ToastCtx.Provider>
   )
-}
-
-export function useToast() {
-  const ctx = useContext(ToastCtx)
-  if (!ctx) throw new Error('useToast must be used within ToastProvider')
-  return ctx
 }

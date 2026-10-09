@@ -22,6 +22,8 @@
   "dashboard": {
     "title": "仪表盘",
     "totalExpense": "总支出",
+    "totalIncome": "总收入",
+    "balance": "本期结余",
     "recentTransactions": "最近交易",
     "noTransactions": "暂无交易记录",
     "loading": "加载中...",

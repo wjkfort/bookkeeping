@@ -47,7 +47,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) 
   };
 
   return (
-    <Flex gap="1" align="center">
+    <Flex gap="2" align="center" className="month-picker">
       <Select.Root
         value={selectedYear?.toString() ?? ""}
         onValueChange={handleYearChange}
@@ -55,10 +55,11 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) 
       >
         <Select.Trigger
           variant="surface"
+          className="month-picker-trigger"
           placeholder={currentYear.toString()}
-          style={{ minWidth: 72 }}
+          style={{ minWidth: 86 }}
         />
-        <Select.Content>
+        <Select.Content className="month-picker-menu">
           {years.map((y) => (
             <Select.Item key={y} value={y.toString()}>
               {y}
@@ -74,10 +75,11 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) 
       >
         <Select.Trigger
           variant="surface"
+          className="month-picker-trigger"
           placeholder={new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date())}
-          style={{ minWidth: 56 }}
+          style={{ minWidth: 74 }}
         />
-        <Select.Content>
+        <Select.Content className="month-picker-menu">
           {months.map((m) => (
             <Select.Item key={m.value} value={m.value}>
               {m.label}

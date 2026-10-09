@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Dialog, Flex, TextField, Button, Text } from "@radix-ui/themes";
 import { createSubscription, updateSubscription, getCategories } from "../../api";
 import { Category } from "../../types";
-import { useToast } from "../ui/Toast";
+import { useToast } from "../ui/toastContext";
 import CategoryPicker from "../ui/CategoryPicker";
 
 interface SubscriptionModalProps {
@@ -104,10 +104,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
       onSuccess();
       onCancel();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error saving subscription:", error);
       toast.error(
-        error.response?.data?.error ||
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
           t("subscriptions.saveError") ||
           "Failed to save subscription"
       );

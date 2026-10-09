@@ -22,9 +22,7 @@ interface TransactionTableProps {
 const TransactionTable: React.FC<TransactionTableProps> = ({
   transactions,
   categories,
-  loading: _loading = false,
   showActions = false,
-  pagination: _pagination = false,
   summaryTotals = null,
   summaryCount,
   onEdit,
@@ -47,11 +45,6 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     return category.name;
   };
 
-  const getCategoryType = (categoryId: number): 'income' | 'expense' | undefined => {
-    const category = categories.find(cat => cat.id === categoryId);
-    return category?.type;
-  };
-
   const { totalIncome, totalExpense, net, count } = useMemo(() => {
     if (summaryTotals) {
       return {
@@ -69,7 +62,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
         transaction.currency,
         currencyCode,
       );
-      if (getCategoryType(transaction.category_id) === 'income') {
+      if (categories.find(cat => cat.id === transaction.category_id)?.type === 'income') {
         income += converted;
       } else {
         expense += converted;
@@ -176,7 +169,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
         <Table.Body>
           {transactions.map((record) => {
-            const categoryType = getCategoryType(record.category_id);
+            const categoryType = categories.find(cat => cat.id === record.category_id)?.type;
             const isIncome = categoryType === 'income';
 
             return (

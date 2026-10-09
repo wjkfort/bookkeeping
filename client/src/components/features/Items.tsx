@@ -22,14 +22,15 @@ import {
 } from "recharts";
 import { useCurrency } from "../../hooks/useCurrency";
 import { getItems, getItemHistory, updateItem, deleteItem } from "../../api";
-import { ItemWithStats, ItemHistory, Transaction } from "../../types";
-import { useToast } from "../ui/Toast";
+import { ItemWithStats, ItemHistory } from "../../types";
+import { useToast } from "../ui/toastContext";
 import dayjs from "dayjs";
 import "./Items.css";
 
 const Items: React.FC = () => {
   const { t } = useTranslation();
   const toast = useToast();
+  const toastError = toast.error;
   const { formatCurrency, formatWithConversion } = useCurrency();
   const [items, setItems] = useState<ItemWithStats[]>([]);
   const [filteredItems, setFilteredItems] = useState<ItemWithStats[]>([]);
@@ -49,8 +50,21 @@ const Items: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    loadItems();
-  }, []);
+    const loadInitialItems = async () => {
+      try {
+        setLoading(true);
+        const response = await getItems(true);
+        setItems(response.data as ItemWithStats[]);
+        setFilteredItems(response.data as ItemWithStats[]);
+      } catch (error) {
+        console.error("Error loading items:", error);
+        toastError(t("items.errorLoading"));
+      } finally {
+        setLoading(false);
+      }
+    };
+    void loadInitialItems();
+  }, [t, toastError]);
 
   const loadItems = async () => {
     try {
@@ -349,8 +363,8 @@ const Items: React.FC = () => {
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip
-                        formatter={(value: number, _: string, props: any) => [
-                          formatWithConversion(value, props.payload?.currency || "USD"),
+                        formatter={(value, _, props) => [
+                          formatWithConversion(Number(value), props.payload?.currency || "USD"),
                           t("transactions.unitPrice"),
                         ]}
                       />

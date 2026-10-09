@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Flex, Button } from '@radix-ui/themes';
+import { Button } from '@radix-ui/themes';
 
 const languages = [
   { code: 'en', label: 'EN' },
@@ -11,20 +11,16 @@ const LanguageSwitcher: React.FC = () => {
   const { i18n } = useTranslation();
 
   return (
-    <Flex gap="0" style={{ borderRadius: 'var(--radius-2)', overflow: 'hidden' }}>
-      {languages.map((lang, i) => {
+    <div className="language-switcher" role="group" aria-label={i18n.language === 'zh' ? '切换语言' : 'Choose language'}>
+      {languages.map((lang) => {
         const isActive = i18n.language === lang.code;
         return (
           <Button
             key={lang.code}
             size="1"
-            variant={isActive ? 'solid' : 'soft'}
-            color="iris"
-            style={{
-              borderRadius: 0,
-              minWidth: i === 0 ? 36 : 40,
-              fontWeight: isActive ? 600 : 400,
-            }}
+            variant="soft"
+            className={`language-option${isActive ? ' is-active' : ''}`}
+            aria-pressed={isActive}
             onClick={() => {
               i18n.changeLanguage(lang.code);
               localStorage.setItem('language', lang.code);
@@ -34,7 +30,7 @@ const LanguageSwitcher: React.FC = () => {
           </Button>
         );
       })}
-    </Flex>
+    </div>
   );
 };
 

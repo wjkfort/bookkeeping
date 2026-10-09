@@ -1,26 +1,19 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Flex, Tabs, IconButton, Text, Heading, Separator } from "@radix-ui/themes";
-import { DashboardIcon, ExitIcon } from "@radix-ui/react-icons";
+import { Flex, IconButton } from "@radix-ui/themes";
+import { ExitIcon, BarChartIcon } from "@radix-ui/react-icons";
 import Dashboard from "./components/features/Dashboard";
 
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LanguageSwitcher from "./components/ui/LanguageSwitcher";
-import { useAuth } from "./contexts/AuthContext";
-
-const navItems = [{ path: "/", icon: DashboardIcon }] as const;
+import { useAuth } from "./contexts/authContext";
 
 function AppContent() {
   const { t } = useTranslation();
   const location = useLocation();
   const { isAuthenticated, loading, logout, user } = useAuth();
-
-  const currentTab =
-    location.pathname === "/"
-      ? "dashboard"
-      : location.pathname.replace("/", "") || "dashboard";
 
   const isAuthPage =
     location.pathname === "/login" || location.pathname === "/register";
@@ -47,56 +40,26 @@ function AppContent() {
 
   // Authenticated app shell with navigation
   return (
-    <Flex direction="column" minHeight="100vh">
+    <Flex direction="column" minHeight="100vh" className="app-shell">
       {isAuthenticated && (
-        <>
-          <Flex
-            px="6"
-            py="3"
-            align="center"
-            justify="between"
-            style={{ borderBottom: "1px solid var(--gray-6)" }}
-          >
-            <Flex align="center" gap="6">
-              <Flex align="center" gap="2" asChild>
-                <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
-                  <Text size="5">💰</Text>
-                  <Heading size="3" style={{ letterSpacing: "-0.02em" }}>
-                    {t("nav.title")}
-                  </Heading>
-                </Link>
-              </Flex>
-              <Tabs.Root value={currentTab}>
-                <Tabs.List>
-                  {navItems.map((item) => (
-                    <Tabs.Trigger
-                      key={item.path}
-                      value={item.path.replace("/", "") || "dashboard"}
-                      asChild
-                    >
-                      <Link to={item.path}>
-                        <item.icon />
-                      </Link>
-                    </Tabs.Trigger>
-                  ))}
-                </Tabs.List>
-              </Tabs.Root>
-            </Flex>
-            <Flex align="center" gap="3">
-              <Text size="2" color="gray">
-                {user?.username}
-              </Text>
+        <header className="app-header">
+          <Flex align="center" justify="between" className="app-header-inner">
+            <Link to="/" className="brand-lockup">
+              <span className="brand-mark"><BarChartIcon /></span>
+              <span className="brand-name">{t("nav.title")}</span>
+            </Link>
+            <Flex align="center" gap="3" className="header-actions">
+              <span className="user-chip">{user?.username}</span>
               <LanguageSwitcher />
-              <IconButton variant="ghost" color="gray" onClick={logout}>
+              <IconButton variant="soft" className="header-logout" onClick={logout} aria-label={t("nav.logout")} title={t("nav.logout")}>
                 <ExitIcon />
               </IconButton>
             </Flex>
           </Flex>
-          <Separator size="4" />
-        </>
+        </header>
       )}
 
-      <Flex flexGrow="1" direction="column" px="4" py="6" style={{ flex: 1 }}>
+      <Flex flexGrow="1" direction="column" className="page-frame" style={{ flex: 1 }}>
           <Routes>
             <Route
               path="/"

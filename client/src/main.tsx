@@ -10,7 +10,7 @@ import "./theme/globalStyles.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Theme accentColor="indigo" grayColor="auto" radius="full" panelBackground="translucent">
+    <Theme accentColor="orange" grayColor="sand" radius="medium" panelBackground="solid">
       <AuthProvider>
         <ToastProvider>
           <App />

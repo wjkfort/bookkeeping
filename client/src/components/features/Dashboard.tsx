@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Button,
@@ -11,7 +11,7 @@ import {
   Dialog,
   TextField,
 } from "@radix-ui/themes";
-import { PlusIcon, ArchiveIcon, ResetIcon } from "@radix-ui/react-icons";
+import { PlusIcon, ArchiveIcon, ResetIcon, ArrowUpIcon, BarChartIcon } from "@radix-ui/react-icons";
 import { useCurrency } from "../../hooks/useCurrency";
 import {
   getSummary,
@@ -26,7 +26,7 @@ import {
 import { Summary, Subscription, CategorySummary } from "../../types";
 import SubscriptionModal from "./SubscriptionModal";
 import MonthPicker from "../ui/MonthPicker";
-import { useToast } from "../ui/Toast";
+import { useToast } from "../ui/toastContext";
 import dayjs, { Dayjs } from "dayjs";
 import {
   Tooltip,
@@ -38,16 +38,14 @@ import {
 import "./Dashboard.css";
 
 const PIE_COLORS = [
-  "var(--jade-9)",
-  "var(--indigo-9)",
-  "var(--tomato-9)",
-  "var(--amber-9)",
-  "var(--cyan-9)",
-  "var(--purple-9)",
-  "var(--pink-9)",
-  "var(--orange-9)",
-  "var(--teal-9)",
-  "var(--gray-9)",
+  "#bd694e",
+  "#768d76",
+  "#d1a45e",
+  "#6e8494",
+  "#a77b89",
+  "#8c795f",
+  "#c28d76",
+  "#809991",
 ];
 
 const Dashboard: React.FC = () => {
@@ -81,10 +79,6 @@ const Dashboard: React.FC = () => {
   const [restoreEndDate, setRestoreEndDate] = useState("");
   const [restoreCycle, setRestoreCycle] = useState("30");
   const [restoring, setRestoring] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, [currencyCode, selectedMonth, isOverall]);
 
   useEffect(() => {
     loadSubscriptions();
@@ -157,10 +151,10 @@ const Dashboard: React.FC = () => {
       toast.success(t("subscriptions.restoreSuccess") || "Subscription restored");
       setRestoreTarget(null);
       loadSubscriptions();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error restoring subscription:", error);
       toast.error(
-        error.response?.data?.error ||
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
           t("subscriptions.restoreError") ||
           "Failed to restore subscription",
       );
@@ -194,10 +188,10 @@ const Dashboard: React.FC = () => {
       });
       toast.success(t("dashboard.renewSuccess") || "Subscription renewed");
       await Promise.all([loadSubscriptions(), loadData()]);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error renewing subscription:", error);
       toast.error(
-        error.response?.data?.error ||
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
           t("dashboard.renewError") ||
           "Failed to renew",
       );
@@ -206,7 +200,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       let dateParams: Record<string, string> = {};
       if (!isOverall && selectedMonth) {
@@ -230,7 +224,11 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currencyCode, selectedMonth, isOverall]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const formatMonth = (date: Dayjs | null) => {
     if (!date) return "";
@@ -253,17 +251,10 @@ const Dashboard: React.FC = () => {
     return summary.total_expense / denom;
   }, [summary.total_expense, selectedMonth, isOverall]);
 
-  const getCategoryLabel = (category: CategorySummary): string => {
-    const lang = i18n.language;
-    if (category.translations?.[lang]) return category.translations[lang];
-    if (category.translations?.en) return category.translations.en;
-    return category.name;
-  };
-
   const pieData = useMemo(
     () =>
       categoryBreakdown.slice(0, 8).map((c) => ({
-        name: getCategoryLabel(c),
+        name: c.translations?.[i18n.language] || c.translations?.en || c.name,
         value: c.amount,
         pct: c.pct,
       })),
@@ -287,16 +278,17 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <Flex direction="column" gap="4">
-      {/* Header */}
-      <Flex justify="between" align="center">
-        <Flex direction="column" gap="1">
-          <Heading size="6">{t("dashboard.title")}</Heading>
-          <Text size="2" color="gray">
+    <Flex direction="column" gap="5" className="dashboard-page">
+      {/* The page is a quiet financial cockpit: a warm ledger surface, not a generic card grid. */}
+      <section className="dashboard-intro">
+        <div>
+          <Text className="dashboard-kicker">{t("dashboard.monthlyOverview")}</Text>
+          <Heading size="8">{t("dashboard.title")}</Heading>
+          <Text size="3" className="dashboard-period">
             {isOverall ? t("dashboard.overall") : formatMonth(selectedMonth)}
           </Text>
-        </Flex>
-        <Flex gap="2" align="center">
+        </div>
+        <Flex gap="2" align="center" className="dashboard-filters">
           <MonthPicker
             value={selectedMonth}
             onChange={(date) => {
@@ -312,32 +304,31 @@ const Dashboard: React.FC = () => {
             {t("dashboard.overall") || "Overall"}
           </Button>
         </Flex>
-      </Flex>
+      </section>
 
-      {/* Spending: total expense + category breakdown */}
-      <Card>
-        <div className="spending-card">
-          <div className="spending-left">
-          <div className="stat-card stat-expense">
-            <div className="stat-icon">📉</div>
-            <Flex direction="column" align="center" gap="1">
-              <Text size="2" color="gray">
-                {t("dashboard.totalExpense")}
-              </Text>
-              <Heading size="7">
-                {summary.total_expense.toFixed(2)}
-              </Heading>
-              <Text size="1" color="gray">
-                {currencyCode}
-                {avgDailyExpense != null && (
-                  <> · {t("dashboard.avgDailyExpense")} {avgDailyExpense.toFixed(0)}</>
-                )}
-              </Text>
-            </Flex>
-          </div>
-          </div>
-          
-          <div className="spending-right">
+      <section className="overview-strip" aria-label={t("dashboard.monthlyOverview")}>
+        <div className="overview-total">
+          <span className="metric-label">{t("dashboard.totalExpense")}</span>
+          <strong>{currencyCode} {summary.total_expense.toFixed(2)}</strong>
+          <span className="metric-note">{avgDailyExpense != null && `${t("dashboard.avgDailyExpense")} ${avgDailyExpense.toFixed(0)} ${currencyCode}`}</span>
+        </div>
+        <div className="overview-metric income-metric">
+          <span className="metric-icon"><ArrowUpIcon /></span>
+          <span><span className="metric-label">{t("dashboard.totalIncome")}</span><strong>{summary.total_income.toFixed(2)}</strong></span>
+        </div>
+        <div className="overview-metric balance-metric">
+          <span className="metric-icon"><BarChartIcon /></span>
+          <span><span className="metric-label">{t("dashboard.balance")}</span><strong>{summary.balance.toFixed(2)}</strong></span>
+        </div>
+        <div className="overview-metric category-metric">
+          <span className="metric-icon"><BarChartIcon /></span>
+          <span><span className="metric-label">{t("dashboard.categoryBreakdown")}</span><strong>{categoryBreakdown.length}</strong></span>
+        </div>
+      </section>
+
+      {/* Category breakdown */}
+      <Card className="spending-panel">
+        <div className="spending-right">
           <Text size="3" weight="bold">
             {t("dashboard.categoryBreakdown")}
           </Text>
@@ -361,6 +352,8 @@ const Dashboard: React.FC = () => {
                       innerRadius={48}
                       outerRadius={80}
                       paddingAngle={2}
+                      stroke="#f4ece1"
+                      strokeWidth={2}
                     >
                       {pieData.map((_, i) => (
                         <Cell
@@ -371,7 +364,7 @@ const Dashboard: React.FC = () => {
                     </Pie>
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      formatter={(value: any, _n: any, item: any) => [
+                      formatter={(value, _name, item) => [
                         `${Number(value).toFixed(2)} (${item?.payload?.pct ?? 0}%)`,
                         item?.payload?.name ?? "",
                       ]}
@@ -397,11 +390,10 @@ const Dashboard: React.FC = () => {
               </Flex>
             )}
           </div>
-          </div>
-          </div>
+        </div>
       </Card>
-          
-                {/* Subscription Management */}
+
+      {/* Subscription Management */}
       <Card className="subscription-section">
         <div className="subscription-header">
           <div className="subscription-title">

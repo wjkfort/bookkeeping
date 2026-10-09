@@ -72,7 +72,6 @@ export const useCurrency = (): UseCurrencyReturn => {
   };
   
   const formatCurrency = (amount: number, currency: string | null = null): string => {
-    const targetCurrency = currency || currentCurrency;
     const symbol = currency ? 
       (currency === 'CNY' ? '¥' : '$') : 
       t('currency.symbol');

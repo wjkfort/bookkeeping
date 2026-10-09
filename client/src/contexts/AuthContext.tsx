@@ -1,42 +1,18 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { AuthContext, type AuthUser } from './authContext';
 import axios from 'axios';
 
-interface User {
-  id: number;
-  email: string;
-  username: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, username: string) => Promise<void>;
-  logout: () => void;
-  isAuthenticated: boolean;
-  loading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Check for stored token on mount
+  const [token, setToken] = useState<string | null>(() => {
     const storedToken = localStorage.getItem('auth_token');
+    if (storedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+    return storedToken;
+  });
+  const [user, setUser] = useState<AuthUser | null>(() => {
     const storedUser = localStorage.getItem('auth_user');
+    return storedUser ? JSON.parse(storedUser) as AuthUser : null;
+  });
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      // Set axios default header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-    }
-    setLoading(false);
-  }, []);
 
   const login = async (email: string, password: string) => {
     try {
@@ -59,8 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Set axios default header
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Login failed');
+    } catch (error) {
+      throw new Error((error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Login failed');
     }
   };
 
@@ -86,8 +62,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Set axios default header
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || 'Registration failed');
+    } catch (error) {
+      throw new Error((error as { response?: { data?: { error?: string } } }).response?.data?.error || 'Registration failed');
     }
   };
 
@@ -108,18 +84,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         isAuthenticated: !!token,
-        loading,
+        loading: false,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

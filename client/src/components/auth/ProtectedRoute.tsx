@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { Flex, Spinner, Text } from "@radix-ui/themes";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../contexts/authContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

@@ -82,7 +82,7 @@ export const deleteCategory = (id: number): Promise<AxiosResponse<void>> => api.
 
 // Transactions
 export const getTransactions = (
-  params?: Record<string, any>
+  params?: Record<string, string | number | boolean | undefined>
 ): Promise<AxiosResponse<Transaction[] | TransactionListResponse>> =>
   api.get("/transactions", { params });
 
@@ -93,7 +93,7 @@ export const updateTransaction = (id: number, data: Partial<Transaction>): Promi
 export const deleteTransaction = (id: number): Promise<AxiosResponse<void>> => api.delete(`/transactions/${id}`);
 
 // Summary
-export const getSummary = (params?: Record<string, any>): Promise<AxiosResponse<Summary>> => api.get("/summary", { params });
+export const getSummary = (params?: Record<string, string | number | boolean | undefined>): Promise<AxiosResponse<Summary>> => api.get("/summary", { params });
 
 export const getMonthlySummary = (params?: {
   months?: number;

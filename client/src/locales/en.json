@@ -22,6 +22,8 @@
   "dashboard": {
     "title": "Dashboard",
     "totalExpense": "Total Expense",
+    "totalIncome": "Total Income",
+    "balance": "Period Balance",
     "recentTransactions": "Recent Transactions",
     "noTransactions": "No transactions yet",
     "loading": "Loading...",
