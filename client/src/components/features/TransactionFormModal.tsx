@@ -39,15 +39,23 @@ export interface TransactionFormModalProps {
   onSuccess?: () => void;
 }
 
+// Must match the `units` table exactly (seeded in db/schema.sql and
+// migrations/004): `item_prices.unit` has a real foreign key to `units.code`, so
+// an option that is not in that table makes the save fail outright. The previous
+// list offered "gallon" and "lb", which the database does not have — picking
+// either one produced a FOREIGN KEY constraint failure — while "g", "ml" and
+// "bag" could not be chosen at all. scripts/check_unit_vocabulary.py keeps the
+// schema, this list and the locale files from drifting apart again.
 const UNIT_OPTIONS = [
-  "gallon",
-  "liter",
-  "kg",
-  "lb",
   "piece",
+  "pack",
   "box",
   "bottle",
-  "pack",
+  "bag",
+  "kg",
+  "g",
+  "liter",
+  "ml",
 ] as const;
 
 const TransactionFormModal: React.FC<TransactionFormModalProps> = ({

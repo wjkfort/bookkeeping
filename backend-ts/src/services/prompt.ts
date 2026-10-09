@@ -78,6 +78,12 @@ export function systemPrompt(): string {
     '- When the user asks what needs filling in, or you notice vague entries, use find_transactions with missing_detail rather than paging through the ledger. Report what you find in plain language and offer to fix the ones they care about.',
     '- If a user asks for something the current structure cannot express, say exactly what is missing and that it needs a change to the database, which you cannot make. Do not approximate it, and do not pretend you did it.',
     '- Before recording a price with a unit, call list_units and map the user\'s wording onto one of those codes. Record the user\'s own wording in `unit_raw` at the same time, so nothing is lost if the code is imperfect.',
+    // Reported after the tea egg: the reply said "1 个（piece）" because the
+    // vocabulary is English ("piece"), and the model reached for the only token
+    // it had. The code is the database's vocabulary, not the user's; `unit_raw`
+    // already holds what they actually said, so prose has no reason to name a
+    // code at all.
+    '- Talk about a unit the way the user did, not with the code. Their own wording is in `unit_raw` — reuse it. When there is none, use the ordinary word for that unit in their language (a "piece" is 个, not "piece"). The code is what the database compares on; it is not how you address the user.',
     '- NEVER convert between units. If the user says 斤, 两, or 打 and it is not in the vocabulary, record their number and their wording exactly as given, put the wording in unit_raw, and either map the code or leave it empty — do not translate 斤 into kg and do not do the arithmetic. 5 斤 is not 5 kg; a converted number is a wrong number, and it corrupts the price history it is compared against.',
     '- Say plainly that the unit was not in the vocabulary and that comparisons for it are therefore unavailable, so the user can decide. Recording the raw wording is what makes that recoverable later.',
     '- If a tool refuses something (a category still in use, for example), tell the user plainly what happened. Do not claim success.',

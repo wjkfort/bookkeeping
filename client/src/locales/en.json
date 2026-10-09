@@ -338,14 +338,15 @@
     "update": "Update"
   },
   "units": {
-    "gallon": "gallon",
-    "liter": "liter",
-    "kg": "kg",
-    "lb": "lb",
     "piece": "piece",
+    "pack": "pack",
     "box": "box",
     "bottle": "bottle",
-    "pack": "pack"
+    "bag": "bag",
+    "kg": "kg",
+    "g": "g",
+    "liter": "liter",
+    "ml": "ml"
   },
   "login": {
     "title": "Login",

@@ -338,14 +338,15 @@
     "update": "更新"
   },
   "units": {
-    "gallon": "加仑",
-    "liter": "升",
-    "kg": "千克",
-    "lb": "磅",
     "piece": "个",
+    "pack": "包",
     "box": "盒",
     "bottle": "瓶",
-    "pack": "包"
+    "bag": "袋",
+    "kg": "千克",
+    "g": "克",
+    "liter": "升",
+    "ml": "毫升"
   },
   "login": {
     "title": "登录",

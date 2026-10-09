@@ -194,6 +194,16 @@ else
   bad "AI support endpoints (esbuild)"
 fi
 
+# --------------------------------------------------- 3d. one unit vocabulary
+#
+# The unit vocabulary is written down in four files, and they had drifted apart
+# in both directions: the form offered "gallon" and "lb" (not in `units`, so
+# saving hit the FOREIGN KEY and surfaced as a 500) while neither locale file
+# labelled "g", "ml" or "bag". `item_prices.unit` cannot hold anything outside
+# the table, so the lists have to agree. Needs no fixtures.
+run_layer "unit vocabulary (schema = form = locales)" \
+  python3 -I scripts/check_unit_vocabulary.py
+
 # ------------------------------------------------------------ 4. money arithmetic
 if [ -n "$V1" ] && [ -f "$V1" ] && [ -n "$V2" ] && [ -f "$V2" ]; then
   run_layer "money arithmetic (v1 vs v2)" \
