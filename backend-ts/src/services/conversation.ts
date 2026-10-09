@@ -21,7 +21,7 @@
  *   + the user's memory note
  *
  * Nothing here lets a client or a model widen that. §5.3 puts the ceiling on the
- * server, and `clampMessages` is where "recent N" stops being a count and
+ * server, and `takeNewestGroups` is where "recent N" stops being a count and
  * becomes a character budget too — a handful of very long messages must not
  * silently blow past the limit just because N was small.
  *
@@ -150,7 +150,8 @@ export async function recordMessage(
  * The most recent turns, oldest first (the order a prompt needs).
  *
  * `limit` bounds how many rows are read; the character budget is applied by
- * `clampMessages`, which is what actually protects the prompt.
+ * `groupMessages` + `takeNewestGroups`, which are what actually protect the
+ * prompt.
  */
 export async function loadRecentMessages(
   db: D1Database, userId: number, sessionId: string,
@@ -175,29 +176,96 @@ export async function loadRecentMessages(
 }
 
 /**
- * Trim a transcript to the character budget, keeping the newest turns.
+ * Split a stored transcript into replayable groups.
  *
- * A tool-call turn and its tool result are a pair: dropping the request while
- * keeping the result (or the reverse) produces a transcript the provider
- * rejects. Both carry `role: 'tool'` / a `tool_calls` value, so the walk keeps
- * the newest turns until the budget is reached and then stops — it never
- * leaves a dangling half of a pair at the front, because it always drops from
- * the oldest end.
+ * A group is a single message, or an assistant turn together with every tool
+ * result that answers it. **Groups are the smallest unit that may be dropped**,
+ * because half a group is a transcript the provider refuses:
+ *
+ *   AI provider error (400): Messages with role 'tool' must be a response to a
+ *   preceding message with 'tool_calls'
+ *
+ * That is exactly what production hit. A session's transcript came to 9231
+ * characters against an 8000 budget, and the character clamp — walking back
+ * from the newest turn and stopping when the budget ran out — landed between an
+ * assistant turn that requested a tool and the tool result answering it, so the
+ * window began with a `tool` row. The clamp's own comment claimed it "never
+ * leaves a dangling half of a pair at the front", which was simply wrong:
+ * dropping from the oldest end is precisely how a pair gets cut in half.
+ *
+ * Rows that cannot be replayed are dropped here rather than passed on, so a
+ * transcript damaged by an earlier bug or by a partial write heals instead of
+ * 400-ing the next turn:
+ *
+ *   - a tool result whose call was never stored (nothing declares it);
+ *   - an assistant turn whose calls are not *all* answered, and whose results
+ *     would therefore be orphans — a write interrupted between the two.
+ *
+ * Dropping a whole group anywhere is safe: everything left is still a valid
+ * sequence.
  */
-export function clampMessages(
-  messages: AiMessage[], charBudget: number = PROMPT_MESSAGE_CHAR_BUDGET,
-): AiMessage[] {
-  if (charBudget <= 0) return [];
+export function groupMessages(messages: AiMessage[]): AiMessage[][] {
+  const groups: AiMessage[][] = [];
 
-  const kept: AiMessage[] = [];
+  for (let i = 0; i < messages.length; ) {
+    const m = messages[i];
+
+    if (m.role === 'assistant') {
+      const ids = readToolCalls(m.tool_calls)
+        .map((c) => (c && typeof c.id === 'string' ? c.id : null))
+        .filter((id): id is string => id !== null);
+
+      if (ids.length > 0) {
+        const results: AiMessage[] = [];
+        const answered = new Set<string>();
+        let j = i + 1;
+        while (j < messages.length && messages[j].role === 'tool') {
+          const id = readToolCallId(messages[j].tool_calls);
+          if (id) answered.add(id);
+          results.push(messages[j]);
+          j += 1;
+        }
+
+        // Every call answered, and nothing answered that was not called.
+        const complete =
+          answered.size === ids.length && ids.every((id) => answered.has(id));
+        if (complete) groups.push([m, ...results]);
+
+        i = j;
+        continue;
+      }
+    }
+
+    if (m.role !== 'tool') groups.push([m]);
+    i += 1;
+  }
+
+  return groups;
+}
+
+/**
+ * The newest whole groups that fit the budget.
+ *
+ * At least the newest group is always kept, even when it alone is over budget;
+ * the caller decides what to do with a prompt that is still too large.
+ *
+ * `buildPrompt` clamps in two stages — this transcript budget, then the whole
+ * prompt — which is why the group structure is returned instead of a flat array.
+ * There is deliberately no one-line `clampMessages` wrapper: it had exactly one
+ * caller before this fix and this change removed it, and an exported helper with
+ * no caller is the same dead-code smell that made `addMerchantAlias` a defect.
+ */
+export function takeNewestGroups(groups: AiMessage[][], charBudget: number): AiMessage[][] {
+  const kept: AiMessage[][] = [];
   let used = 0;
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    const size = (m.content?.length ?? 0) + (m.tool_calls?.length ?? 0);
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const size = groups[i].reduce(
+      (n, m) => n + (m.content?.length ?? 0) + (m.tool_calls?.length ?? 0), 0,
+    );
     if (used + size > charBudget && kept.length > 0) break;
     used += size;
-    kept.push(m);
+    kept.push(groups[i]);
   }
 
   return kept.reverse();

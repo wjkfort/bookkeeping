@@ -24,7 +24,7 @@ import { readMemory } from './memory';
 import { listCategories } from './categories';
 import { findGaps } from './gaps';
 import { summarize } from './queries';
-import { loadRecentMessages, clampMessages, readToolCallId, readToolName, readToolCalls } from './conversation';
+import { loadRecentMessages, groupMessages, takeNewestGroups, readToolCallId, readToolName, readToolCalls } from './conversation';
 import { todayInZone } from '../utils/time';
 import type { AiMessage } from '../types';
 
@@ -263,49 +263,69 @@ export async function buildPrompt(
   const snapshot = await buildSnapshot(db, userId, today, opts.timezone);
 
   const recent: AiMessage[] = await loadRecentMessages(db, userId, opts.sessionId, opts.recentLimit);
-  const clamped = clampMessages(recent, PROMPT_TRANSCRIPT_BUDGET);
-  let transcriptClamped = clamped.length !== recent.length;
 
-  const messages: ChatMessage[] = [
+  // Group before anything is dropped. `groupMessages` also discards rows that can
+  // never be replayed — a tool result whose request is gone — so a transcript
+  // damaged by an earlier bug or a partial write heals here instead of reaching
+  // the provider as a 400.
+  const groups = groupMessages(recent);
+  let kept = takeNewestGroups(groups, PROMPT_TRANSCRIPT_BUDGET);
+
+  const head: ChatMessage[] = [
     { role: 'system', content: systemPrompt() },
     { role: 'system', content: `Current state:\n${renderSnapshot(snapshot)}` },
-    ...clamped.map((m): ChatMessage => {
-      if (m.role === 'tool') {
-        // The stored transcript is replayed faithfully: a tool result must carry
-        // the id of the call it answers, and a `name` so the provider can match.
-        const id = readToolCallId(m.tool_calls);
-        const name = readToolName(m.tool_calls);
-        return {
-          role: 'tool',
-          content: m.content ?? '',
-          ...(id ? { tool_call_id: id } : {}),
-          ...(name ? { name } : {}),
-        };
-      }
-      const toolCalls = readToolCalls(m.tool_calls);
+  ];
+
+  const toChatMessage = (m: AiMessage): ChatMessage => {
+    if (m.role === 'tool') {
+      // The stored transcript is replayed faithfully: a tool result must carry
+      // the id of the call it answers, and a `name` so the provider can match.
+      const id = readToolCallId(m.tool_calls);
+      const name = readToolName(m.tool_calls);
       return {
-        role: m.role,
-        content: m.content,
-        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        role: 'tool',
+        content: m.content ?? '',
+        ...(id ? { tool_call_id: id } : {}),
+        ...(name ? { name } : {}),
       };
-    }),
+    }
+    const toolCalls = readToolCalls(m.tool_calls);
+    return {
+      role: m.role,
+      content: m.content,
+      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+    };
+  };
+
+  const assemble = (chosen: AiMessage[][]): ChatMessage[] => [
+    ...head,
+    ...chosen.flat().map(toChatMessage),
     // Last before the user's own words, where recency makes it hard to miss.
     { role: 'system', content: languageDirective(detectLanguage(userMessage)) },
     { role: 'user', content: userMessage },
   ];
 
-  // Final whole-prompt check: drop oldest transcript entries until it fits. The
-  // two system blocks and the new user message are never dropped — the snapshot
-  // is what makes the numbers trustworthy, and the user message is the question.
   const budget = opts.charBudget ?? PROMPT_CHAR_BUDGET;
   const size = (msgs: ChatMessage[]) =>
     msgs.reduce((n, m) => n + (m.content?.length ?? 0) + (m.tool_calls ? JSON.stringify(m.tool_calls).length : 0), 0);
 
-  while (size(messages) > budget && messages.length > 3) {
-    // Index 2 is the first transcript entry.
-    messages.splice(2, 1);
-    transcriptClamped = true;
+  // Final whole-prompt check: drop the oldest transcript, still in whole groups.
+  // The two system blocks, the language directive and the user's own message are
+  // never dropped — the snapshot is what makes the numbers trustworthy, and the
+  // user message is the question.
+  //
+  // This loop used to `splice(2, 1)`, one message at a time, with a
+  // `length > 3` guard. That had the same pairing bug as the character clamp —
+  // it could leave a tool result at the front — and it could also eat the
+  // language directive sitting immediately before the user's message, which is
+  // the one line that keeps a reply in the user's language.
+  let messages = assemble(kept);
+  while (size(messages) > budget && kept.length > 0) {
+    kept = kept.slice(1);
+    messages = assemble(kept);
   }
+
+  const transcriptClamped = kept.flat().length !== recent.length;
 
   return { messages, transcriptClamped, snapshot };
 }

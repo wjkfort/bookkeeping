@@ -62,7 +62,7 @@ import { toolDefinitions, runTool, TOOLS } from '../src/services/tools';
 import { findTransactions } from '../src/services/queries';
 import { buildPrompt, PROMPT_CHAR_BUDGET, detectLanguage } from '../src/services/prompt';
 import {
-  clampMessages, recordMessage, loadRecentMessages, toolCallIdPayload,
+  groupMessages, takeNewestGroups, recordMessage, loadRecentMessages, toolCallIdPayload,
   pageMessages, listSessions, tokenUsage,
 } from '../src/services/conversation';
 import { runChatTurn, runOpeningTurn, MAX_TOOL_ROUNDS } from '../src/services/chat';
@@ -1207,19 +1207,144 @@ async function main() {
         jinAsKg.without_unit?.count === 1, JSON.stringify(jinAsKg.without_unit?.count));
 
 
-  // A pathological transcript must not blow the budget: clampMessages is what
-  // makes "recent N" a character budget rather than a count.
+  // A pathological transcript must not blow the budget: the group clamp is what
+  // makes "recent N" a character budget rather than a count. This mirrors what
+  // buildPrompt does (`groupMessages` then `takeNewestGroups`), so the tests and
+  // production exercise the same path.
+  const clamp = (msgs: any[], budget: number) =>
+    takeNewestGroups(groupMessages(msgs), budget).flat();
   const huge: any[] = [];
   for (let i = 0; i < 20; i++) {
     huge.push({ id: i, user_id: uid, role: 'user', content: 'x'.repeat(2000), tool_calls: null, tokens_in: 0, tokens_out: 0, created_at: '' });
   }
-  const clamped = clampMessages(huge, 5000);
+  const clamped = clamp(huge, 5000);
   const clampedSize = clamped.reduce((n, m) => n + m.content.length, 0);
-  check('clampMessages keeps the newest turns inside the budget', clampedSize <= 5000,
+  check('the clamp keeps the newest turns inside the budget', clampedSize <= 5000,
         `got ${clampedSize}`);
-  check('clampMessages drops from the oldest end', clamped.length < huge.length,
+  check('the clamp drops from the oldest end', clamped.length < huge.length,
         `${clamped.length} of ${huge.length}`);
-  check('clampMessages keeps the newest message', clamped[clamped.length - 1].id === 19);
+  check('the clamp keeps the newest message', clamped[clamped.length - 1].id === 19);
+
+  // ---------------------------------------------------------------------------
+  // Production regression, 2026-10-09: the character clamp cut a tool-call pair
+  // in half.
+  //
+  // The real transcript of session 9588e4f3… came to 9231 characters against the
+  // 8000 budget. Walking back from the newest turn, the budget ran out between
+  // an assistant turn that requested two tools and the results answering them,
+  // so the window began with a `tool` row. DeepSeek answered:
+  //
+  //   AI provider error (400): Messages with role 'tool' must be a response to a
+  //   preceding message with 'tool_calls'
+  //
+  // The shapes and sizes below are the production ones (7877-character
+  // list_categories result and all), so this test fails on the old clamp: it
+  // kept ids 20..23 and dropped 18, 19 — leaving 20, a bare tool result, first.
+  // ---------------------------------------------------------------------------
+  const call = (id: string) => ({
+    id, type: 'function', function: { name: 'list_categories', arguments: '{}' },
+  });
+  const row = (id: number, role: string, content: string | null, toolCalls: any = null) => ({
+    id, user_id: uid, session_id: S, role, content,
+    tool_calls: toolCalls ? JSON.stringify(toolCalls) : null,
+    tokens_in: 0, tokens_out: 0, created_at: '',
+  });
+
+  // Every `tool` message must answer a call declared by the assistant turn that
+  // immediately precedes its run, and every call must be answered exactly once.
+  const replayable = (msgs: any[], idOf: (m: any) => string | null): boolean => {
+    for (let i = 0; i < msgs.length; i++) {
+      if (msgs[i].role !== 'tool') continue;
+      let start = i;
+      while (start > 0 && msgs[start - 1].role === 'tool') start -= 1;
+      const request = msgs[start - 1];
+      if (!request || request.role !== 'assistant') return false;
+      const declared: string[] = (request.tool_calls ?? []).map((c: any) => c.id);
+      if (declared.length === 0) return false;
+      const answered = new Set<string>();
+      for (let k = start; k < msgs.length && msgs[k].role === 'tool'; k++) {
+        const id = idOf(msgs[k]);
+        if (id) answered.add(id);
+      }
+      if (answered.size !== declared.length) return false;
+      if (!declared.every((id) => answered.has(id))) return false;
+    }
+    return true;
+  };
+  const storedId = (m: any) => {
+    try { return JSON.parse(m.tool_calls ?? '{}').tool_call_id ?? null; } catch { return null; }
+  };
+
+  const productionShape = [
+    row(17, 'user', '今天买AI token花了50'),
+    row(18, 'assistant', null, [call('A'), call('B')]),
+    row(19, 'tool', 'x'.repeat(7877), toolCallIdPayload('A', 'list_categories')),
+    row(20, 'tool', 'unit vocabulary…', toolCallIdPayload('B', 'list_units')),
+    row(21, 'assistant', null, [call('C')]),
+    row(22, 'tool', '{"id":490,…}', toolCallIdPayload('C', 'add_transaction')),
+    row(23, 'assistant', '已记下：今天 AI token 50 元，归到「编程」类别。'),
+  ];
+  const productionClamped = clamp(productionShape, 8000);
+  const productionShapeDesc = JSON.stringify(productionClamped.map((m) => `${m.id}:${m.role}`));
+  check('a clamped transcript never starts with a tool result',
+        productionClamped.length > 0 && productionClamped[0].role !== 'tool', productionShapeDesc);
+  check('a clamped transcript keeps every call with all of its results',
+        replayable(productionClamped, storedId), productionShapeDesc);
+  check('the newest turn survives the clamp',
+        productionClamped[productionClamped.length - 1].id === 23, productionShapeDesc);
+
+  // A transcript already damaged in storage heals rather than 400-ing the next
+  // turn: a result nothing declares, and a call answered only in part (a write
+  // interrupted between the two rows).
+  const orphanResult = [
+    row(1, 'assistant', 'an earlier answer'),
+    row(2, 'tool', 'nothing declares this call', toolCallIdPayload('gone', 'list_units')),
+  ];
+  const healed = clamp(orphanResult, 8000);
+  check('a tool result nothing declares is dropped',
+        healed.length === 1 && healed[0].role === 'assistant',
+        JSON.stringify(healed.map((m) => `${m.id}:${m.role}`)));
+
+  const halfAnswered = [
+    row(1, 'user', 'hi'),
+    row(2, 'assistant', null, [call('A'), call('B')]),
+    row(3, 'tool', 'only one of the two', toolCallIdPayload('A', 'list_categories')),
+  ];
+  const halfKept = clamp(halfAnswered, 8000);
+  check('a call answered only in part is dropped, results and all',
+        halfKept.length === 1 && halfKept[0].id === 1,
+        JSON.stringify(halfKept.map((m) => `${m.id}:${m.role}`)));
+
+  // The whole-prompt clamp has the same duty, and one more: it used to
+  // `splice(2, 1)` single messages, which could also eat the language directive
+  // that sits immediately before the user's own message.
+  const clampSession = 'svc-clamp-session';
+  await recordMessage(db, uid, { session_id: clampSession, role: 'user', content: 'first question' });
+  await recordMessage(db, uid, {
+    session_id: clampSession, role: 'assistant', content: null,
+    tool_calls: JSON.stringify([call('D')]),
+  });
+  await recordMessage(db, uid, {
+    session_id: clampSession, role: 'tool', content: 'y'.repeat(9000),
+    tool_calls: toolCallIdPayload('D', 'list_categories'),
+  });
+  await recordMessage(db, uid, { session_id: clampSession, role: 'assistant', content: 'first answer' });
+  await recordMessage(db, uid, { session_id: clampSession, role: 'user', content: 'second question' });
+
+  const clampedPrompt = await buildPrompt(db as any, uid, 'third question', {
+    sessionId: clampSession, today: '2030-06-15',
+  });
+  const roles = JSON.stringify(clampedPrompt.messages.map((m) => m.role));
+  check('the user message is still last after clamping',
+        clampedPrompt.messages[clampedPrompt.messages.length - 1].content === 'third question', roles);
+  check('the language directive survives the clamp',
+        clampedPrompt.messages[clampedPrompt.messages.length - 2].role === 'system' &&
+        /Reply entirely in/.test(clampedPrompt.messages[clampedPrompt.messages.length - 2].content ?? ''),
+        JSON.stringify(clampedPrompt.messages[clampedPrompt.messages.length - 2]));
+  check('the assembled prompt is a transcript the provider accepts',
+        replayable(clampedPrompt.messages, (m) => m.tool_call_id ?? null), roles);
+  check('the oversized transcript was reported as clamped',
+        clampedPrompt.transcriptClamped === true, `${clampedPrompt.transcriptClamped}`);
 
   console.log('\n=== chat: the tool-calling loop ===');
   // Canned provider: round 1 asks for a write, round 2 answers in words.
