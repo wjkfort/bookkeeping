@@ -218,7 +218,9 @@ ledger_days      user_id → users CASCADE, date,
 | `migrations/004_normalise_units_merchants.sql` | `units` 词表、`merchants` + `merchant_aliases`；`item_prices` 增加 `unit_raw` 与 `merchant_id`，`unit` 约束到 `units(code)`。在 003 之后 |
 | `migrations/005_ai_message_sessions.sql` | `ai_messages` 增加 `session_id NOT NULL DEFAULT 'default'`（重建表）；已有行归入 `'legacy'`；索引改为 `(user_id, session_id, id)`。在 004 之后 |
 | `migrations/006_category_structure_triggers.sql` | 两个触发器，把分类的"深度 ≤ 2"、"子类型 = 父类型"、"子分类与父分类同属一个用户"变成数据库约束。`CHECK` 不能含子查询，触发器是唯一可用机制。在 005 之后，幂等 |
-| `scripts/verify_migration.py` | 在真实数据副本上应用整条链并检查 **38** 项 |
+| `migrations/007_value_domain.sql` | 先修数据（`description=''` → NULL、74 行空格时间戳 → ISO），再为 7 张表安装 14 个值域触发器（日期合法性、JSON 合法性、负数金额/负数 token、非正汇率）。在 006 之后，可重复运行 |
+| `migrations/008_category_tree.sql` | **数据重组**（非结构）：合并 Groceries/Supermarket、把话费归位到 Necessary、烟酒独立成根、一次性支出归入 Personal Care / Family & Gifts、统一命名与翻译、给三个组补具名子类、补 5 笔订阅关联。52 → 58 个分类。`verify_migration.py` 把它放在保留性检查**之后**执行 |
+| `scripts/verify_migration.py` | 在真实数据副本上应用整条链并检查 **40** 项 |
 | `db/schema.sql` | 新建/空库用；验证器逐结构证明它与迁移结果一致（触发器按存储 SQL 比对） |
 
 迁移规则：
@@ -285,7 +287,7 @@ v2、拷贝、再删暂存表——绝不重命名在用表。
 1. `wrangler d1 export bookkeeping-db --remote --output=prod-backup-<date>.sql`。
 2. 对新鲜导出跑 `verify_migration.py`。**原始导出预期会失败** 2 项前置检查（那 5 条未挂 item 的
    行），这正是下一步要修的。
-3. 对生产执行 `001`，重新导出并重跑验证器：必须 **38/0** 才能继续。
+3. 对生产执行 `001`，重新导出并重跑验证器：必须 **40/0** 才能继续。
 4. 确认 `subscriptions.archived_at` 存在（2026-10-09 时已存在）。
 5. 提交代码但**先不 push**。在同一分钟内：`git push`，紧接着依序执行 `002`、`003`、`004`。
 6. 部署匹配的前后端代码。`wrangler d1 execute --file` 整文件单事务，失败会整体回滚（已在
@@ -332,7 +334,7 @@ POST   /ai/chat             发送消息；返回回复与本次写入列表
                             { message | opening:true, session, timezone?, today? }
 GET    /ai/messages         分页聊天历史。**必须带 ?session=**，?before=<id> 向前翻页
 GET    /ai/sessions         历史对话列表（条数、首末时间、token）。界面尚未使用
-GET    /ai/status           是否已配置、工具清单、token 用量（daily_token_limit 恒为 null）
+GET    /ai/status           是否已配置、provider、工具清单、token 用量（daily_token_limit 恒为 null）
 GET    /ai/gaps             未闭合提醒（缺日、逾期订阅）；?today= & ?timezone= 可固定参照
 POST   /ai/gaps/no-spend    { date, status? } → upsert ledger_days
 GET    /ai/units            单位词表（同 /units、/prices/units 三处挂载）
@@ -622,7 +624,7 @@ app 与鉴权中间件。
 |---|---|
 | `POST /ai/chat` | `{message}` 走完整对话循环；`{opening:true}` 由服务端算出缺口后让模型开场 |
 | `GET /ai/messages` | `?before=<id>` 分页聊天历史（R5） |
-| `GET /ai/status` | 是否已配置、工具清单、token 用量（**`daily_token_limit: null`**） |
+| `GET /ai/status` | 是否已配置、`provider`（当前恒为 `"deepseek"`）、工具清单、token 用量（**`daily_token_limit: null`**） |
 
 关键实现约束：
 
@@ -652,6 +654,10 @@ app 与鉴权中间件。
 - **提醒由服务端算出。** 面板显示 `GET /ai/gaps` 的结果，并把每一天交给两个动作
   （"那天没花钱" → `no_spend`；"只记了一部分" → `partial`），而不是让模型复述。
   首次打开时用 `opening:true` 让助手带出提醒；若已有对话则跳过，不重复开场。
+- **入口形态随 provider 变化。** `GET /ai/status` 返回 `provider`（当前只有 `"deepseek"`）。
+  `provider === "deepseek"` 时，右下角启动器可以显示鲸鱼娘形象（素材由使用者提供，放在
+  `client/public/mascot/`，见该目录的 README）；没有素材或换了 provider 就回落到普通气泡图标。
+  启动器可拖动（位置存 `localStorage`、越界自动钳制、聚焦后方向键可微调），位移小于 4px 仍算点击。
 - **缺密钥不破坏页面。** 先查 `GET /ai/status`；`configured:false` 时把输入框换成一句
   说明，而不是给一个必然报错的输入框（R6）。
 - **工具拒绝要如实说。** `writes[]` 里有失败项时弹出错误（并显示服务端原因），

@@ -125,18 +125,21 @@ npx wrangler d1 execute bookkeeping-db --remote \
 npx wrangler d1 execute bookkeeping-db --remote \
   --file=./migrations/001_link_priced_rows_to_items.sql
 
-# 5. 重新导出并确认验证器到 38/0（要对新导出跑，不是第 1 步那个）
+# 5. 重新导出并确认验证器到 40/0（要对新导出跑，不是第 1 步那个）
 npx wrangler d1 export bookkeeping-db --remote --output=prod-backup-after-001.sql
 python3 -I scripts/verify_migration.py prod-backup-after-001.sql
 
-# 6. 紧接着应用 002 → 003 → 004 → 005 → 006
+# 6. 紧接着应用 002 → 003 → 004 → 005 → 006 → 007 → 008
 #    （003 针对 v2 schema，必须在 002 之后；005 针对 003 建的表，必须在 003 之后；
-#      006 建触发器，必须等 002 重建完 categories 之后）
+#      006/007 建触发器，必须等 002 重建完 categories 之后；
+#      008 重排分类树并改数据，必须在最后——它依赖 006 的触发器允许这些改动）
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/002_schema_v2.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/003_ai_layer_tables.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/004_normalise_units_merchants.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/005_ai_message_sessions.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/006_category_structure_triggers.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/007_value_domain.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/008_category_tree.sql
 ```
 
 **006 可以单独补跑，不影响上面那次迁移的历史。** 它只建两个触发器、不改任何一行数据，幂等

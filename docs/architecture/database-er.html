@@ -706,7 +706,7 @@
         <ul>
           <li>&bull; 9 张表各有一条 user_id → users ON DELETE CASCADE；units 与 exchange_rates 没有，users 是归属根</li>
           <li>&bull; categories.parent_id 自引用（自连接拉不出箭头）</li>
-          <li>&bull; migrations/006 的触发器强制：深度 ≤ 2、子类型 = 父类型、子分类与父分类同一用户</li>
+          <li>&bull; 16 个触发器：006 分类结构（深度 ≤ 2、子类型 = 父类型、同一用户）；007 值域（日期、JSON、非负数）</li>
         </ul>
       </div>
     </div>

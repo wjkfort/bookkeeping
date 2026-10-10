@@ -79,7 +79,9 @@ npm run db:rebuild
 npx wrangler dev       # or: npm run dev
 
 #    Nothing here is irreplaceable: rebuilding from the same export reproduces
-#    the same database. Note the corollary, though — production has been on v2
+#    the same database — plus any migration production has not taken yet, so
+#    while those exist the local database deliberately differs from production.
+#    Note the corollary, though — production has been on v2
 #    since 2026-10-09, so a current export is already migrated and the v1 -> v2
 #    chain (scripts/setup_prod_staging.py, `npm run db:rebuild:v1`) no longer
 #    applies to it. That is also why the /tmp fixture pair the harness compares

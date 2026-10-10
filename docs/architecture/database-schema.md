@@ -1,11 +1,12 @@
 # 数据库表结构（schema v2）
 
-12 张表 / 10 个显式索引 / **2 个触发器**。结构以本地库实际 DDL 为准（`db/schema.sql` 与
-`migrations/000`–`006` 两条路径由 `scripts/verify_migration.py` 逐结构比对，必须一致）。
+12 张表 / 10 个显式索引 / **16 个触发器**。结构以本地库实际 DDL 为准（`db/schema.sql` 与
+`migrations/000`–`007` 两条路径由 `scripts/verify_migration.py` 逐结构比对，必须一致）。
 
 - 本地库：`backend-ts/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/bb5754fe….sqlite`
 - 远端：D1 `bookkeeping-db`（`database_id = 81d99dfc-618f-408f-8e28-d2752a807d45`）
-- 行数为 2026-10-10 本地样本数据，仅作量级参考
+- 行数为 2026-10-10 生产导出、应用完 000–008 之后的数据，仅作量级参考
+- **有哪些分类**是数据而非结构，当前形态由 `migrations/008_category_tree.sql` 定义
 
 ## ER 关系图
 
@@ -49,10 +50,12 @@ cd <repo>/docs/architecture
 | 约定 | 说明 |
 | --- | --- |
 | 金额 | 一律 **整数分**（`amount_cents`、`unit_price_cents`），`CHECK (>= 0)`；收支方向由 `categories.type` 决定，不靠正负号 |
-| 时间 | 全部 `TEXT`。`created_at` 默认 `datetime('now')`（UTC，无时区后缀）；业务日期 `date`/`observed_on`/`end_date` 为 `'YYYY-MM-DD'` |
+| 时间戳 | 全部 `TEXT`，一律 **ISO-8601 UTC**（`2026-10-10T08:04:52.262Z`，即 `toISOString()`）。DDL 里仍写着 `DEFAULT (datetime('now'))`，但**没有写入路径再依赖它**，且迁移 007 已把历史上由它产生的 74 行空格格式（`2026-10-10 08:04:52`）归一到 ISO——两种格式字典序不同（`' '` `0x20` < `'T'` `0x54`），混在一列里会让任何范围比较或排序出错 |
+| 业务日期 | `date` / `observed_on` / `end_date` / `ledger_days.date` 为 `'YYYY-MM-DD'`，且必须是**真实日历日期**：由触发器（迁移 007）+ 服务层 `isDateOnly()` 双重强制。原因见[触发器](#附触发器16-个)：`strftime` 对无法解析的日期返回 NULL，坏日期不会报错，只会从月度汇总里消失 |
 | 币种 | `TEXT` + `CHECK (length(currency) = 3)`，如 `CNY`/`USD` |
 | 用户隔离 | `users` 是归属根。除 **`units`** 与 **`exchange_rates`** 外，其余 9 张表都有 `user_id → users(id) ON DELETE CASCADE`，所有查询按 `user_id` 过滤（JWT 作用域，模型无法指定用户） |
 | 无行号表 | `exchange_rates`、`ledger_days` 为 `WITHOUT ROWID`（复合主键，省一层 B-tree） |
+| 可选文本 | "无描述"只有 `NULL` 一种写法。`description` 曾同时存在 `''`（26 行）与 `NULL`，导致 `WHERE description IS NULL` 漏掉一半；服务层两条路径现在都归一成 `NULL`，迁移 007 清理了存量 |
 
 ### 删除级联一览（重要）
 
@@ -71,7 +74,7 @@ cd <repo>/docs/architecture
 # 第一部分：业务表（10 张）
 
 ## 1. `users` — 账号
-行数：4
+行数：2
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -83,7 +86,7 @@ cd <repo>/docs/architecture
 | `created_at` / `updated_at` | TEXT NOT NULL DEFAULT `datetime('now')` | |
 
 ## 2. `categories` — 分类（两级树）
-行数：68
+行数：58
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -105,7 +108,7 @@ cd <repo>/docs/architecture
 > 更精确的报错（比如父分类不存在时回 404），真正的约束在 DDL。
 
 ## 3. `transactions` — 交易流水（核心事实表）
-行数：523
+行数：490
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -128,7 +131,7 @@ cd <repo>/docs/architecture
 > v1 的 `item_id` / `unit_price` / `quantity` / `unit` 四列**已移入 `item_prices`**；`last_renewed_at` 已移除，等价于该订阅交易的 `MAX(date)`。
 
 ## 4. `subscriptions` — 订阅
-行数：9
+行数：4
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -145,7 +148,7 @@ cd <repo>/docs/architecture
 | `created_at` | TEXT NOT NULL DEFAULT `datetime('now')` | |
 
 ## 5. `items` — 物品（价格历史的挂载点）
-行数：20
+行数：15
 
 | 列 | 类型 / 约束 |
 | --- | --- |
@@ -155,7 +158,7 @@ cd <repo>/docs/architecture
 | `created_at` | TEXT NOT NULL DEFAULT `datetime('now')` |
 
 ## 6. `item_prices` — 价格观测（R4 比价的数据基础）
-行数：39
+行数：24
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -186,7 +189,7 @@ cd <repo>/docs/architecture
 > 这是**共享封闭词表，不是用户数据**：价格只在同一单位内比较才有意义，"12.8/个" 和 "12.8/pack" 不是同一个价。未知单位直接写入失败，而不是拆成两种拼写。
 
 ## 8. `merchants` — 商家实体
-行数：4
+行数：1
 
 | 列 | 类型 / 约束 |
 | --- | --- |
@@ -196,7 +199,7 @@ cd <repo>/docs/architecture
 | `created_at` | TEXT NOT NULL DEFAULT `datetime('now')` |
 
 ## 9. `merchant_aliases` — 商家别名
-行数：1
+行数：0
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -227,7 +230,7 @@ cd <repo>/docs/architecture
 # 第二部分：AI 相关表（2 张）
 
 ## 11. `ai_messages` — 对话轮次
-行数：117
+行数：35
 
 | 列 | 类型 / 约束 | 说明 |
 | --- | --- | --- |
@@ -294,10 +297,12 @@ cd <repo>/docs/architecture
 
 另有 6 个由 `PRIMARY KEY` / `UNIQUE` 约束隐式创建的索引（`sqlite_autoindex_*`）：`users.email`、`subscriptions(user_id,name)`、`items(user_id,name)`、`units.code`、`merchants(user_id,name)`、`merchant_aliases(user_id,alias)`。两张 `WITHOUT ROWID` 表（`exchange_rates`、`ledger_days`）的复合主键即表本身，不额外产生索引。
 
-## 附：触发器（2 个）
+## 附：触发器（16 个）
 
-三条分类结构规则由触发器强制，`db/schema.sql` 与 `migrations/006_category_structure_triggers.sql`
-里是**逐字节相同**的两条语句（校验器按存储 SQL 比对触发器，改一处必须改另一处）：
+两组触发器，都用同一套 `<CODE>: <prose>` 约定。`db/schema.sql` 与对应迁移文件里是
+**逐字节相同**的语句（校验器按存储 SQL 比对触发器，改一处必须改另一处）。
+
+### 分组一：分类结构（迁移 006，2 个）
 
 | 触发器 | 时机 | 拦下什么 |
 | --- | --- | --- |
@@ -311,6 +316,47 @@ cd <repo>/docs/architecture
 按单个用户的 `user_id` 取数建 map，父分类不在 map 里时该分类会被静默丢弃——它躺在库里却看不见。
 服务层的 `assertParentAllowed()` 本来就会拦（返回 **404 而不是 403**，避免确认别人的分类存在），
 触发器兜住的是不过服务层的那几条路径。
+
+### 分组二：值域（迁移 007，14 个）
+
+每个表一对 `BEFORE INSERT` / `BEFORE UPDATE`：
+
+| 表 | 错误码 | 拦下什么 |
+| --- | --- | --- |
+| `transactions` | `INVALID_DATE` | `date` 不是真实的 `YYYY-MM-DD` |
+| `item_prices` | `INVALID_DATE` | `observed_on` 同上 |
+| `subscriptions` | `INVALID_DATE` / `NEGATIVE_AMOUNT` | `end_date` 同上；`amount_cents` 为负 |
+| `ledger_days` | `INVALID_DATE` | `date` 同上 |
+| `categories` | `INVALID_JSON` | `translations` 非 NULL 却不是 JSON |
+| `ai_messages` | `INVALID_JSON` / `NEGATIVE_TOKENS` | `tool_calls` 非 JSON；`tokens_in`/`tokens_out` 为负 |
+| `exchange_rates` | `NON_POSITIVE_RATE` | `rate` 为 0 或负 |
+
+**为什么这组也是触发器而不是 CHECK**——尽管这些规则本身完全可以用 CHECK 表达。因为 SQLite
+不能给已有表加约束，加 CHECK 等于重建表，而其中三张表被别表引用：
+
+```
+categories    <- categories.parent_id (CASCADE)、transactions.category_id (RESTRICT)、
+                 subscriptions.category_id (SET NULL)
+transactions  <- item_prices.transaction_id (SET NULL)
+subscriptions <- transactions.subscription_id (SET NULL)
+```
+
+`DROP TABLE` 会做一次隐式 DELETE，从而对**刚拷好的行**触发那些 ON DELETE 动作——迁移 002 记录了
+这两个陷阱，当年不得不把整库的表都"寄存"一遍才躲过去。所以"给 categories 加个 CHECK"实际上是
+五张表的寄存式重建，而它防的是这个库从未出现过的值。如果哪天因为这些表要重建，顺手把它们改成
+CHECK 是件好事。
+
+日期这一条特别值得说：**判据必须是空值安全的**。直觉写法 `NEW.date <> date(NEW.date)` 是错的——
+`date()` 对无法解析的值返回 **NULL**，`x <> NULL` 求值为 NULL，而触发器/CHECK 的 WHERE 把 NULL
+当作"通过"。那样写只拦得住"能解析但会被归一化"的值（如 `2026-02-30`），而 `'yesterday'`、
+`'2026-3-5'`、`'2026-13-45'` 会直接放行。库里用的是 `date(NEW.date) IS NOT NEW.date`。
+
+这组规则防的失效模式：`summary.ts` / `queries.ts` 按 `strftime('%Y-%m', date)` 分组，而 `strftime`
+对无法解析的日期**返回 NULL 而不是报错**——一笔坏日期的交易不会失败，它会从所有月度汇总里消失。
+`INVALID_JSON` 同理：列只是 TEXT，而读取方直接 `JSON.parse`，一行坏值曾能让整个分类列表 500。
+
+服务层也做同样的校验（`utils/time.ts` 的 `isDateOnly`，覆盖 HTTP 与 AI 工具两条路径），
+且对日期复用**同一个 `INVALID_DATE` 代码**：是服务层还是数据库拦下的，对调用方是无关的实现细节。
 
 错误消息形如 `<CODE>: <prose>`，`src/services/errors.ts` 的 `asServiceError()` 把它翻回
 400 并保留 code（`CATEGORY_DEPTH` / `CATEGORY_TYPE_MISMATCH` / `CATEGORY_SELF_PARENT`），

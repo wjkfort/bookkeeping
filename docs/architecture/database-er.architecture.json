@@ -40,6 +40,6 @@
     { "dot": "emerald", "title": "业务表 10 张", "items": ["账号、分类树、交易、订阅、物品、价格观测", "商家 + 别名、单位词表、汇率缓存", "金额一律整数分；收支方向由 categories.type 决定"] },
     { "dot": "rose", "title": "AI 相关表 2 张", "items": ["ai_messages：一次对话按 session_id 分组，token 数即成本账", "ledger_days：no_spend / partial 三态，决定要不要继续追问"] },
     { "dot": "amber", "title": "删除时会发生什么", "items": ["transactions.category_id 是 RESTRICT：分类下有交易就删不掉", "item_prices.item_id CASCADE；transaction_id / merchant_id SET NULL", "其余 user_id 全 CASCADE；categories.parent_id CASCADE（删父连带删子）"] },
-    { "dot": "slate", "title": "未画的边（10 条）与结构约束", "items": ["9 张表各有一条 user_id → users ON DELETE CASCADE；units 与 exchange_rates 没有，users 是归属根", "categories.parent_id 自引用（自连接拉不出箭头）", "migrations/006 的触发器强制：深度 ≤ 2、子类型 = 父类型、子分类与父分类同一用户"] }
+    { "dot": "slate", "title": "未画的边（10 条）与结构约束", "items": ["9 张表各有一条 user_id → users ON DELETE CASCADE；units 与 exchange_rates 没有，users 是归属根", "categories.parent_id 自引用（自连接拉不出箭头）", "16 个触发器：006 分类结构（深度 ≤ 2、子类型 = 父类型、同一用户）；007 值域（日期、JSON、非负数）"] }
   ]
 }
