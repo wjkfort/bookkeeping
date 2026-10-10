@@ -100,3 +100,28 @@ export function localGapWindow(
   }
   return { today, window };
 }
+
+/**
+ * A date-only string, `YYYY-MM-DD`, that is also a real calendar date.
+ *
+ * The shape alone is not enough. `2026-02-30` matches `/^\d{4}-\d{2}-\d{2}$/`
+ * and every date function accepts it, and SQLite's normalises it to 2026-03-02
+ * — but `summary.ts` and `queries.ts` group by `strftime('%Y-%m', date)`, which
+ * returns NULL for anything it cannot parse. A malformed date therefore does not
+ * raise: the row simply leaves every monthly total (R6's silent wrong number,
+ * the same class of failure the category rules guard against).
+ *
+ * `new Date(Date.UTC(...))` is the round trip that catches it: a day that
+ * overflows its month rolls forward, so the parts no longer match the input.
+ */
+export function isDateOnly(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year
+    && probe.getUTCMonth() === month - 1
+    && probe.getUTCDate() === day;
+}
+

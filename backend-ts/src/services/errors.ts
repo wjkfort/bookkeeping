@@ -69,6 +69,14 @@ const TRIGGER_CONSTRAINT_CODES = [
   'CATEGORY_TYPE_MISMATCH',
   'CATEGORY_SELF_PARENT',
   'CATEGORY_CROSS_USER',
+  // The value-domain rules (migrations/007). `INVALID_DATE` is raised by the
+  // service layer too, deliberately: whether the service or the trigger catches
+  // a bad date, the caller sees the same code.
+  'INVALID_DATE',
+  'INVALID_JSON',
+  'NEGATIVE_AMOUNT',
+  'NEGATIVE_TOKENS',
+  'NON_POSITIVE_RATE',
 ] as const;
 
 /**

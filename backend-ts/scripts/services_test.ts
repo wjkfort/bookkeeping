@@ -364,7 +364,7 @@ async function main() {
     }
   };
   const triggerCode = (message: string) =>
-    /\b(CATEGORY_DEPTH|CATEGORY_TYPE_MISMATCH|CATEGORY_SELF_PARENT|CATEGORY_CROSS_USER)\b/
+    /\b(CATEGORY_DEPTH|CATEGORY_TYPE_MISMATCH|CATEGORY_SELF_PARENT|CATEGORY_CROSS_USER|INVALID_DATE|INVALID_JSON|NEGATIVE_AMOUNT|NEGATIVE_TOKENS|NON_POSITIVE_RATE)\b/
       .exec(message)?.[1] ?? '';
 
   const tRoot = raw.prepare(
@@ -481,6 +481,116 @@ async function main() {
           === 'CATEGORY_CROSS_USER',
         'expected CATEGORY_CROSS_USER');
 
+  // -------------------------------------------------------------------------
+  // The value domain (migration 007).
+  //
+  // The date rule is the reason this block is emphatic about its examples. The
+  // obvious way to write it is `NEW.date <> date(NEW.date)` — and that is wrong:
+  // `date()` returns NULL for anything it cannot parse, `x <> NULL` is NULL, and
+  // a trigger's WHERE treats NULL as "do not abort". So the naive form rejected
+  // only dates that parse and then change ('2026-02-30' -> 2026-03-02) while
+  // letting 'yesterday', '2026-3-5' and '2026-13-45' straight through. The
+  // null-safe `date(NEW.date) IS NOT NEW.date` closes all three, and these cases
+  // exist to keep it that way.
+  // -------------------------------------------------------------------------
+  console.log('\n=== value domain: dates, JSON, negative numbers ===');
+
+  const domainCat = await createCategory(db, uid, { name: 'svc-value-domain', type: 'expense' });
+  const txInsert = (date: string) => rawErr(
+    `INSERT INTO transactions (user_id, category_id, amount_cents, currency, date, source, created_at, updated_at)
+     VALUES (?, ?, 100, 'CNY', ?, 'manual', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
+    uid, domainCat.id, date);
+
+  for (const bad of ['yesterday', '2026-3-5', '2026-13-45', '', '2026-02-30', '2026/03/05']) {
+    check(`raw SQL: transactions.date ${JSON.stringify(bad)} is refused`,
+          triggerCode(txInsert(bad)) === 'INVALID_DATE', `expected INVALID_DATE, got ${txInsert(bad)}`);
+  }
+  check('raw SQL: a real date is accepted',
+        txInsert('2026-03-05') === '', 'should succeed');
+  check('raw SQL: a leap day in a leap year is accepted',
+        txInsert('2028-02-29') === '', 'should succeed');
+
+  const domainItem = raw.prepare(
+    "INSERT INTO items (user_id, name, created_at) VALUES (?, ?, '2026-01-01T00:00:00.000Z')")
+    .run(uid, 'svc-domain-item').lastInsertRowid as number;
+  check('raw SQL: item_prices.observed_on refuses an unparseable date',
+        triggerCode(rawErr(
+          `INSERT INTO item_prices (user_id, item_id, unit_price_cents, currency, observed_on, created_at)
+           VALUES (?, ?, 100, 'CNY', '2026-1-2', '2026-01-01T00:00:00.000Z')`,
+          uid, domainItem)) === 'INVALID_DATE', 'expected INVALID_DATE');
+
+  check('raw SQL: subscriptions.end_date refuses an unparseable date',
+        triggerCode(rawErr(
+          `INSERT INTO subscriptions (user_id, name, amount_cents, currency, cycle_days, end_date, created_at)
+           VALUES (?, 'svc-domain-sub', 100, 'CNY', 30, 'next month', '2026-01-01T00:00:00.000Z')`,
+          uid)) === 'INVALID_DATE', 'expected INVALID_DATE');
+
+  check('raw SQL: subscriptions.amount_cents refuses a negative amount',
+        triggerCode(rawErr(
+          `INSERT INTO subscriptions (user_id, name, amount_cents, currency, cycle_days, end_date, created_at)
+           VALUES (?, 'svc-domain-sub2', -100, 'CNY', 30, '2026-12-01', '2026-01-01T00:00:00.000Z')`,
+          uid)) === 'NEGATIVE_AMOUNT', 'expected NEGATIVE_AMOUNT');
+
+  check('raw SQL: ledger_days.date refuses an unparseable date',
+        triggerCode(rawErr(
+          "INSERT INTO ledger_days (user_id, date, status, created_at) VALUES (?, '2026-1-1', 'no_spend', 'x')",
+          uid)) === 'INVALID_DATE', 'expected INVALID_DATE');
+
+  check('raw SQL: categories.translations refuses non-JSON',
+        triggerCode(rawErr(
+          "INSERT INTO categories (user_id, name, type, translations, created_at) VALUES (?, 'svc-domain-bad-json', 'expense', 'not json', 'x')",
+          uid)) === 'INVALID_JSON', 'expected INVALID_JSON');
+
+  check('raw SQL: ai_messages.tool_calls refuses non-JSON',
+        triggerCode(rawErr(
+          `INSERT INTO ai_messages (user_id, session_id, role, tool_calls, tokens_in, tokens_out, created_at)
+           VALUES (?, 'svc-domain', 'assistant', '{', 0, 0, '2026-01-01T00:00:00.000Z')`,
+          uid)) === 'INVALID_JSON', 'expected INVALID_JSON');
+
+  check('raw SQL: ai_messages.tokens_in refuses a negative count',
+        triggerCode(rawErr(
+          `INSERT INTO ai_messages (user_id, session_id, role, content, tokens_in, tokens_out, created_at)
+           VALUES (?, 'svc-domain', 'assistant', 'x', -1, 0, '2026-01-01T00:00:00.000Z')`,
+          uid)) === 'NEGATIVE_TOKENS', 'expected NEGATIVE_TOKENS');
+
+  check('raw SQL: exchange_rates.rate refuses zero',
+        triggerCode(rawErr(
+          "INSERT INTO exchange_rates (base_currency, target_currency, rate, fetched_at) VALUES ('USD', 'JPY', 0, 'x')"))
+          === 'NON_POSITIVE_RATE', 'expected NON_POSITIVE_RATE');
+
+  // The service layer refuses these before the database sees them, so the caller
+  // gets a field-named 400 rather than a constraint error. `INVALID_DATE` is the
+  // same code the trigger raises: which layer caught it is an implementation
+  // detail the client should not have to know.
+  const badTxDate = await expectServiceErrorInfo(() => createTransaction(db, uid, {
+    amount: 1, currency: 'CNY', date: '2026-2-31', category_id: domainCat.id,
+  }));
+  check('createTransaction rejects an impossible date as INVALID_DATE',
+        badTxDate.status === 400 && badTxDate.code === 'INVALID_DATE',
+        `status ${badTxDate.status} code ${badTxDate.code}`);
+
+  const badPriceDate = await expectServiceErrorInfo(() => logPrice(db, uid, {
+    item_id: Number(domainItem), unit_price: 1, observed_on: 'yesterday',
+  }));
+  check('logPrice rejects an unparseable observed_on as INVALID_DATE',
+        badPriceDate.status === 400 && badPriceDate.code === 'INVALID_DATE',
+        `status ${badPriceDate.status} code ${badPriceDate.code}`);
+
+  // The AI tool calls this function directly, so the HTTP route's check does not
+  // cover it — an unparseable date here would be stored as a ledger key that no
+  // real day ever matches.
+  const badLedgerDate = await expectServiceErrorInfo(() => markLedgerDay(db, uid, '2026-1-1'));
+  check('markLedgerDay rejects an unparseable date as INVALID_DATE',
+        badLedgerDate.status === 400 && badLedgerDate.code === 'INVALID_DATE',
+        `status ${badLedgerDate.status} code ${badLedgerDate.code}`);
+
+  const badSubDate = await expectServiceErrorInfo(() => createSubscription(db, uid, {
+    name: 'svc-domain-bad-sub', end_date: '2026-02-30', amount: 1,
+  } as any));
+  check('createSubscription rejects an impossible end_date as INVALID_DATE',
+        badSubDate.status === 400 && badSubDate.code === 'INVALID_DATE',
+        `status ${badSubDate.status} code ${badSubDate.code}`);
+
   // The shapes above are the bare RAISE text, which is what node:sqlite
   // surfaces. Production goes through workerd, which prefixes the message with
   // its own code — so a matcher that grabbed "any UPPER_CASE token before a
@@ -492,6 +602,8 @@ async function main() {
     'SQLITE_CONSTRAINT_TRIGGER: CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent',
     'CATEGORY_SELF_PARENT: a category cannot be its own parent',
     'SQLITE_CONSTRAINT_TRIGGER: CATEGORY_CROSS_USER: a subcategory must belong to the same user as its parent',
+    'SQLITE_CONSTRAINT_TRIGGER: INVALID_DATE: transactions.date must be a real date in YYYY-MM-DD form',
+    'SQLITE_CONSTRAINT_TRIGGER: NEGATIVE_TOKENS: ai_messages.tokens_in must not be negative',
   ]) {
     const { status, body } = toErrorResponse(new Error(wrapped), 'fallback');
     check(`wrapped as "${wrapped.split(':')[0]}" -> 400 with a code`,

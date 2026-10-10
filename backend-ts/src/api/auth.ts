@@ -48,8 +48,13 @@ authRouter.post("/register", async (c) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Insert user
-    const result = await db.prepare("INSERT INTO users (email, password_hash, username) VALUES (?, ?, ?)").bind(email, passwordHash, username).run();
+    // Insert user. The timestamps are explicit for the same reason as
+    // createCategory: `DEFAULT (datetime('now'))` writes a different text shape
+    // than the rest of the code, and the two do not sort together.
+    const now = new Date().toISOString();
+    const result = await db.prepare(
+      "INSERT INTO users (email, password_hash, username, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+    ).bind(email, passwordHash, username, now, now).run();
 
     if (!result.success) {
       return c.json({ error: "Failed to create user" }, 500);
@@ -59,8 +64,8 @@ authRouter.post("/register", async (c) => {
 
     for (const category of defaultCategories) {
       await db.prepare(
-        "INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, NULL, NULL, ?)"
-      ).bind(category.name, category.type, userId).run();
+        "INSERT INTO categories (name, type, parent_id, translations, user_id, created_at) VALUES (?, ?, NULL, NULL, ?, ?)"
+      ).bind(category.name, category.type, userId, now).run();
     }
 
     // Generate JWT token

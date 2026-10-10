@@ -27,7 +27,7 @@ import type {
   ItemPrice,
 } from '../types';
 import { toCents, toAmount, centsToAmount } from '../utils/money';
-import { todayInZone } from '../utils/time';
+import { isDateOnly, todayInZone } from '../utils/time';
 import { badRequest, notFound, serverError } from './errors';
 import { logPrice } from './prices';
 import { normaliseMerchantName } from './merchants';
@@ -161,6 +161,15 @@ export async function createTransaction(
   // omitted date is resolved, and then in the *user's* zone: a purchase made at
   // 01:00 in UTC+8 belongs to that local day, not to the UTC one the server is
   // running on.
+  //
+  // Verbatim is not the same as unexamined: the grouping in summary.ts and
+  // queries.ts is `strftime('%Y-%m', date)`, which returns NULL rather than
+  // failing for a date it cannot parse, so an unparseable date would drop the
+  // row out of every monthly figure instead of raising.
+  if (input.date !== undefined && input.date !== null && !isDateOnly(input.date)) {
+    throw badRequest('date must be a real date in YYYY-MM-DD form', { date: input.date },
+                     'INVALID_DATE');
+  }
   const date = input.date ?? todayInZone(input.timezone);
 
   if (!(await ensureOwnedCategory(db, category_id, userId))) {
@@ -253,11 +262,19 @@ export async function updateTransaction(
     updates.push('currency = ?');
     values.push(body.currency);
   }
+  // `description || null` mirrors createTransaction: an empty string and an
+  // absent description are the same thing to every reader, and storing both
+  // spellings means `WHERE description IS NULL` silently misses half of them.
+  // This path was the one that stored ''.
   if (body.description !== undefined) {
     updates.push('description = ?');
-    values.push(body.description);
+    values.push(body.description || null);
   }
   if (body.date !== undefined) {
+    if (!isDateOnly(body.date)) {
+      throw badRequest('date must be a real date in YYYY-MM-DD form', { date: body.date },
+                       'INVALID_DATE');
+    }
     updates.push('date = ?');
     values.push(body.date);
   }

@@ -61,13 +61,29 @@ export function buildCategoryTree(categories: Category[]): Category[] {
   return rootCategories;
 }
 
-function parseTranslations(raw: unknown) {
-  return raw ? JSON.parse(raw as string) : null;
+/**
+ * Categories store `translations` as JSON text; the wire shape has an object.
+ *
+ * A row whose text is not JSON used to throw out of `JSON.parse` and take the
+ * whole category list down with a 500 — one bad row, every request. The column
+ * is only TEXT in the schema, so this cannot be assumed away: return null (a
+ * category with no translations is a valid thing to render) and leave a trail.
+ * The trigger in migration 007 now refuses new values that are not JSON, so
+ * this is about rows written before that.
+ */
+function parseTranslations(raw: unknown, categoryId?: number) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw as string);
+  } catch {
+    console.warn(`categories.translations is not JSON (category ${categoryId}): ignored`);
+    return null;
+  }
 }
 
 /** Categories are stored with `translations` as JSON text; the wire shape has an object. */
 function toCategory(row: Category): Category {
-  return { ...row, translations: parseTranslations(row.translations) };
+  return { ...row, translations: parseTranslations(row.translations, row.id) };
 }
 
 export async function listCategories(
@@ -144,13 +160,18 @@ export async function createCategory(
 
   const translationsJson = translations ? JSON.stringify(translations) : null;
 
+  // Written explicitly rather than left to `DEFAULT (datetime('now'))`: the
+  // default produces `2026-10-10 08:04:52` while everything else here writes
+  // `toISOString()`, and the two sort differently as text (`' '` < `'T'`), which
+  // `listCategories`' `ORDER BY created_at` would quietly get wrong. Migration
+  // 007 normalised the rows that predate this.
   let result: Category | null;
   try {
     result = await db
       .prepare(
-        'INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, ?, ?, ?) RETURNING *',
+        'INSERT INTO categories (name, type, parent_id, translations, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING *',
       )
-      .bind(name, type, parent_id || null, translationsJson, userId)
+      .bind(name, type, parent_id || null, translationsJson, userId, new Date().toISOString())
       .first<Category>();
   } catch (error) {
     // `assertParentAllowed` above is a fast path for a precise message; the

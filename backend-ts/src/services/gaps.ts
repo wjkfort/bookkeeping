@@ -22,7 +22,7 @@ import {
   type SubscriptionView,
 } from './subscriptions';
 import { badRequest, serverError } from './errors';
-import { DEFAULT_TIMEZONE, localDateString } from '../utils/time';
+import { DEFAULT_TIMEZONE, isDateOnly, localDateString } from '../utils/time';
 
 /**
  * R3: how many days back the gap check looks.
@@ -250,6 +250,14 @@ export async function markLedgerDay(
 ): Promise<LedgerDay> {
   if (status !== 'no_spend' && status !== 'partial') {
     throw badRequest("status must be 'no_spend' or 'partial'");
+  }
+
+  // The HTTP route checks this, but the AI tool calls this function directly
+  // with a date the model chose, so the check belongs here where both paths
+  // meet. A date keyed into `ledger_days` stops gap detection asking about that
+  // day, and a malformed one would be stored and never match a real day again.
+  if (!isDateOnly(date)) {
+    throw badRequest('date must be a real date in YYYY-MM-DD form', { date }, 'INVALID_DATE');
   }
 
   await db

@@ -17,11 +17,9 @@
 
 import type { Subscription, SubscriptionRow, SubscriptionRenewal } from '../types';
 import { toCents, centsToAmount } from '../utils/money';
-import { todayInZone } from '../utils/time';
+import { isDateOnly, todayInZone } from '../utils/time';
 import { badRequest, notFound, serverError } from './errors';
 import { ensureOwnedCategory } from './transactions';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Advance a calendar date by `days`.
@@ -141,8 +139,9 @@ export async function createSubscription(
     throw badRequest("name and end_date are required");
   }
 
-  if (!DATE_RE.test(end_date)) {
-    throw badRequest("end_date must be in YYYY-MM-DD format");
+  if (!isDateOnly(end_date)) {
+    throw badRequest("end_date must be a real date in YYYY-MM-DD form",
+                     { end_date }, "INVALID_DATE");
   }
 
   if (cycle < 1) {
@@ -222,8 +221,9 @@ export async function updateSubscription(
     values.push(currency);
   }
   if (end_date !== undefined) {
-    if (!DATE_RE.test(end_date)) {
-      throw badRequest("end_date must be in YYYY-MM-DD format");
+    if (!isDateOnly(end_date)) {
+      throw badRequest("end_date must be a real date in YYYY-MM-DD form",
+                     { end_date }, "INVALID_DATE");
     }
     updates.push("end_date = ?");
     values.push(end_date);
@@ -299,8 +299,9 @@ export async function restoreSubscription(
 ): Promise<SubscriptionView> {
   const { end_date, cycle } = body;
 
-  if (!end_date || !DATE_RE.test(end_date)) {
-    throw badRequest("end_date is required and must be in YYYY-MM-DD format");
+  if (!end_date || !isDateOnly(end_date)) {
+    throw badRequest("end_date is required and must be a real date in YYYY-MM-DD form",
+                     { end_date }, "INVALID_DATE");
   }
   if (cycle !== undefined && (typeof cycle !== "number" || cycle < 1)) {
     throw badRequest("cycle must be at least 1 day");
@@ -395,10 +396,14 @@ export async function renewSubscription(
   const createTx = body.create_transaction !== false;
   const categoryId =
     body.category_id !== undefined ? body.category_id : subscription.category_id;
-  const txDate =
-    body.date && DATE_RE.test(body.date)
-      ? body.date
-      : todayInZone(body.timezone);
+  // As with createTransaction: an absent date is resolved in the user's zone,
+  // but a supplied one that is not a real date is rejected. Recording a renewal
+  // on the wrong day because the model sent "next month" is not a recovery.
+  if (body.date !== undefined && body.date !== null && !isDateOnly(body.date)) {
+    throw badRequest("date must be a real date in YYYY-MM-DD form", { date: body.date },
+                     "INVALID_DATE");
+  }
+  const txDate = body.date ?? todayInZone(body.timezone);
   const description =
     body.description?.trim() || `Subscription renewal: ${subscription.name}`;
 

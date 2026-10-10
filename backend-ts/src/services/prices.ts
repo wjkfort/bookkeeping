@@ -18,7 +18,7 @@
  */
 
 import { toCents, toAmount } from '../utils/money';
-import { todayInZone } from '../utils/time';
+import { isDateOnly, todayInZone } from '../utils/time';
 import { badRequest, notFound, serverError } from './errors';
 import { listUnits } from './units';
 import { resolveMerchant } from './merchants';
@@ -383,9 +383,17 @@ export async function logPrice(
 
   const merchant = await resolveMerchant(db, userId, input.merchant);
 
-  const observedOn = input.observed_on && /^\d{4}-\d{2}-\d{2}$/.test(input.observed_on)
-    ? input.observed_on
-    : todayInZone(input.timezone);
+  // Only an absent `observed_on` is defaulted. A supplied one that is not a real
+  // date is rejected rather than quietly replaced with today: the AI tools pass
+  // this straight from the model, and silently recording the wrong day is worse
+  // than telling the model to try again (R6). `2026-02-30` used to pass the
+  // shape test and then vanish from the monthly grouping.
+  if (input.observed_on !== undefined && input.observed_on !== null
+      && !isDateOnly(input.observed_on)) {
+    throw badRequest('observed_on must be a real date in YYYY-MM-DD form',
+                     { observed_on: input.observed_on }, 'INVALID_DATE');
+  }
+  const observedOn = input.observed_on ?? todayInZone(input.timezone);
 
   const result = await db
     .prepare(
@@ -478,6 +486,10 @@ export async function updatePrice(
   }
 
   if (body.observed_on !== undefined) {
+    if (!isDateOnly(body.observed_on)) {
+      throw badRequest('observed_on must be a real date in YYYY-MM-DD form',
+                       { observed_on: body.observed_on }, 'INVALID_DATE');
+    }
     updates.push('observed_on = ?');
     values.push(body.observed_on);
   }
