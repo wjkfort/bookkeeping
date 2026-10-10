@@ -32,7 +32,8 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" align="center" justify="center" className="auth-page">
+    <Flex asChild direction="column" align="center" justify="center" className="auth-page">
+      <main>
       {/* Language switcher — page-level, matches app header position */}
       <Flex justify="end" className="auth-language">
         <LanguageSwitcher />
@@ -41,9 +42,9 @@ export const Login: React.FC = () => {
       {/* Brand */}
       <Flex align="center" gap="3" mb="6" className="auth-brand-row">
         <span className="brand-mark"><BarChartIcon /></span>
-        <Heading size="5" className="auth-brand-name">
+        <Text size="5" weight="medium" className="auth-brand-name">
           {t("nav.title")}
-        </Heading>
+        </Text>
       </Flex>
 
       <Card size="3" className="auth-form-card">
@@ -53,30 +54,51 @@ export const Login: React.FC = () => {
             <Text size="2" color="gray">{t("login.subtitle")}</Text>
           </Flex>
 
-          <TextField.Root
-            size="3"
-            placeholder={t("login.emailPlaceholder")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          {/* A real form: before this the fields had no name, no type="email", no
+              autocomplete and took their accessible name from the placeholder. */}
+          <form
+            className="auth-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
           >
-            <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
-          </TextField.Root>
+            <label className="sr-only" htmlFor="login-email">
+              {t("login.emailPlaceholder")}
+            </label>
+            <TextField.Root
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              size="3"
+              placeholder={t("login.emailPlaceholder")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            >
+              <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <TextField.Root
-            size="3"
-            type="password"
-            placeholder={t("login.passwordPlaceholder")}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          >
-            <TextField.Slot><LockClosedIcon /></TextField.Slot>
-          </TextField.Root>
+            <label className="sr-only" htmlFor="login-password">
+              {t("login.passwordPlaceholder")}
+            </label>
+            <TextField.Root
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              size="3"
+              placeholder={t("login.passwordPlaceholder")}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            >
+              <TextField.Slot><LockClosedIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <Button size="3" className="auth-primary-button" onClick={handleSubmit} disabled={loading || !email || !password}>
-            {loading ? t("common.loading") : t("login.button")}
-          </Button>
+            <Button type="submit" size="3" className="auth-primary-button" disabled={loading || !email || !password}>
+              {loading ? t("common.loading") : t("login.button")}
+            </Button>
+          </form>
 
           <Text size="2" align="center" color="gray">
             {t("login.noAccount")}{" "}
@@ -86,6 +108,7 @@ export const Login: React.FC = () => {
           </Text>
         </Flex>
       </Card>
+      </main>
     </Flex>
   );
 };

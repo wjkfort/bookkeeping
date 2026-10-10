@@ -1,4 +1,5 @@
 import { useState, useCallback, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ToastCtx } from './toastContext'
 import * as ToastPrimitive from '@radix-ui/react-toast'
 import { Flex, Text, IconButton } from '@radix-ui/themes'
@@ -22,6 +23,7 @@ const typeConfig: Record<ToastType, { Icon: typeof CheckCircledIcon }> = {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t: translate } = useTranslation()
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const addToast = useCallback((message: string, type: ToastType) => {
@@ -46,6 +48,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <ToastPrimitive.Root
               key={t.id}
               open
+              role="status"
+              aria-live="polite"
               onOpenChange={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
               asChild
             >
@@ -53,7 +57,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <Icon className="app-toast-icon" />
                 <Text size="2" className="app-toast-message">{t.message}</Text>
                 <ToastPrimitive.Close asChild>
-                  <IconButton size="1" variant="ghost" className="app-toast-close" aria-label="Close notification">
+                  <IconButton size="1" variant="ghost" className="app-toast-close" aria-label={translate("common.closeNotification")}>
                     <Cross1Icon />
                   </IconButton>
                 </ToastPrimitive.Close>

@@ -1,9 +1,12 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Text } from "@radix-ui/themes";
 import type { Category } from "../../types";
 import "./CategoryPicker.css";
+
+/** The "All categories" row is a row like any other for the keyboard cursor. */
+const CLEAR_ID = -1;
 
 const RECENT_STORAGE_KEY = "bk_recent_category_ids";
 const RECENT_LIMIT = 8;
@@ -343,13 +346,64 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
   const showEmpty =
     !allowClear && filtered.length === 0 && recentCats.length === 0;
 
+  // Keyboard model. The picker used to handle only Escape and Backspace, so a
+  // keyboard user could type a query and then had no way to reach a row: the
+  // listbox had options with no cursor. This is a flat cursor over the rows that
+  // are actually rendered, in DOM order.
+  // (The group expand/collapse toggles stay mouse-only aids; they are taken out
+  // of the tab order so the listbox holds only options.)
+  const listboxId = useId();
+  const [activeId, setActiveId] = useState<number | null>(null);
+
+  const selectableIds = useMemo<number[]>(() => {
+    const ids: number[] = [];
+    if (allowClear) ids.push(CLEAR_ID);
+    recentCats.forEach((c) => ids.push(c.id));
+    if (grouped.mode === "flat") {
+      grouped.items.forEach((c) => ids.push(c.id));
+    } else {
+      grouped.groups.forEach((g) => {
+        if (g.parent) {
+          ids.push(g.parent.id);
+          if (expandedParents.has(g.parent.id)) {
+            g.items.forEach((c) => ids.push(c.id));
+          }
+        } else {
+          g.items.forEach((c) => ids.push(c.id));
+        }
+      });
+    }
+    return ids;
+  }, [allowClear, recentCats, grouped, expandedParents]);
+
+  useEffect(() => {
+    if (!open) setActiveId(null);
+  }, [open]);
+
+  useEffect(() => {
+    if (activeId == null) return;
+    dropdownRef.current
+      ?.querySelector(`[data-cat-id="${activeId}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeId]);
+
+  const rowProps = (id: number) => ({
+    id: `${listboxId}-opt-${id}`,
+    role: "option" as const,
+    "aria-selected": value === id,
+    "data-cat-id": id,
+  });
+  const activeClass = (id: number) => (activeId === id ? " is-active" : "");
+
   const dropdown =
     open && menuPos
       ? createPortal(
           <div
             ref={dropdownRef}
             className="category-picker-dropdown"
+            id={listboxId}
             role="listbox"
+            aria-label={ph}
             // Modal dialogs set body { pointer-events: none }; re-enable so
             // the menu is clickable when portaled outside Dialog.Content.
             style={{
@@ -365,7 +419,9 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
             {allowClear && (
               <button
                 type="button"
-                className={`category-picker-item clear ${value == null ? "selected" : ""}`}
+                {...rowProps(CLEAR_ID)}
+                aria-selected={value == null}
+                className={`category-picker-item clear ${value == null ? "selected" : ""}${activeClass(CLEAR_ID)}`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   select(null);
@@ -384,7 +440,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                   <button
                     key={`r-${cat.id}`}
                     type="button"
-                    className={`category-picker-item ${value === cat.id ? "selected" : ""}`}
+                    {...rowProps(cat.id)}
+                    className={`category-picker-item ${value === cat.id ? "selected" : ""}${activeClass(cat.id)}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       select(cat.id);
@@ -410,7 +467,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                   <button
                     key={cat.id}
                     type="button"
-                    className={`category-picker-item ${value === cat.id ? "selected" : ""}`}
+                    {...rowProps(cat.id)}
+                    className={`category-picker-item ${value === cat.id ? "selected" : ""}${activeClass(cat.id)}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       select(cat.id);
@@ -449,6 +507,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                               type="button"
                               className="category-picker-expand"
                               aria-label="expand"
+                              tabIndex={-1}
                               onMouseDown={(e) =>
                                 toggleExpand(g.parent!.id, e)
                               }
@@ -462,7 +521,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                           )}
                           <button
                             type="button"
-                            className={`category-picker-item parent ${value === g.parent.id ? "selected" : ""}`}
+                            {...rowProps(g.parent.id)}
+                            className={`category-picker-item parent ${value === g.parent.id ? "selected" : ""}${activeClass(g.parent.id)}`}
                             onMouseDown={(e) => {
                               e.preventDefault();
                               select(g.parent!.id);
@@ -493,7 +553,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                             <button
                               key={cat.id}
                               type="button"
-                              className={`category-picker-item child ${value === cat.id ? "selected" : ""}`}
+                              {...rowProps(cat.id)}
+                              className={`category-picker-item child ${value === cat.id ? "selected" : ""}${activeClass(cat.id)}`}
                               onMouseDown={(e) => {
                                 e.preventDefault();
                                 select(cat.id);
@@ -516,7 +577,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
                         <button
                           key={cat.id}
                           type="button"
-                          className={`category-picker-item ${value === cat.id ? "selected" : ""}`}
+                          {...rowProps(cat.id)}
+                          className={`category-picker-item ${value === cat.id ? "selected" : ""}${activeClass(cat.id)}`}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             select(cat.id);
@@ -559,6 +621,13 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
         disabled={disabled}
         placeholder={ph}
         value={query}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={
+          activeId != null ? `${listboxId}-opt-${activeId}` : undefined
+        }
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
@@ -574,9 +643,39 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({
           if (e.key === "Escape") {
             setOpen(false);
             setQuery(selected ? labelOf(selected) : "");
+            return;
           }
           if (e.key === "Backspace" && allowClear && !query && value != null) {
             select(null);
+            return;
+          }
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            if (!open) {
+              setOpen(true);
+              return;
+            }
+            if (selectableIds.length === 0) return;
+            const current =
+              activeId == null ? -1 : selectableIds.indexOf(activeId);
+            let next: number;
+            if (e.key === "ArrowDown") {
+              next = current + 1;
+              // While searching, the first row is "All categories" (clear), which
+              // is not what someone who just typed a query is aiming at.
+              if (activeId == null && query.trim() && selectableIds[0] === CLEAR_ID) {
+                next = 1;
+              }
+              next = next % selectableIds.length;
+            } else {
+              next = current <= 0 ? selectableIds.length - 1 : current - 1;
+            }
+            setActiveId(selectableIds[next]);
+            return;
+          }
+          if (e.key === "Enter" && open && activeId != null) {
+            e.preventDefault();
+            select(activeId === CLEAR_ID ? null : activeId);
           }
         }}
         autoComplete="off"

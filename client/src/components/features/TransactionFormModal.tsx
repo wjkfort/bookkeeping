@@ -28,7 +28,7 @@ import {
   ItemHistory,
 } from "../../types";
 import CategoryPicker from "../ui/CategoryPicker";
-import { useCurrency } from "../../hooks/useCurrency";
+import { currencySymbolFor, useCurrency } from "../../hooks/useCurrency";
 import { useToast } from "../ui/toastContext";
 
 export interface TransactionFormModalProps {
@@ -66,13 +66,16 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 }) => {
   const { t } = useTranslation();
   const toast = useToast();
-  const { currencyCode, formatCurrency } = useCurrency();
+  const { currencyCode, currencySymbol, availableCurrencies, formatCurrency } = useCurrency();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [amount, setAmount] = useState("");
+  // The currency this record is *stored* in, shown on the field. It used to be
+  // whatever the interface language implied, invisibly.
+  const [currency, setCurrency] = useState(currencyCode);
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [itemName, setItemName] = useState("");
@@ -99,6 +102,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 
   const resetForm = () => {
     setAmount("");
+    setCurrency(currencyCode);
     setDescription("");
     setCategoryId(null);
     setItemName("");
@@ -167,6 +171,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
       }
 
       setAmount(String(transaction.amount));
+      setCurrency(transaction.currency || currencyCode);
       setDescription(transaction.description || "");
       setCategoryId(transaction.category_id);
       setItemName(name);
@@ -310,7 +315,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
     try {
       const data: Partial<Transaction> = {
         amount: parseFloat(amount),
-        currency: currencyCode,
+        currency,
         category_id: categoryId,
         date,
         description: description || "",
@@ -387,16 +392,38 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 <Text as="div" size="2" mb="1" weight="medium">
                   {t("transactions.amount")}
                 </Text>
-                <TextField.Root
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount((e.target as HTMLInputElement).value)
-                  }
-                  autoFocus={!isEditing}
-                />
+                <Flex gap="2">
+                  <TextField.Root
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) =>
+                      setAmount((e.target as HTMLInputElement).value)
+                    }
+                    autoFocus={!isEditing}
+                    style={{ flex: 1 }}
+                  >
+                    <TextField.Slot side="right">
+                      {currencySymbol}
+                    </TextField.Slot>
+                  </TextField.Root>
+                  {/* Which currency this row is written in — visible, and not a
+                      side effect of the interface language. */}
+                  <Select.Root value={currency} onValueChange={setCurrency}>
+                    <Select.Trigger
+                      aria-label={t("transactions.currency")}
+                      style={{ minWidth: 96 }}
+                    />
+                    <Select.Content>
+                      {availableCurrencies.map((c) => (
+                        <Select.Item key={c} value={c}>
+                          {`${currencySymbolFor(c)}${c}`}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select.Root>
+                </Flex>
               </label>
               <label style={{ flex: "1 1 140px", minWidth: 120 }}>
                 <Text as="div" size="2" mb="1" weight="medium">
@@ -672,6 +699,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
               {t("transactions.cancel")}
             </Button>
             <Button
+              className="app-primary"
               onClick={handleSubmit}
               disabled={saving || !amount || !categoryId || !date}
             >

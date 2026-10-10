@@ -7,14 +7,16 @@
 }
 .auth-language { position: absolute; top: 22px; right: max(20px, calc((100vw - 1176px) / 2)); }
 .auth-brand-row { color: var(--app-ink); }
-.auth-brand-name.rt-Heading { font-family: Newsreader, Georgia, serif; font-size: 27px; letter-spacing: -.03em; }
+/* The wordmark is a label, not a heading: the page has exactly one h1. */
+.auth-brand-name { font-family: Newsreader, Georgia, serif; font-size: 27px; font-weight: 600; letter-spacing: -.03em; color: var(--app-ink); }
 .auth-form-card.rt-BaseCard { width: min(100%, 420px); background: #fffaf4; border: 1px solid var(--app-line); border-radius: 12px; box-shadow: 0 18px 50px -28px rgba(62, 40, 26, .24); }
 .auth-form-heading .rt-Heading { font-family: Newsreader, Georgia, serif; font-size: 31px; letter-spacing: -.03em; color: var(--app-ink); }
 .auth-form-heading .rt-Text { color: var(--app-muted); }
 .auth-form-card .rt-TextFieldRoot { background: #fffdf9; border: 1px solid var(--app-line); color: var(--app-ink); }
-.auth-form-card .rt-TextFieldRoot:focus-within { outline: 2px solid var(--app-coral); outline-offset: 1px; }
-.auth-primary-button.rt-Button { background: var(--app-coral); color: white; font-weight: 600; }
-.auth-primary-button.rt-Button:hover { background: var(--app-coral-dark); }
+.auth-form-card .rt-TextFieldRoot:focus-within { outline: 2px solid var(--app-coral-dark); outline-offset: 1px; }
+/* White on --app-coral is 3.48:1 and fails AA for the button's own label. */
+.auth-primary-button.rt-Button { background: var(--app-coral-dark); color: white; font-weight: 600; }
+.auth-primary-button.rt-Button:hover { background: var(--app-coral-deep); }
 .auth-link.rt-Link { color: var(--app-coral-dark); font-weight: 600; }
 .auth-link.rt-Link:hover { color: var(--app-ink); }
 @media (max-width: 520px) {
@@ -22,3 +24,6 @@
   .auth-language { top: 18px; right: 18px; }
   .auth-form-card.rt-BaseCard { width: 100%; }
 }
+
+/* The form is a real <form> now, so it needs the column rhythm the wrapper had. */
+.auth-form { display: flex; flex-direction: column; gap: 16px; }

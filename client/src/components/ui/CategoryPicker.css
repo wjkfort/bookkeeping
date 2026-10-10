@@ -163,3 +163,7 @@
   font-size: 11px;
   color: var(--gray-11);
 }
+
+/* The keyboard cursor: the same surface as :hover, plus a ring so the active row
+   is identifiable without relying on the pointer. */
+.category-picker-item.is-active { background: #e2cdb7; outline: 2px solid var(--app-coral-dark); outline-offset: -2px; }

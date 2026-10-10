@@ -8,6 +8,7 @@ import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LanguageSwitcher from "./components/ui/LanguageSwitcher";
+import CurrencySwitcher from "./components/ui/CurrencySwitcher";
 import { useAuth } from "./contexts/authContext";
 
 function AppContent() {
@@ -50,6 +51,8 @@ function AppContent() {
             </Link>
             <Flex align="center" gap="3" className="header-actions">
               <span className="user-chip">{user?.username}</span>
+              {/* Money and words are two different settings. */}
+              <CurrencySwitcher />
               <LanguageSwitcher />
               <IconButton variant="soft" className="header-logout" onClick={logout} aria-label={t("nav.logout")} title={t("nav.logout")}>
                 <ExitIcon />
@@ -59,7 +62,10 @@ function AppContent() {
         </header>
       )}
 
-      <Flex flexGrow="1" direction="column" className="page-frame" style={{ flex: 1 }}>
+      {/* `asChild` so the page frame is a real <main> landmark: the app had no
+          main and no nav, only an implicit banner. */}
+      <Flex asChild flexGrow="1" direction="column" className="page-frame" style={{ flex: 1 }}>
+        <main>
           <Routes>
             <Route
               path="/"
@@ -74,6 +80,7 @@ function AppContent() {
                 shell with no route matched. */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+        </main>
       </Flex>
     </Flex>
   );

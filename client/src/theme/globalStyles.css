@@ -1,15 +1,61 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+/* The display and body faces are loaded from index.html as a non-blocking
+   stylesheet. An @import here blocked first paint on a third-party request and,
+   measured, DM Sans never arrived while Newsreader did — so the body type was
+   silently the OS default. Both families now have local fallbacks in the stack. */
+
+@import "./fonts.css";
 
 :root {
   --app-ink: #2d2925;
-  --app-muted: #766d66;
+  /* #766d66 measured 3.75:1 on the card colours, i.e. below AA on every legend
+     row and on the archived block. This is the same warm grey, dark enough to
+     clear 4.5:1 on the darkest surface it sits on. */
+  --app-muted: #665d56;
   --app-paper: #f7f2eb;
   --app-paper-deep: #eee5da;
   --app-line: #ded3c7;
   --app-coral: #d9684b;
   --app-coral-dark: #a84632;
+  --app-coral-deep: #8f3826;
   --app-sage: #728b72;
   --app-blue: #657c8d;
+}
+
+/* Radix Themes draws every focus ring from --accent-8, which measured 1.74-2.11:1
+   against this palette. The override below covers its soft/ghost variants; the
+   explicit rules cover the solid coral buttons, whose default ring is the
+   contrast colour (white) and vanishes against paper. Ink measures 12.95:1 on
+   paper and 4.14:1 on coral. */
+.radix-themes {
+  --accent-8: var(--app-coral-dark);
+  --focus-8: var(--app-coral-dark);
+  /* Soft and ghost variants read --accent-3/-a3 (surface) and --accent-11/-a11
+     (label). Leaving these at Radix orange put #cc4e00 text on an orange tint —
+     3.21:1 on "View all", under AA for its own label — and made the app's own
+     buttons look borrowed. */
+  --accent-3: #eee0d1;
+  --accent-a3: #e6d4c0;
+  --accent-11: var(--app-ink);
+  --accent-a11: var(--app-ink);
+  /* Radix sets font-family on .radix-themes, so declaring the body font only on
+     `body` (which contains nothing but #root) meant no app text ever used it. */
+  --default-font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Every heading in this app is the serif display face; Radix's Heading reads
+     this token, so setting it here is what makes the panel titles serif. */
+  --heading-font-family: "Newsreader", Georgia, serif;
+}
+.radix-themes .record-expense-button.rt-Button:focus-visible,
+.radix-themes .load-error-retry.rt-Button:focus-visible,
+.radix-themes .chat-dock-manual.rt-Button:focus-visible,
+.radix-themes .auth-primary-button.rt-Button:focus-visible,
+.radix-themes .month-picker-trigger.rt-SelectTrigger:focus-visible,
+.radix-themes .row-action-danger.rt-IconButton:focus-visible {
+  outline: 2px solid var(--app-ink);
+  outline-offset: 2px;
+}
+.radix-themes .subscription-item:focus-visible {
+  outline: 3px solid var(--app-ink);
+  outline-offset: 2px;
 }
 
 * { box-sizing: border-box; }
@@ -21,6 +67,14 @@ body {
 }
 button, input, select { font-family: inherit; }
 ::selection { background: #f3b7a3; color: var(--app-ink); }
+/* Browser surfaces belong to the design too: caret, scrollbars, link underlines. */
+body { caret-color: var(--app-coral-dark); }
+* { scrollbar-width: thin; scrollbar-color: #cdbca8 transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #cdbca8; border: 2px solid transparent; background-clip: content-box; border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: #bda88f; background-clip: content-box; }
+a { text-underline-offset: 3px; }
 
 .app-shell { background: var(--app-paper); }
 .app-header {
@@ -31,6 +85,7 @@ button, input, select { font-family: inherit; }
 }
 .app-header-inner { max-width: 1240px; width: 100%; margin: 0 auto; padding: 18px 32px; }
 .brand-lockup { display: inline-flex; align-items: center; gap: 10px; color: var(--app-ink); text-decoration: none; }
+.brand-lockup:focus-visible { outline: 2px solid var(--app-coral-dark); outline-offset: 3px; border-radius: 8px; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--app-coral); color: white; }
 .brand-name { font-family: Newsreader, Georgia, serif; font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
 .language-switcher { display: inline-flex; align-items: center; gap: 4px; height: 42px; padding: 4px; background: var(--app-paper-deep); border: 1px solid var(--app-line); border-radius: 10px; flex-shrink: 0; }
@@ -48,10 +103,108 @@ button, input, select { font-family: inherit; }
 .month-picker-trigger.rt-SelectTrigger:disabled { background-color: #e5d9ca; color: var(--app-muted); opacity: .65; }
 .month-picker-menu.rt-SelectContent { background: #f0e5d7; color: var(--app-ink); border: 1px solid #d5bea9; }
 .month-picker-menu .rt-SelectItem[data-highlighted] { background: #e2cdb7; color: var(--app-ink); }
+/* The display currency, next to the language pill so the two read as different
+   settings: one changes words, the other changes money. */
+.currency-switcher.rt-SelectTrigger { background-color: var(--app-paper-deep); color: var(--app-ink); border: 1px solid var(--app-line); box-shadow: none; height: 42px; font-weight: 600; }
+.currency-switcher.rt-SelectTrigger:hover { background-color: #e4d1bf; }
+.currency-switcher.rt-SelectTrigger:focus-visible { outline: 2px solid var(--app-coral-dark); outline-offset: 2px; }
 .page-frame { max-width: 1240px; width: 100%; margin: 0 auto; padding: 42px 32px 72px; }
+
+/* Radix's own surfaces are white with a second orange accent. Dialogs and
+   popovers are where the product is examined hardest, so they join the palette
+   instead of looking like a component-library demo. */
+.rt-DialogContent, .rt-AlertDialogContent, .rt-PopoverContent {
+  --color-panel-solid: #fffaf4;
+  background-color: #fffaf4;
+  border: 1px solid var(--app-line);
+  box-shadow: 0 24px 60px -32px rgba(62, 40, 26, .38);
+}
+/* Radix Themes' Dialog.Title renders a plain Heading (`.rt-Heading`), not a
+   `.rt-DialogTitle`, so the title is targeted through the content wrapper. */
+.radix-themes .rt-DialogContent,
+.radix-themes .rt-AlertDialogContent,
+.radix-themes .rt-PopoverContent {
+  color: var(--app-ink);
+}
+.radix-themes .rt-DialogContent .rt-Heading,
+.radix-themes .rt-AlertDialogContent .rt-Heading {
+  font-family: Newsreader, Georgia, serif;
+  letter-spacing: -.02em;
+  color: var(--app-ink);
+}
+.field-error { color: var(--app-coral-dark); font-weight: 600; }
+.field-hint { color: var(--app-muted); font-weight: 500; }
+
+/* One accent, everywhere. Radix's `accentColor="orange"` puts a second orange
+   (#f76b15) on every default button — the modal's Create, the composer's send,
+   the "Overall" toggle — so the product's most-examined moments looked like a
+   component-library demo. These two classes put them back on the ledger palette.
+   The toggle's default text also measured 3.64:1, under AA for its own label. */
+.radix-themes .app-primary.rt-Button {
+  background: var(--app-coral-dark);
+  color: #fff;
+  font-weight: 600;
+}
+.radix-themes .app-primary.rt-Button:hover { background: var(--app-coral-deep); }
+.radix-themes .app-toggle.rt-Button {
+  background: var(--app-paper-deep);
+  color: var(--app-ink);
+  border: 1px solid var(--app-line);
+  box-shadow: none;
+  font-weight: 600;
+}
+.radix-themes .app-toggle.rt-Button:hover { background: #e4d1bf; }
+.radix-themes .app-toggle.is-active.rt-Button {
+  background: var(--app-coral-dark);
+  color: #fff;
+  border-color: var(--app-coral-dark);
+}
+.radix-themes .app-toggle.is-active.rt-Button:hover { background: var(--app-coral-deep); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A skeleton beats a bare "...": the page keeps its shape while it loads. */
+.skeleton-block { background: #eee5da; border: 1px solid var(--app-line); border-radius: 12px; }
+.skeleton-strip { height: 132px; border-radius: 0; }
+.skeleton-card { height: 320px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 @media (max-width: 640px) {
   .app-header-inner { padding: 14px 18px; }
   .page-frame { padding: 28px 18px 48px; }
   .user-chip { display: none; }
+}
+
+/* At 390px the wordmark wrapped to two lines and made a 112px bar. It shrinks
+   before it is dropped (<=380px). */
+@media (max-width: 440px) {
+  .brand-name { font-size: 17px; white-space: nowrap; }
+  .brand-mark { width: 28px; height: 28px; }
+}
+
+/* At 320px the header's minimum width was 338px and the Logout button was
+   clipped. The wordmark is the only thing that can go. */
+@media (max-width: 380px) {
+  .app-header-inner { padding: 12px 14px; }
+  .brand-name { display: none; }
+  .language-switcher { height: 38px; }
+  .language-option.rt-Button { min-width: 40px; padding: 0 8px; }
 }

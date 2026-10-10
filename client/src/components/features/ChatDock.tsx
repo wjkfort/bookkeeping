@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Flex, Text } from "@radix-ui/themes";
-import { ChatBubbleIcon, Cross2Icon, PaperPlaneIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { ChatBubbleIcon, Cross2Icon, PaperPlaneIcon, PlusIcon, UpdateIcon } from "@radix-ui/react-icons";
 import {
   getAiStatus,
   getAiMessages,
@@ -34,6 +34,12 @@ import "./ChatDock.css";
 interface ChatDockProps {
   /** Called after the assistant recorded something, so figures refresh. */
   onChanged?: () => void;
+  /**
+   * Opens the manual entry form. The assistant is an accelerator, not the only
+   * door into the ledger: with no server key the dock must still hand the user
+   * a way to record something rather than an infrastructure message.
+   */
+  onManualEntry?: () => void;
 }
 
 /**
@@ -98,7 +104,7 @@ const serverMessage = (e: unknown): string | null => {
   return null;
 };
 
-const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
+const ChatDock: React.FC<ChatDockProps> = ({ onChanged, onManualEntry }) => {
   const { t } = useTranslation();
   const toast = useToast();
 
@@ -115,6 +121,8 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
   // re-open: it must happen once per session, not once per click.
   const openedRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fabRef = useRef<HTMLButtonElement>(null);
 
   const refreshGaps = useCallback(async () => {
     try {
@@ -170,6 +178,28 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
       // Nothing to greet with is not an error worth showing.
     }
   }, [messages.length, onChanged]);
+
+  /**
+   * The dock calls itself a dialog, so it has to behave like one: focus moves
+   * in on open, Escape closes it, and the trigger gets focus back on close.
+   */
+  const closeDock = useCallback(() => {
+    setIsOpen(false);
+    fabRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && configured !== false) inputRef.current?.focus();
+  }, [isOpen, configured]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDock();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen, closeDock]);
 
   const handleToggle = () => {
     const next = !isOpen;
@@ -256,9 +286,11 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
     <>
       <button
         type="button"
+        ref={fabRef}
         className={`chat-dock-fab${isOpen ? " is-open" : ""}`}
         onClick={handleToggle}
         aria-label={t(isOpen ? "assistant.close" : "assistant.open")}
+        aria-expanded={isOpen}
         title={t(isOpen ? "assistant.close" : "assistant.open")}
       >
         {isOpen ? <Cross2Icon /> : <ChatBubbleIcon />}
@@ -268,13 +300,18 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
       </button>
 
       {isOpen && (
-        <section className="chat-dock" role="dialog" aria-label={t("assistant.title")}>
+        <section
+          className="chat-dock"
+          role="dialog"
+          aria-modal="false"
+          aria-label={t("assistant.title")}
+        >
           <header className="chat-dock-header">
             <Text className="chat-dock-title">{t("assistant.title")}</Text>
             <Button
               variant="ghost"
               size="1"
-              onClick={() => setIsOpen(false)}
+              onClick={closeDock}
               aria-label={t("assistant.close")}
             >
               <Cross2Icon />
@@ -285,6 +322,11 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
             <div className="chat-dock-unavailable">
               <Text className="chat-dock-unavailable-title">{t("assistant.unavailableTitle")}</Text>
               <Text size="2" className="chat-dock-muted">{t("assistant.unavailableBody")}</Text>
+              {onManualEntry && (
+                <Button size="2" className="chat-dock-manual" onClick={onManualEntry}>
+                  <PlusIcon /> {t("assistant.recordManually")}
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -312,7 +354,7 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
                 </div>
               )}
 
-              <div className="chat-dock-log">
+              <div className="chat-dock-log" aria-live="polite" aria-relevant="additions text">
                 {dated.length === 0 && !isSending && (
                   <Text size="2" className="chat-dock-muted">{t("assistant.empty")}</Text>
                 )}
@@ -345,6 +387,7 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
                 }}
               >
                 <input
+                  ref={inputRef}
                   className="chat-dock-input"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -352,7 +395,7 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged }) => {
                   aria-label={t("assistant.placeholder")}
                   disabled={isSending}
                 />
-                <Button type="submit" disabled={isSending || draft.trim().length === 0}>
+                <Button className="app-primary" type="submit" disabled={isSending || draft.trim().length === 0}>
                   <PaperPlaneIcon />
                 </Button>
               </form>

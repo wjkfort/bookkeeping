@@ -10,7 +10,7 @@ interface MonthPickerProps {
 }
 
 const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const locale = i18n.language === "zh" ? "zh-CN" : "en-US";
 
   const currentYear = dayjs().year();
@@ -57,6 +57,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) 
           variant="surface"
           className="month-picker-trigger"
           placeholder={currentYear.toString()}
+          aria-label={t("dashboard.selectYear")}
           style={{ minWidth: 86 }}
         />
         <Select.Content className="month-picker-menu">
@@ -77,6 +78,7 @@ const MonthPicker: React.FC<MonthPickerProps> = ({ value, onChange, disabled }) 
           variant="surface"
           className="month-picker-trigger"
           placeholder={new Intl.DateTimeFormat(locale, { month: "short" }).format(new Date())}
+          aria-label={t("dashboard.selectMonth")}
           style={{ minWidth: 74 }}
         />
         <Select.Content className="month-picker-menu">

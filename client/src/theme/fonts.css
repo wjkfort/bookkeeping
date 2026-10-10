@@ -1,0 +1,23 @@
+/* Self-hosted faces.
+   These were a Google Fonts <link>. Two problems with that, both measured:
+   the body face never applied at all (Radix's Theme sets its own font-family on
+   .radix-themes, so "DM Sans" was never requested — no woff2, ever), and a
+   render-blocking third-party request is the wrong dependency for an app that
+   also ships a zh locale where fonts.googleapis.com may be unreachable.
+   Both files are variable fonts, so one file covers the whole weight range. */
+
+@font-face {
+  font-family: "DM Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/dm-sans.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Newsreader";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/fonts/newsreader.woff2") format("woff2");
+}

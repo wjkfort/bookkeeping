@@ -5,6 +5,8 @@ import { createSubscription, updateSubscription, getCategories } from "../../api
 import { Category } from "../../types";
 import { useToast } from "../ui/toastContext";
 import CategoryPicker from "../ui/CategoryPicker";
+import CyclePicker from "../ui/CyclePicker";
+import { useReturnFocus } from "../../hooks/useReturnFocus";
 
 interface SubscriptionModalProps {
   visible: boolean;
@@ -41,8 +43,14 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [amount, setAmount] = useState("0");
   const [currency, setCurrency] = useState("USD");
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [errors, setErrors] = useState<{ name: string | null; endDate: string | null }>({
+    name: null,
+    endDate: null,
+  });
 
   const isEditing = editingId !== null;
+
+  useReturnFocus(visible);
 
   useEffect(() => {
     if (!visible) return;
@@ -58,6 +66,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      setErrors({ name: null, endDate: null });
       if (initialValues) {
         setName(initialValues.name ?? "");
         setIcon(initialValues.icon ?? "");
@@ -79,8 +88,16 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   }, [visible, initialValues]);
 
   const handleSubmit = async () => {
-    if (!name.trim()) return;
-    if (!endDate) return;
+    // Say what is missing. This used to return silently, so pressing Create on
+    // an incomplete form did nothing at all — while `nameRequired` and
+    // `endDateRequired` were already written in both locales.
+    const nameError = !name.trim() ? t("subscriptions.nameRequired") : null;
+    const dateError = !endDate ? t("subscriptions.endDateRequired") : null;
+    setErrors({ name: nameError, endDate: dateError });
+    if (nameError || dateError) {
+      toast.error(nameError ?? dateError ?? "");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -145,8 +162,17 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <TextField.Root
               placeholder={t("subscriptions.namePlaceholder") || "e.g., Netflix, Spotify"}
               value={name}
-              onChange={(e) => setName((e.target as HTMLInputElement).value)}
+              onChange={(e) => {
+                setName((e.target as HTMLInputElement).value);
+                if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+              }}
+              aria-invalid={errors.name ? true : undefined}
             />
+            {errors.name && (
+              <Text as="div" size="1" mt="1" className="field-error" role="alert">
+                {errors.name}
+              </Text>
+            )}
           </label>
 
           <label>
@@ -167,13 +193,19 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                if (errors.endDate) setErrors((prev) => ({ ...prev, endDate: null }));
+              }}
+              aria-invalid={errors.endDate ? true : undefined}
               style={{
                 width: "100%",
                 height: 32,
                 padding: "4px 8px",
                 borderRadius: "var(--radius-2)",
-                border: "1px solid var(--gray-7)",
+                border: errors.endDate
+                  ? "1px solid var(--app-coral-dark)"
+                  : "1px solid var(--gray-7)",
                 background: "var(--color-surface)",
                 color: "var(--gray-12)",
                 fontSize: 14,
@@ -181,18 +213,18 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 boxSizing: "border-box",
               }}
             />
+            {errors.endDate && (
+              <Text as="div" size="1" mt="1" className="field-error" role="alert">
+                {errors.endDate}
+              </Text>
+            )}
           </label>
 
           <label>
             <Text as="div" size="2" mb="1" weight="medium">
-              {t("subscriptions.cycle") || "Cycle (days)"}
+              {t("subscriptions.cycle")}
             </Text>
-            <TextField.Root
-              type="number"
-              placeholder="30"
-              value={cycle}
-              onChange={(e) => setCycle((e.target as HTMLInputElement).value)}
-            />
+            <CyclePicker value={cycle} onChange={setCycle} disabled={loading} />
           </label>
 
           <label>
@@ -241,7 +273,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <Button variant="soft" color="gray" onClick={onCancel} disabled={loading}>
             {t("common.cancel") || "Cancel"}
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+          <Button className="app-primary" onClick={handleSubmit} disabled={loading}>
             {loading
               ? t("common.saving") || "Saving..."
               : isEditing

@@ -13,14 +13,14 @@
   place-items: center;
   border: none;
   border-radius: 50%;
-  background: var(--app-coral);
+  background: var(--app-coral-dark);
   color: white;
   font-size: 22px;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(90, 50, 34, .26);
   transition: transform .16s ease, background .16s ease;
 }
-.chat-dock-fab:hover { transform: translateY(-2px); background: var(--app-coral-dark); }
+.chat-dock-fab:hover { transform: translateY(-2px); background: var(--app-coral-deep); }
 .chat-dock-fab:focus-visible { outline: 2px solid var(--app-ink); outline-offset: 3px; }
 .chat-dock-fab.is-open { background: var(--app-ink); }
 
@@ -70,8 +70,10 @@
 
 .chat-dock-muted { color: var(--app-muted); }
 
-.chat-dock-unavailable { padding: 22px 18px; display: flex; flex-direction: column; gap: 8px; }
+.chat-dock-unavailable { padding: 22px 18px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .chat-dock-unavailable-title { font-weight: 600; color: var(--app-ink); }
+.chat-dock-manual.rt-Button { background: var(--app-coral-dark); color: #fff; font-weight: 600; }
+.chat-dock-manual.rt-Button:hover { background: var(--app-coral-deep); }
 
 .chat-dock-reminders {
   padding: 12px 14px;
@@ -92,7 +94,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   font-size: 13px;
   color: var(--app-ink);
 }

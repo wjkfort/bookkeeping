@@ -42,7 +42,8 @@ export const Register: React.FC = () => {
   };
 
   return (
-    <Flex direction="column" align="center" justify="center" className="auth-page">
+    <Flex asChild direction="column" align="center" justify="center" className="auth-page">
+      <main>
       {/* Language switcher — page-level, matches app header position */}
       <Flex justify="end" className="auth-language">
         <LanguageSwitcher />
@@ -51,9 +52,9 @@ export const Register: React.FC = () => {
       {/* Brand */}
       <Flex align="center" gap="3" mb="6" className="auth-brand-row">
         <span className="brand-mark"><BarChartIcon /></span>
-        <Heading size="5" className="auth-brand-name">
+        <Text size="5" weight="medium" className="auth-brand-name">
           {t("nav.title")}
-        </Heading>
+        </Text>
       </Flex>
 
       <Card size="3" className="auth-form-card">
@@ -63,25 +64,45 @@ export const Register: React.FC = () => {
             <Text size="2" color="gray">{t("register.subtitle")}</Text>
           </Flex>
 
-          <TextField.Root size="3" placeholder={t("register.usernamePlaceholder")} value={username} onChange={(e) => setUsername(e.target.value)}>
-            <TextField.Slot><PersonIcon /></TextField.Slot>
-          </TextField.Root>
+          <form
+            className="auth-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+          >
+            <label className="sr-only" htmlFor="register-username">
+              {t("register.usernamePlaceholder")}
+            </label>
+            <TextField.Root id="register-username" name="username" autoComplete="username" size="3" placeholder={t("register.usernamePlaceholder")} value={username} onChange={(e) => setUsername(e.target.value)}>
+              <TextField.Slot><PersonIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <TextField.Root size="3" placeholder={t("register.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)}>
-            <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
-          </TextField.Root>
+            <label className="sr-only" htmlFor="register-email">
+              {t("register.emailPlaceholder")}
+            </label>
+            <TextField.Root id="register-email" name="email" type="email" autoComplete="email" size="3" placeholder={t("register.emailPlaceholder")} value={email} onChange={(e) => setEmail(e.target.value)}>
+              <TextField.Slot><EnvelopeClosedIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <TextField.Root size="3" type="password" placeholder={t("register.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)}>
-            <TextField.Slot><LockClosedIcon /></TextField.Slot>
-          </TextField.Root>
+            <label className="sr-only" htmlFor="register-password">
+              {t("register.passwordPlaceholder")}
+            </label>
+            <TextField.Root id="register-password" name="new-password" type="password" autoComplete="new-password" size="3" placeholder={t("register.passwordPlaceholder")} value={password} onChange={(e) => setPassword(e.target.value)}>
+              <TextField.Slot><LockClosedIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <TextField.Root size="3" type="password" placeholder={t("register.confirmPasswordPlaceholder")} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}>
-            <TextField.Slot><LockClosedIcon /></TextField.Slot>
-          </TextField.Root>
+            <label className="sr-only" htmlFor="register-confirm">
+              {t("register.confirmPasswordPlaceholder")}
+            </label>
+            <TextField.Root id="register-confirm" name="confirm-password" type="password" autoComplete="new-password" size="3" placeholder={t("register.confirmPasswordPlaceholder")} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}>
+              <TextField.Slot><LockClosedIcon /></TextField.Slot>
+            </TextField.Root>
 
-          <Button size="3" className="auth-primary-button" onClick={handleSubmit} disabled={loading || !username || !email || !password}>
-            {loading ? t("common.loading") : t("register.button")}
-          </Button>
+            <Button type="submit" size="3" className="auth-primary-button" disabled={loading || !username || !email || !password}>
+              {loading ? t("common.loading") : t("register.button")}
+            </Button>
+          </form>
 
           <Text size="2" align="center" color="gray">
             {t("register.hasAccount")}{" "}
@@ -91,6 +112,7 @@ export const Register: React.FC = () => {
           </Text>
         </Flex>
       </Card>
+      </main>
     </Flex>
   );
 };
