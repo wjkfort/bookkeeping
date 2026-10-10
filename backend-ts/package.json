@@ -9,7 +9,8 @@
     "test:full": "bash scripts/check.sh /tmp/prod-fixtures/prod-v1.sqlite /tmp/prod-fixtures/prod-v2.sqlite",
     "db:schema:local": "wrangler d1 execute bookkeeping-db --local --file=./db/schema.sql",
     "db:schema:remote": "wrangler d1 execute bookkeeping-db --remote --file=./db/schema.sql",
-    "db:rebuild": "python3 -I scripts/setup_prod_staging.py $(ls -t prod-backup-*.sql | head -1) .wrangler/state"
+    "db:rebuild": "python3 -I scripts/rebuild_local_db.py",
+    "db:rebuild:v1": "python3 -I scripts/setup_prod_staging.py $(ls -t prod-backup-*.sql | head -1) .wrangler/state"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

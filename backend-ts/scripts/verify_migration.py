@@ -21,10 +21,14 @@ Checks, for every user:
 """
 
 import os
-import re
 import sqlite3
 import sys
 import tempfile
+
+# `-I` (the way every script here is invoked) keeps the script's own directory
+# off sys.path, so the shared module needs an explicit path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from schema_signature import differences, signature  # noqa: E402
 
 SCHEMA = "migrations/002_schema_v2.sql"
 # The v1 pre-flight column fix. Applied to the source before SCHEMA when the
@@ -389,103 +393,22 @@ def main():
     print(f"  indexes: {n_idx}")
 
     # db/schema.sql is the path a NEW database takes, so it must build the same
-    # schema this migration just built. Compared STRUCTURALLY rather than as DDL
-    # text: the stored `sql` includes comments and the exact spelling of
-    # `CREATE TABLE` / quoting, none of which change behaviour, and comments
-    # cannot be stripped safely because they may contain quoted defaults. What
-    # matters is columns, types, nullability, defaults, keys and indexes.
-    def signature(conn):
-        tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf%' ORDER BY name")]
-        sig = {}
-        for t in tables:
-            cols = tuple(
-                (r[1], (r[2] or '').upper(), r[3], r[4], r[5])
-                for r in conn.execute(f'PRAGMA table_info("{t}")')
-            )
-            fks = tuple(sorted(
-                (r[2], r[3], r[4], r[5], r[6])
-                for r in conn.execute(f'PRAGMA foreign_key_list("{t}")')
-            ))
-            # `PRAGMA index_list` has gained columns across SQLite versions, so
-            # index columns are read by name and the indexed expressions are
-            # pulled from each index's own DDL.
-            idx = []
-            for r in conn.execute(f'PRAGMA index_list("{t}")'):
-                row = dict(zip(("seq", "name", "unique", "origin", "partial"), r))
-                isql = conn.execute(
-                    "SELECT sql FROM sqlite_master WHERE type='index' AND name=?",
-                    (row["name"],)).fetchone()
-                idx.append((row["name"], row["unique"], row.get("partial"),
-                            re.sub(r"\s+", " ", (isql[0] if isql and isql[0] else "")).strip()))
-            idx = tuple(sorted(idx))
-            ddl = conn.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (t,)
-            ).fetchone()
-            # CHECK constraints decide what the database accepts, so they are
-            # part of the signature even though PRAGMA does not expose them.
-            checks = tuple(sorted(re.findall(
-                r"CHECK\s*\([^)]*\)", re.sub(r"\s+", " ", ddl[0] or ""), re.I)))
-            views = tuple(sorted(
-                (r[0], re.sub(r"\s+", " ", r[1] or "").strip())
-                for r in conn.execute(
-                    "SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")))
-            sig[t] = (cols, fks, idx, checks, views)
-        # Triggers are schema objects that *do* change behaviour, so they belong
-        # in the comparison. They are collected separately rather than per table
-        # because `signature`'s per-table tuple is zipped against a fixed label
-        # list; a name/sql pair is all a trigger needs.
-        triggers = tuple(sorted(
-            (r[0], re.sub(r"\s+", " ", (r[1] or "")).strip())
-            for r in conn.execute(
-                "SELECT name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name")))
-        return sig, triggers
-
+    # schema this migration just built. `signature()` compares them
+    # structurally, and is shared with rebuild_local_db.py so that "these two
+    # databases are the same shape" has one definition.
     if os.path.exists(SCHEMA_SQL):
         fresh = sqlite3.connect(":memory:")
         try:
             fresh.executescript(open(SCHEMA_SQL, encoding="utf-8").read())
-            A, A_triggers = signature(fresh)
-            B, B_triggers = signature(db)
-            only_fresh = sorted(set(A) - set(B))
-            only_migrated = sorted(set(B) - set(A))
-            differing = []
-            for t in sorted(set(A) & set(B)):
-                if A[t] == B[t]:
-                    continue
-                labels = ("columns", "foreign keys", "indexes", "checks", "views")
-                detail = []
-                for lab, x, y in zip(labels, A[t], B[t]):
-                    if x == y:
-                        continue
-                    if isinstance(x, tuple) and isinstance(y, tuple):
-                        # Show the offending entries, not just counts: a count
-                        # difference of zero is meaningless to a reader.
-                        only_a = [i for i in x if i not in y]
-                        only_b = [i for i in y if i not in x]
-                        detail.append(f"{lab}: only here={only_a} only migrated={only_b}")
-                    else:
-                        detail.append(f"{lab}: {x!r} vs {y!r}")
-                differing.append((t, detail))
+            expected, observed = signature(fresh), signature(db)
             # A trigger missing from one path is the failure mode this guards:
             # a fresh install would enforce the category rules and a migrated
             # database would not, with nothing else to notice the difference.
-            trigger_detail = ""
-            triggers_match = A_triggers == B_triggers
-            if not triggers_match:
-                trigger_detail = (f"triggers: only-in-{os.path.basename(SCHEMA_SQL)}="
-                                  f"{[n for n, _ in A_triggers if (n, _) not in B_triggers]} "
-                                  f"only-in-migration="
-                                  f"{[n for n, _ in B_triggers if (n, _) not in A_triggers]} "
-                                  f"differing-sql="
-                                  f"{[n for n, s in A_triggers if dict(B_triggers).get(n) not in (None, s)]}")
+            diffs = differences(expected, observed)
             check(f"{SCHEMA_SQL} matches the migrated schema",
-                  not only_fresh and not only_migrated and not differing and triggers_match,
-                  f"{len(A)} tables, {len(A_triggers)} triggers; "
-                  f"only-in-{os.path.basename(SCHEMA_SQL)}={only_fresh} "
-                  f"only-in-migration={only_migrated} differing={differing}"
-                  + (f" {trigger_detail}" if trigger_detail else ""))
+                  not diffs,
+                  f"{len(expected[0])} tables, {len(expected[1])} triggers"
+                  + (f"; {'; '.join(diffs)}" if diffs else ""))
         except sqlite3.Error as exc:
             check(f"{SCHEMA_SQL} applies to an empty database", False, str(exc))
         finally:

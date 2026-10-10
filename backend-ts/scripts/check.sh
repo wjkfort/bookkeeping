@@ -76,22 +76,29 @@ fi
 # through, so transactions appear and disappear in it and every comparison
 # against a stored baseline would show spurious differences.
 #
-# They are DERIVED, not kept: `prod-backup-*.sql` is the single source of real
-# data in the repo and everything else is rebuilt from it, which is why they live
-# in /tmp. When they are absent this rebuilds them from the newest export, using
-# `setup_prod_staging.py` — the same script a human runs, and importantly one
-# that applies migrations/001 first. Building straight from the raw export
-# instead produces a database that is subtly wrong (the five unlinked priced rows
-# stay unlinked) and the money layer then reports four differences that look like
-# regressions. One definition of how the migrated database is produced, reused.
+# They are a v1/v2 PAIR, and that is why they can no longer be rebuilt. The money
+# oracle compares the pre-migration database with the migrated one, and the
+# contract layer compares a capture of the old code against the v1 database with
+# the new code against v2. Production has been on v2 since 2026-10-09, so no
+# current export can produce the v1 side: `setup_prod_staging.py` runs the v1 ->
+# v2 chain and now refuses a v2 export outright.
+#
+# So the pair is frozen: if it is present the two layers still run (that is the
+# ongoing regression check), and if it is gone the layers skip. Neither is a
+# failure, which is why the branch below distinguishes "cannot be rebuilt" from
+# "the rebuild broke".
 V1="${1:-}"
 V2="${2:-}"
 STAGING_V1=/tmp/prod-staging/preflight-v1.sqlite
 
 if [ -z "$V1" ] && [ -z "$V2" ] && [ ! -f /tmp/prod-fixtures/prod-v2.sqlite ]; then
   EXPORT=$(ls -t prod-backup-*.sql 2>/dev/null | head -1)
-  if [ -n "$EXPORT" ]; then
-    note "fixtures absent — rebuilding from $EXPORT"
+  if [ -z "$EXPORT" ]; then
+    skip "fixtures (absent, and no prod-backup-*.sql to build them from)"
+  elif grep -q 'amount_cents' "$EXPORT"; then
+    skip "fixtures (absent and not rebuildable: $EXPORT is already on v2, so the v1 side no longer exists)"
+  else
+    note "fixtures absent — rebuilding from the v1 export $EXPORT"
     if python3 -I scripts/setup_prod_staging.py "$EXPORT" >/tmp/check-fixtures.log 2>&1; then
       ok "fixtures rebuilt"
     else

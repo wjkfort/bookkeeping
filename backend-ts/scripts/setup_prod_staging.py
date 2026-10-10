@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
 Prepare a local, throwaway D1 database carrying REAL production data on the
-new schema, so the v2 code can be exercised in a browser without touching
-production.
+new schema, by running the v1 -> v2 migration chain on a v1 export.
 
     python3 -I scripts/setup_prod_staging.py prod-backup-<date>.sql
+
+    >>> THIS TAKES A **v1** EXPORT. Production has been on v2 since 2026-10-09,
+    >>> so a current export is already migrated and this script refuses it.
+    >>> To load current production data locally, use:
+    >>>     python3 -I scripts/rebuild_local_db.py      (or: npm run db:rebuild)
+    >>> What is left here is the migration rehearsal path: it also builds the v1
+    >>> snapshot the money oracle compares against, which a post-migration export
+    >>> cannot provide.
 
 An optional second argument sets where the migrated database is placed. The
 default is the throwaway staging directory, served with an explicit
@@ -22,7 +29,7 @@ What it does, in the order migration 002 documents:
   2. apply migrations/000_add_archived_at_to_subscriptions.sql if needed
   3. apply migrations/001_link_priced_rows_to_items.sql   (pre-flight repair)
   4. apply migrations/002_schema_v2.sql                   (the migration)
-  4b. apply any later migrations (003 …), in order
+  4b. apply any later migrations (003 … 006), in order
   5. place the result where `--persist-to` expects it
 
 Outputs, deliberately in two separate directories:
@@ -104,6 +111,19 @@ def main():
 
     db = sqlite3.connect(work)
     db.execute("PRAGMA foreign_keys = ON")
+
+    # Production has been on v2 since 2026-10-09, so a current export is already
+    # migrated and this chain cannot run against it: 002 renames the v1 tables
+    # and copies columns that no longer exist. Fail here, with the alternative,
+    # rather than three steps later with "no such column: item_id".
+    tx_cols = {r[1] for r in db.execute("PRAGMA table_info(transactions)")}
+    all_tables = {r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    if "amount_cents" in tx_cols and "item_prices" in all_tables:
+        print(f"  {export} is already on v2 — this script migrates v1 -> v2 and has")
+        print(f"  nothing to do. To load production data locally:")
+        print(f"    python3 -I scripts/rebuild_local_db.py {export} {PERSIST}")
+        return 2
 
     cols = {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}
     if "archived_at" not in cols:

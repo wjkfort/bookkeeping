@@ -49,6 +49,13 @@ npm run db:schema:remote
 
 ### Schema v2 migration and its verification net
 
+> **This section documents a one-time migration that has already run.** v2 went
+> to production on 2026-10-09 and production no longer has a v1 database, so the
+> commands below that take a `prod-backup-<date>.sql` argument (steps 1 and 2's
+> `db:rebuild:v1`, and `rehearse_migration.py`) can only be pointed at an
+> *archived* v1 export. The parts that still run against current production are
+> `npm run db:rebuild` (load real data locally) and `npm run test`.
+
 `migrations/002_schema_v2.sql` upgrades a v1 database in place (integer cents,
 `item_prices`, `cycle_days`, `subscription_id` renewals, upserted
 `exchange_rates`). It is breaking: old code cannot read the new schema, so the
@@ -64,14 +71,21 @@ python3 -I scripts/verify_migration.py prod-backup-<date>.sql
 # 2. Build the local database to develop against. There is only one now — the
 #    migrated (v2) schema — and it lives where wrangler looks by default, so no
 #    --persist-to flag is needed anywhere. `db:rebuild` takes the newest
-#    prod-backup-*.sql and runs the whole chain including the 001 preflight
-#    repair, so the result is what the verifier checked in step 1.
+#    prod-backup-*.sql, loads it verbatim, applies whatever migrations production
+#    has not taken yet, proves the result matches db/schema.sql, and only then
+#    replaces the local database (so a failed rebuild leaves it untouched).
+#    Stop `wrangler dev` first: the swap replaces the file underneath it.
 npm run db:rebuild
 npx wrangler dev       # or: npm run dev
 
 #    Nothing here is irreplaceable: rebuilding from the same export reproduces
-#    the same database. The /tmp fixtures the harness uses are rebuilt on demand
-#    by `npm run test`, so they need not be kept either.
+#    the same database. Note the corollary, though — production has been on v2
+#    since 2026-10-09, so a current export is already migrated and the v1 -> v2
+#    chain (scripts/setup_prod_staging.py, `npm run db:rebuild:v1`) no longer
+#    applies to it. That is also why the /tmp fixture pair the harness compares
+#    (a v1 database and its migrated twin) can never be rebuilt: the v1 side
+#    does not exist any more. If the pair is present the layers still run; if it
+#    is gone they skip, rather than reporting a failure that cannot be fixed.
 
 # 3. Run the whole harness — typecheck, migration invariants, write paths, the
 #    service layer, the AI endpoints, money arithmetic, and the API contract.
@@ -106,10 +120,11 @@ npx esbuild scripts/api_write_test.ts --bundle --platform=node --format=esm \
 node scripts/.build/api_write_test.mjs "$V2DB"
 ```
 
-Run every layer at once, against fixtures built from a real export:
+Run every layer at once, against fixtures built from a real **v1** export:
 
 ```bash
 # build a migrated staging database (served by wrangler) plus isolated fixtures
+# NOTE: v1 export only — a current export is already migrated and is refused
 python3 -I scripts/setup_prod_staging.py prod-backup-<date>.sql
 
 npm run test:full   # typecheck + migration invariants + write paths
