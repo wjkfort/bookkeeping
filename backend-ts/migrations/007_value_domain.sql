@@ -84,14 +84,22 @@ UPDATE transactions SET description = NULL WHERE description = '';
 -- range comparison or ORDER BY is wrong. 74 rows carried the default's shape.
 -- The '.000Z' is honest: the default has second precision, so the milliseconds
 -- are unknown and zero is the only value that does not invent one.
+--
+-- The shape test is `LIKE '____-__-__ __:__:__'` and not the equivalent GLOB
+-- with `[0-9]` classes. Both match the same 74 rows and local SQLite accepts
+-- both, but D1 rejects the GLOB with "LIKE or GLOB pattern too complex:
+-- SQLITE_ERROR" — a difference between the SQLite you can test against locally
+-- and the one that runs in production. `_` is a single-character wildcard, so
+-- the pattern is just as precise here; there are no letters in it for LIKE's
+-- case-insensitivity to affect.
 UPDATE users SET created_at = replace(created_at, ' ', 'T') || '.000Z'
- WHERE created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]';
+ WHERE created_at LIKE '____-__-__ __:__:__';
 UPDATE users SET updated_at = replace(updated_at, ' ', 'T') || '.000Z'
- WHERE updated_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]';
+ WHERE updated_at LIKE '____-__-__ __:__:__';
 UPDATE categories SET created_at = replace(created_at, ' ', 'T') || '.000Z'
- WHERE created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]';
+ WHERE created_at LIKE '____-__-__ __:__:__';
 UPDATE transactions SET updated_at = replace(updated_at, ' ', 'T') || '.000Z'
- WHERE updated_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]';
+ WHERE updated_at LIKE '____-__-__ __:__:__';
 
 -- ===========================================================================
 -- 2. Guard
