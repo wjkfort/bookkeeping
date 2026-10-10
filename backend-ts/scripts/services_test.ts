@@ -71,7 +71,7 @@ import {
   isValidTimezone, DEFAULT_TIMEZONE,
 } from '../src/utils/time';
 import type { ChatResult } from '../src/services/deepseek';
-import { ServiceError } from '../src/services/errors';
+import { ServiceError, toErrorResponse } from '../src/services/errors';
 
 const failures: string[] = [];
 let checks = 0;
@@ -136,6 +136,23 @@ async function expectServiceError(fn: () => Promise<unknown>): Promise<number | 
     return null;
   } catch (e) {
     if (e instanceof ServiceError) return e.status;
+    throw e;
+  }
+}
+
+/**
+ * As above, but keeps the code. The DDL triggers (migrations/006) report a
+ * stable code, and asserting on it is what distinguishes "the rule I meant was
+ * enforced" from "something else happened to fail with a 400".
+ */
+async function expectServiceErrorInfo(
+  fn: () => Promise<unknown>,
+): Promise<{ status: number | null; code: string | undefined; message: string }> {
+  try {
+    await fn();
+    return { status: null, code: undefined, message: '' };
+  } catch (e) {
+    if (e instanceof ServiceError) return { status: e.status, code: e.code, message: e.message };
     throw e;
   }
 }
@@ -312,8 +329,192 @@ async function main() {
   const renamed = await updateCategory(db, uid, child.id, { name: 'svc-cat-child-renamed' });
   check('a plain rename still succeeds', renamed.name === 'svc-cat-child-renamed', `got ${renamed.name}`);
 
-  const okType = await updateCategory(db, uid, child.id, { type: 'income' });
-  check('a leaf may change type freely', okType.type === 'income', `got ${okType.type}`);
+  // The rule holds in BOTH directions, and it used to be checked in only one:
+  // only the parent's type was ever consulted, so a leaf could be retyped to the
+  // opposite of the category it hangs under and leave a report mis-classifying
+  // it. The UPDATE trigger in migrations/006 closes that, and this asserts the
+  // trigger's own code rather than a bare 400.
+  const retypeLeaf = await expectServiceErrorInfo(
+    () => updateCategory(db, uid, child.id, { type: 'income' }));
+  check('a leaf cannot be retyped to differ from its parent',
+        retypeLeaf.status === 400 && retypeLeaf.code === 'CATEGORY_TYPE_MISMATCH',
+        `status ${retypeLeaf.status} code ${retypeLeaf.code}`);
+
+  // A root has no parent to disagree with, so its type is still free.
+  const rootLeaf = await createCategory(db, uid, { name: 'svc-cat-root-leaf', type: 'expense' });
+  const okType = await updateCategory(db, uid, rootLeaf.id, { type: 'income' });
+  check('a root leaf may change type freely', okType.type === 'income', `got ${okType.type}`);
+
+  // -------------------------------------------------------------------------
+  // The rules as DDL constraints (migrations/006).
+  //
+  // Everything above goes through the service layer, which pre-checks and could
+  // in principle be the only thing enforcing the rules. These cases bypass it
+  // and write raw SQL, which is the point: the database is the only writer every
+  // path must go through — a future script, a repair, a second service.
+  // -------------------------------------------------------------------------
+  console.log('\n=== category rules as DDL triggers (raw SQL, no service layer) ===');
+
+  const rawErr = (sql: string, ...args: any[]): string => {
+    try {
+      raw.prepare(sql).run(...args);
+      return '';
+    } catch (e: any) {
+      return String(e?.message ?? e);
+    }
+  };
+  const triggerCode = (message: string) =>
+    /\b(CATEGORY_DEPTH|CATEGORY_TYPE_MISMATCH|CATEGORY_SELF_PARENT|CATEGORY_CROSS_USER)\b/
+      .exec(message)?.[1] ?? '';
+
+  const tRoot = raw.prepare(
+    "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-root', 'expense', NULL)")
+    .run(uid).lastInsertRowid as number;
+  const tChild = raw.prepare(
+    "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-child', 'expense', ?)")
+    .run(uid, tRoot).lastInsertRowid as number;
+  check('raw SQL can build a legal two-level tree', Number(tChild) > 0, `child id ${tChild}`);
+
+  check('raw SQL: a third level is refused by the database',
+        triggerCode(rawErr(
+          "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-grand', 'expense', ?)",
+          uid, tChild)) === 'CATEGORY_DEPTH',
+        'expected CATEGORY_DEPTH');
+
+  check('raw SQL: a child of the other type is refused by the database',
+        triggerCode(rawErr(
+          "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-mixed', 'income', ?)",
+          uid, tRoot)) === 'CATEGORY_TYPE_MISMATCH',
+        'expected CATEGORY_TYPE_MISMATCH');
+
+  check('raw SQL: a category cannot be its own parent',
+        triggerCode(rawErr('UPDATE categories SET parent_id = ? WHERE id = ?', tRoot, tRoot))
+          === 'CATEGORY_SELF_PARENT',
+        'expected CATEGORY_SELF_PARENT');
+
+  check('raw SQL: a category with children cannot be reparented',
+        triggerCode(rawErr('UPDATE categories SET parent_id = ? WHERE id = ?', tChild, tRoot))
+          === 'CATEGORY_DEPTH',
+        'expected CATEGORY_DEPTH');
+
+  check('raw SQL: a parent cannot be retyped while a child disagrees',
+        triggerCode(rawErr("UPDATE categories SET type = 'income' WHERE id = ?", tRoot))
+          === 'CATEGORY_TYPE_MISMATCH',
+        'expected CATEGORY_TYPE_MISMATCH');
+
+  check('raw SQL: a leaf cannot be retyped away from its parent',
+        triggerCode(rawErr("UPDATE categories SET type = 'income' WHERE id = ?", tChild))
+          === 'CATEGORY_TYPE_MISMATCH',
+        'expected CATEGORY_TYPE_MISMATCH');
+
+  // The escape hatch the migration documents: detach, retype, reattach. Without
+  // it the rules would make a subtree's type impossible to change at all, which
+  // is why it is asserted rather than left to the migration's prose.
+  const subtreeOk = (() => {
+    try {
+      raw.prepare('UPDATE categories SET parent_id = NULL WHERE id = ?').run(tChild);
+      raw.prepare("UPDATE categories SET type = 'income' WHERE id = ?").run(tRoot);
+      raw.prepare("UPDATE categories SET type = 'income' WHERE id = ?").run(tChild);
+      raw.prepare('UPDATE categories SET parent_id = ? WHERE id = ?').run(tRoot, tChild);
+      return true;
+    } catch { return false; }
+  })();
+  const subtreeTypes = raw.prepare(
+    'SELECT type FROM categories WHERE id IN (?, ?) ORDER BY id').all(tRoot, tChild) as any[];
+  check('raw SQL: a subtree can be retyped by detaching first',
+        subtreeOk && subtreeTypes.every(r => r.type === 'income'),
+        subtreeTypes.map(r => r.type).join(','));
+
+  // A rename must not be collateral damage of the triggers.
+  check('raw SQL: a plain rename still passes the triggers',
+        rawErr("UPDATE categories SET name = 'trg-child-renamed' WHERE id = ?", tChild) === '',
+        'update should succeed');
+
+  // -------------------------------------------------------------------------
+  // A child must belong to the same user as its parent.
+  //
+  // The service layer already refuses this, and refuses it as a 404 rather than
+  // a 403 so that it does not confirm another user's category exists. The
+  // trigger is the backstop for every path that does not go through the
+  // service layer — and it guards a nastier outcome than a wrong report:
+  // `buildCategoryTree` builds its map from one user's rows and silently drops a
+  // child whose parent is absent, so a cross-user child is invisible in the UI
+  // while still sitting in the database.
+  //
+  // A separate user, with a distinct email: `users.email` is UNIQUE and the
+  // isolation section above already created 'svc-other@local'.
+  // -------------------------------------------------------------------------
+  console.log('\n=== category ownership: a child belongs to its parent\'s user ===');
+
+  raw.prepare("INSERT INTO users (email, password_hash, username) VALUES ('trg-other@local','x','trg-other')")
+    .run();
+  const otherUid = (raw.prepare("SELECT id FROM users WHERE email = 'trg-other@local'").get() as any).id;
+  const foreignRoot = raw.prepare(
+    "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-foreign-root', 'expense', NULL)")
+    .run(otherUid).lastInsertRowid as number;
+
+  const crossUserService = await expectServiceErrorInfo(() => createCategory(db, uid, {
+    name: 'svc-cat-cross-user', type: 'expense', parent_id: Number(foreignRoot),
+  }));
+  check("the service refuses another user's parent as a 404 (not a 403, which would confirm it exists)",
+        crossUserService.status === 404, `status ${crossUserService.status}`);
+
+  check("raw SQL: a new category cannot hang under another user's category",
+        triggerCode(rawErr(
+          "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-cross', 'expense', ?)",
+          uid, foreignRoot)) === 'CATEGORY_CROSS_USER',
+        'expected CATEGORY_CROSS_USER');
+
+  const myRoot = raw.prepare(
+    "INSERT INTO categories (user_id,name,type,parent_id) VALUES (?, 'trg-mine-root', 'expense', NULL)")
+    .run(uid).lastInsertRowid as number;
+  check("raw SQL: an existing root cannot be moved under another user's category",
+        triggerCode(rawErr('UPDATE categories SET parent_id = ? WHERE id = ?', foreignRoot, myRoot))
+          === 'CATEGORY_CROSS_USER',
+        'expected CATEGORY_CROSS_USER');
+
+  // The user_id column itself is not something the API lets a caller set, but a
+  // raw write could try to move a whole subtree to another owner; the trigger
+  // compares NEW.user_id against the parent, so stealing a child is refused too.
+  check("raw SQL: a category's owner cannot be changed out from under its parent",
+        triggerCode(rawErr('UPDATE categories SET user_id = ? WHERE id = ?', otherUid, tChild))
+          === 'CATEGORY_CROSS_USER',
+        'expected CATEGORY_CROSS_USER');
+
+  // The shapes above are the bare RAISE text, which is what node:sqlite
+  // surfaces. Production goes through workerd, which prefixes the message with
+  // its own code — so a matcher that grabbed "any UPPER_CASE token before a
+  // colon" would capture D1_ERROR or SQLITE_CONSTRAINT_TRIGGER and then reject
+  // it as an unknown code, turning every rule violation back into a 500.
+  console.log('\n=== a trigger violation is a 400 on both adapter paths ===');
+  for (const wrapped of [
+    'D1_ERROR: CATEGORY_DEPTH: categories may not be nested more than 2 levels deep',
+    'SQLITE_CONSTRAINT_TRIGGER: CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent',
+    'CATEGORY_SELF_PARENT: a category cannot be its own parent',
+    'SQLITE_CONSTRAINT_TRIGGER: CATEGORY_CROSS_USER: a subcategory must belong to the same user as its parent',
+  ]) {
+    const { status, body } = toErrorResponse(new Error(wrapped), 'fallback');
+    check(`wrapped as "${wrapped.split(':')[0]}" -> 400 with a code`,
+          status === 400 && typeof body.code === 'string',
+          `status ${status} body ${JSON.stringify(body)}`);
+  }
+  const unrelated = toErrorResponse(
+    new Error('SQLITE_CONSTRAINT_CHECK: amount_cents >= 0'), 'fallback');
+  check('an unrelated constraint is not swallowed as a rule violation',
+        unrelated.status === 500, `status ${unrelated.status}`);
+
+  // What miniflare actually puts on the wire, taken from a live `PUT
+  // /api/v1/categories/:id` against `wrangler dev`. The driver appends its own
+  // annotation after the prose; leaving it in sends the user (and the model) a
+  // message that reads like a stack trace.
+  const realShape = toErrorResponse(new Error(
+    'CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent'
+    + ': SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_TRIGGER)'), 'fallback');
+  check('the driver annotation is stripped from the message',
+        realShape.status === 400
+        && realShape.body.error === 'a subcategory must have the same type as its parent'
+        && realShape.body.code === 'CATEGORY_TYPE_MISMATCH',
+        JSON.stringify(realShape.body));
 
   console.log('\n=== category delete: still-in-use conflict carries the count ===');
   let conflictErr: any = null;

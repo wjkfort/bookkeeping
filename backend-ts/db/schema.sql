@@ -188,4 +188,65 @@ CREATE INDEX IF NOT EXISTS idx_item_prices_tx          ON item_prices (transacti
 -- chat window: latest N messages per user
 -- chat window: latest N messages of ONE conversation, which is what is loaded
 CREATE INDEX IF NOT EXISTS idx_ai_messages_session     ON ai_messages (user_id, session_id, id);
--- audit lookups: history of one row
+
+-- ---------------------------------------------------------------------------
+-- Structure rules on `categories`, enforced by triggers rather than CHECKs.
+--
+--   depth <= 2                the parent must itself be a root
+--   child.type = parent.type
+--   child.user_id = parent.user_id
+--
+-- All three compare a row against other rows of the same table, and a SQLite
+-- CHECK may not contain a subquery, so a trigger is the only mechanism
+-- available. `src/api/summary.ts` classifies by `c.type` and rolls a child up
+-- exactly one level, so a violation makes report numbers silently wrong (R6).
+-- The user_id rule is not about reports: `buildCategoryTree` drops a category
+-- whose parent is missing, so a cross-user child would vanish from the UI.
+--
+-- Keep these two statements byte-identical to migrations/006: the verifier
+-- compares this file against the migrated schema, triggers by stored SQL.
+-- ---------------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS trg_categories_structure_insert
+BEFORE INSERT ON categories
+FOR EACH ROW
+WHEN NEW.parent_id IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'CATEGORY_CROSS_USER: a subcategory must belong to the same user as its parent')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE id = NEW.parent_id AND user_id <> NEW.user_id);
+
+    SELECT RAISE(ABORT, 'CATEGORY_DEPTH: categories may not be nested more than 2 levels deep')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE id = NEW.parent_id AND parent_id IS NOT NULL);
+
+    SELECT RAISE(ABORT, 'CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE id = NEW.parent_id AND type <> NEW.type);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_categories_structure_update
+BEFORE UPDATE ON categories
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'CATEGORY_SELF_PARENT: a category cannot be its own parent')
+     WHERE NEW.parent_id IS NOT NULL AND NEW.parent_id = NEW.id;
+
+    SELECT RAISE(ABORT, 'CATEGORY_CROSS_USER: a subcategory must belong to the same user as its parent')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE id = NEW.parent_id AND user_id <> NEW.user_id);
+
+    SELECT RAISE(ABORT, 'CATEGORY_DEPTH: categories may not be nested more than 2 levels deep')
+     WHERE NEW.parent_id IS NOT NULL
+       AND (EXISTS (SELECT 1 FROM categories
+                     WHERE id = NEW.parent_id AND parent_id IS NOT NULL)
+            OR EXISTS (SELECT 1 FROM categories
+                        WHERE parent_id = NEW.id));
+
+    SELECT RAISE(ABORT, 'CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE id = NEW.parent_id AND type <> NEW.type);
+
+    SELECT RAISE(ABORT, 'CATEGORY_TYPE_MISMATCH: a subcategory must have the same type as its parent')
+     WHERE EXISTS (SELECT 1 FROM categories
+                    WHERE parent_id = NEW.id AND type <> NEW.type);
+END;

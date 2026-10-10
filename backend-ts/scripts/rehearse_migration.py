@@ -8,7 +8,7 @@ it against production.
 Steps, exactly as they will be run in production:
 
     1. load the export into a fresh database          (the backup)
-    2. migrations/add_archived_at_to_subscriptions.sql (no-op if already present)
+    2. migrations/000_add_archived_at_to_subscriptions.sql (no-op if already present)
     3. migrations/001_link_priced_rows_to_items.sql    (pre-flight repair)
     4. verify_migration.py                             (must be 33/0)
     5. migrations/002_schema_v2.sql                    (the migration)
@@ -30,13 +30,14 @@ import subprocess
 import sys
 import tempfile
 
-PREFLIGHT_ARCHIVED = "migrations/add_archived_at_to_subscriptions.sql"
+PREFLIGHT_ARCHIVED = "migrations/000_add_archived_at_to_subscriptions.sql"
 PREFLIGHT_LINK = "migrations/001_link_priced_rows_to_items.sql"
 MIGRATION = "migrations/002_schema_v2.sql"
 # Applied after MIGRATION, in order.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
-                    "migrations/005_ai_message_sessions.sql"]
+                    "migrations/005_ai_message_sessions.sql",
+                    "migrations/006_category_structure_triggers.sql"]
 VERIFIER = "scripts/verify_migration.py"
 
 failures = []
@@ -91,7 +92,7 @@ def main():
     tx_before = db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
     check("loaded", tx_before > 0, f"{tx_before} transactions")
 
-    step(2, "apply add_archived_at_to_subscriptions.sql if needed")
+    step(2, "apply 000_add_archived_at_to_subscriptions.sql if needed")
     cols = {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}
     if "archived_at" not in cols:
         db.executescript(open(PREFLIGHT_ARCHIVED, encoding="utf-8").read())

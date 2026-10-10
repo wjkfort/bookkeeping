@@ -5,9 +5,9 @@
  * (`list_categories`, `add_category`, `rename_category`, `move_category`,
  * `delete_category`) share one implementation.
  *
- * This module also adds the two structural rules the schema and the
- * requirements doc have always claimed were enforced here, and which were in
- * fact absent from the codebase:
+ * The two structural rules the schema and the requirements doc always claimed
+ * were enforced, and which were in fact absent from the codebase until
+ * 2026-10-09, are:
  *
  *   - depth <= 2 (a child may not have children of its own)
  *   - child.type === parent.type
@@ -18,13 +18,20 @@
  * under a *non-root* parent that the roll-up never visits, and an income child
  * under an expense parent would have its amount classed by whichever type the
  * query happened to read. Either way a report number silently becomes wrong,
- * which R6 forbids. Production data already satisfies both rules (max depth 2,
- * zero type mismatches), so this rejects only requests that would have
- * corrupted the reports.
+ * which R6 forbids.
+ *
+ * ENFORCEMENT LIVES IN THE DATABASE. `migrations/006` installs BEFORE
+ * INSERT/UPDATE triggers on `categories` (a CHECK cannot express either rule,
+ * because both compare the row against other rows and a CHECK may not hold a
+ * subquery). This module keeps `assertParentAllowed` as a fast path that
+ * produces a precise message — a 404 for a missing parent, prose naming the
+ * rule — and converts a trigger's verdict into the same `ServiceError` shape
+ * through `asServiceError`. The DDL is what makes the rule unbypassable; this
+ * file is what makes the common failures pleasant to read.
  */
 
 import type { Category, CreateCategoryRequest, UpdateCategoryRequest } from '../types';
-import { badRequest, conflict, notFound, serverError } from './errors';
+import { asServiceError, badRequest, conflict, notFound, serverError } from './errors';
 
 /** A child may not have children: the tree is at most two levels. */
 export const MAX_CATEGORY_DEPTH = 2;
@@ -137,12 +144,21 @@ export async function createCategory(
 
   const translationsJson = translations ? JSON.stringify(translations) : null;
 
-  const result = await db
-    .prepare(
-      'INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, ?, ?, ?) RETURNING *',
-    )
-    .bind(name, type, parent_id || null, translationsJson, userId)
-    .first<Category>();
+  let result: Category | null;
+  try {
+    result = await db
+      .prepare(
+        'INSERT INTO categories (name, type, parent_id, translations, user_id) VALUES (?, ?, ?, ?, ?) RETURNING *',
+      )
+      .bind(name, type, parent_id || null, translationsJson, userId)
+      .first<Category>();
+  } catch (error) {
+    // `assertParentAllowed` above is a fast path for a precise message; the
+    // triggers in migrations/006 are the guarantee. Translating their verdict
+    // here keeps this function's contract — caller-fixable problems leave as
+    // `ServiceError`, never as a raw driver error.
+    throw asServiceError(error) ?? error;
+  }
 
   if (!result) {
     throw serverError('Failed to create category');
@@ -228,10 +244,19 @@ export async function updateCategory(
 
   values.push(id, userId);
 
-  const result = await db
-    .prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ? AND user_id = ? RETURNING *`)
-    .bind(...values)
-    .first<Category>();
+  let result: Category | null;
+  try {
+    result = await db
+      .prepare(`UPDATE categories SET ${updates.join(', ')} WHERE id = ? AND user_id = ? RETURNING *`)
+      .bind(...values)
+      .first<Category>();
+  } catch (error) {
+    // The checks above cover the moves this file anticipates. The one it used
+    // to miss — retyping a leaf so that it no longer matches the parent it
+    // hangs under — is caught by the UPDATE trigger (migrations/006); reporting
+    // its code is what makes that a 400 instead of a 500.
+    throw asServiceError(error) ?? error;
+  }
 
   if (!result) {
     throw notFound('Category not found');

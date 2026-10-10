@@ -1,0 +1,20 @@
+-- Migration 000 — add `subscriptions.archived_at`.
+--
+-- Applied by hand, long before the numbered chain existed (git history: the
+-- archive/restore feature commit). It is numbered 000 because of *when* it must
+-- run, not when it was written: 002 rebuilds `subscriptions` and copies
+-- `archived_at` across, so the column has to exist before 002 runs. 001 is
+-- already a v1 pre-flight repair, so 000 sits ahead of it.
+--
+-- Order: 000 → 001 → 002 → 003 → 004 → 005 → 006
+--
+--   npx wrangler d1 execute bookkeeping-db --remote --file=migrations/000_add_archived_at_to_subscriptions.sql
+--
+-- NOT idempotent and NOT re-runnable: a second run fails with "duplicate column
+-- name: archived_at", which is why every caller checks
+-- `PRAGMA table_info(subscriptions)` first. The check is worth keeping because
+-- the 2026-07-22 prod backup predates this file, so a fresh load from an old
+-- export does need it while the local clone does not.
+--
+-- NULL = active, non-NULL = archived (paused).
+ALTER TABLE subscriptions ADD COLUMN archived_at TEXT;

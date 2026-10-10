@@ -19,7 +19,7 @@ Then open http://localhost:8787 and sign in with your real account.
 
 What it does, in the order migration 002 documents:
   1. load the export into a fresh v1 database
-  2. apply migrations/add_archived_at_to_subscriptions.sql if needed
+  2. apply migrations/000_add_archived_at_to_subscriptions.sql if needed
   3. apply migrations/001_link_priced_rows_to_items.sql   (pre-flight repair)
   4. apply migrations/002_schema_v2.sql                   (the migration)
   4b. apply any later migrations (003 …), in order
@@ -64,14 +64,15 @@ FIXTURE_V1 = os.path.join(FIXTURES, "prod-v1.sqlite")
 FIXTURE_V2 = os.path.join(FIXTURES, "prod-v2.sqlite")
 
 PREFLIGHT = [
-    "migrations/add_archived_at_to_subscriptions.sql",
+    "migrations/000_add_archived_at_to_subscriptions.sql",
     "migrations/001_link_priced_rows_to_items.sql",
 ]
 MIGRATION = "migrations/002_schema_v2.sql"
 # Applied after MIGRATION, in order, each targeting the previous version.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
-                    "migrations/005_ai_message_sessions.sql"]
+                    "migrations/005_ai_message_sessions.sql",
+                    "migrations/006_category_structure_triggers.sql"]
 
 
 def main():

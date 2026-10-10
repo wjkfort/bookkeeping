@@ -27,11 +27,15 @@ import sys
 import tempfile
 
 SCHEMA = "migrations/002_schema_v2.sql"
+# The v1 pre-flight column fix. Applied to the source before SCHEMA when the
+# export predates it (see apply_pending_column_migrations).
+ARCHIVED_AT_MIGRATION = "migrations/000_add_archived_at_to_subscriptions.sql"
 # Applied after SCHEMA, in order. Each is a separate file because it targets a
 # database already on the previous version.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
-                    "migrations/005_ai_message_sessions.sql"]
+                    "migrations/005_ai_message_sessions.sql",
+                    "migrations/006_category_structure_triggers.sql"]
 # The full schema for new/empty databases; must match what the migration builds.
 SCHEMA_SQL = "db/schema.sql"
 
@@ -73,15 +77,19 @@ def load(path):
 def apply_pending_column_migrations(db):
     """Bring the source to the state migration 002 expects.
 
-    archived_at is added by migrations/add_archived_at_to_subscriptions.sql, a
+    archived_at is added by migrations/000_add_archived_at_to_subscriptions.sql, a
     separate file applied by hand. Older exports lack it, so apply it here
     rather than let 002 fail with a confusing "no such column".
+
+    The file itself is executed rather than its one statement being repeated
+    here: duplicating the DDL would let the two drift, and this check exists to
+    prove the migration chain and db/schema.sql describe the same database.
     """
     cols = {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}
     if "archived_at" not in cols:
-        db.execute("ALTER TABLE subscriptions ADD COLUMN archived_at TEXT")
+        db.executescript(open(ARCHIVED_AT_MIGRATION, encoding="utf-8").read())
         db.commit()
-        return ["add_archived_at_to_subscriptions.sql"]
+        return [os.path.basename(ARCHIVED_AT_MIGRATION)]
     return []
 
 
@@ -424,13 +432,22 @@ def main():
                 for r in conn.execute(
                     "SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")))
             sig[t] = (cols, fks, idx, checks, views)
-        return sig
+        # Triggers are schema objects that *do* change behaviour, so they belong
+        # in the comparison. They are collected separately rather than per table
+        # because `signature`'s per-table tuple is zipped against a fixed label
+        # list; a name/sql pair is all a trigger needs.
+        triggers = tuple(sorted(
+            (r[0], re.sub(r"\s+", " ", (r[1] or "")).strip())
+            for r in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name")))
+        return sig, triggers
 
     if os.path.exists(SCHEMA_SQL):
         fresh = sqlite3.connect(":memory:")
         try:
             fresh.executescript(open(SCHEMA_SQL, encoding="utf-8").read())
-            A, B = signature(fresh), signature(db)
+            A, A_triggers = signature(fresh)
+            B, B_triggers = signature(db)
             only_fresh = sorted(set(A) - set(B))
             only_migrated = sorted(set(B) - set(A))
             differing = []
@@ -451,10 +468,24 @@ def main():
                     else:
                         detail.append(f"{lab}: {x!r} vs {y!r}")
                 differing.append((t, detail))
+            # A trigger missing from one path is the failure mode this guards:
+            # a fresh install would enforce the category rules and a migrated
+            # database would not, with nothing else to notice the difference.
+            trigger_detail = ""
+            triggers_match = A_triggers == B_triggers
+            if not triggers_match:
+                trigger_detail = (f"triggers: only-in-{os.path.basename(SCHEMA_SQL)}="
+                                  f"{[n for n, _ in A_triggers if (n, _) not in B_triggers]} "
+                                  f"only-in-migration="
+                                  f"{[n for n, _ in B_triggers if (n, _) not in A_triggers]} "
+                                  f"differing-sql="
+                                  f"{[n for n, s in A_triggers if dict(B_triggers).get(n) not in (None, s)]}")
             check(f"{SCHEMA_SQL} matches the migrated schema",
-                  not only_fresh and not only_migrated and not differing,
-                  f"{len(A)} tables; only-in-{os.path.basename(SCHEMA_SQL)}={only_fresh} "
-                  f"only-in-migration={only_migrated} differing={differing}")
+                  not only_fresh and not only_migrated and not differing and triggers_match,
+                  f"{len(A)} tables, {len(A_triggers)} triggers; "
+                  f"only-in-{os.path.basename(SCHEMA_SQL)}={only_fresh} "
+                  f"only-in-migration={only_migrated} differing={differing}"
+                  + (f" {trigger_detail}" if trigger_detail else ""))
         except sqlite3.Error as exc:
             check(f"{SCHEMA_SQL} applies to an empty database", False, str(exc))
         finally:

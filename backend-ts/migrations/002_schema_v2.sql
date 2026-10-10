@@ -57,7 +57,7 @@ DROP VIEW  IF EXISTS subscriptions_src;
 --   npx wrangler d1 execute bookkeeping-db --remote --command \
 --     "SELECT name FROM pragma_table_info('subscriptions') ORDER BY cid"
 --
--- archived_at must be present. migrations/add_archived_at_to_subscriptions.sql
+-- archived_at must be present. migrations/000_add_archived_at_to_subscriptions.sql
 -- was applied by hand to the local database but is absent from the prod backup
 -- of 2026-07-22, so check rather than assume. If it is missing, apply that file
 -- first; this migration cannot paper over it, because SQLite resolves column
@@ -218,12 +218,12 @@ CREATE TABLE ledger_days (
 -- NOTE ON subscriptions.archived_at — this file covers the database that HAS
 -- the column, which is the expected prod state (the local database, cloned from
 -- prod, has it). The column never arrives by itself: it comes from the separate
--- hand-applied migrations/add_archived_at_to_subscriptions.sql.
+-- hand-applied migrations/000_add_archived_at_to_subscriptions.sql.
 --
 -- SQLite resolves column names at prepare time, so one statement cannot
 -- conditionally reference a column that might be missing — an IF/EXISTS guard
 -- does not help, tested. If prod turns out to lack the column, run
--- migrations/add_archived_at_to_subscriptions.sql FIRST (it is a one-line
+-- migrations/000_add_archived_at_to_subscriptions.sql FIRST (it is a one-line
 -- ALTER TABLE ADD COLUMN, harmless on a database that already has it would be
 -- an error instead, so check before running).
 --

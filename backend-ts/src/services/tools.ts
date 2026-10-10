@@ -42,7 +42,7 @@ import { markLedgerDay, findGaps } from './gaps';
 import { resolveMerchant, addMerchantAlias } from './merchants';
 import { readMemory, writeMemory } from './memory';
 import { findTransactions, summarize } from './queries';
-import { ServiceError } from './errors';
+import { asServiceError } from './errors';
 
 export interface ToolResult {
   ok: boolean;
@@ -933,12 +933,17 @@ export async function runTool(
     }
     return { ok: true, data };
   } catch (e) {
-    if (e instanceof ServiceError) {
+    // `asServiceError` also recognises a DDL trigger violation (migrations/006),
+    // so a structural rule broken by a tool call comes back as a fixable 400
+    // with its code instead of an opaque TOOL_FAILED. That is what lets the
+    // model retry the call correctly rather than give up (R6).
+    const serviceError = asServiceError(e);
+    if (serviceError) {
       return {
         ok: false,
-        code: e.code ?? `HTTP_${e.status}`,
-        error: e.message,
-        ...(e.details ? { data: e.details } : {}),
+        code: serviceError.code ?? `HTTP_${serviceError.status}`,
+        error: serviceError.message,
+        ...(serviceError.details ? { data: serviceError.details } : {}),
       };
     }
     return {
