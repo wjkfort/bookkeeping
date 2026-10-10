@@ -114,21 +114,34 @@ npx wrangler d1 export bookkeeping-db --remote --output=prod-backup-<date>.sql
 # 2. 把代码提交好，但【先不要 push】
 git add … && git commit -m "…"
 
-# 3. 前置修复：把 5 条"有价无 item"的行挂到 items，否则它们的价格会被丢弃
+# 3. 前置列修复（仅当生产缺 subscriptions.archived_at 时）：先探测再决定
+npx wrangler d1 execute bookkeeping-db --remote --command \
+  "SELECT name FROM pragma_table_info('subscriptions') ORDER BY cid"
+# 缺 archived_at 才执行——该文件不可重复运行，第二次会报 duplicate column name
+npx wrangler d1 execute bookkeeping-db --remote \
+  --file=./migrations/000_add_archived_at_to_subscriptions.sql
+
+# 4. 前置修复：把 5 条"有价无 item"的行挂到 items，否则它们的价格会被丢弃
 npx wrangler d1 execute bookkeeping-db --remote \
   --file=./migrations/001_link_priced_rows_to_items.sql
 
-# 4. 重新导出并确认验证器到 33/0（要对新导出跑，不是第 1 步那个）
+# 5. 重新导出并确认验证器到 38/0（要对新导出跑，不是第 1 步那个）
 npx wrangler d1 export bookkeeping-db --remote --output=prod-backup-after-001.sql
 python3 -I scripts/verify_migration.py prod-backup-after-001.sql
 
-# 5. 紧接着应用 002 → 003 → 004 → 005
-#    （003 针对 v2 schema，必须在 002 之后；005 针对 003 建的表，必须在 003 之后）
+# 6. 紧接着应用 002 → 003 → 004 → 005 → 006
+#    （003 针对 v2 schema，必须在 002 之后；005 针对 003 建的表，必须在 003 之后；
+#      006 建触发器，必须等 002 重建完 categories 之后）
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/002_schema_v2.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/003_ai_layer_tables.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/004_normalise_units_merchants.sql
 npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/005_ai_message_sessions.sql
+npx wrangler d1 execute bookkeeping-db --remote --file=./migrations/006_category_structure_triggers.sql
 ```
+
+**006 可以单独补跑，不影响上面那次迁移的历史。** 它只建两个触发器、不改任何一行数据，幂等
+（`CREATE TRIGGER IF NOT EXISTS`），也不依赖代码部署：应用后线上立刻多出三条约束。已有的 68 行分类
+全部满足（最大深度 2、0 处类型不匹配、0 处自引用、0 处跨用户父分类），所以补跑不会拒绝任何存量数据。
 
 **实际执行时改了一点（更好）：不等 push，而是本机 `npx wrangler deploy` 先把后端发上去。**
 实测后端确实绑了 Cloudflare Git CI/CD（push 后自动多出一次部署），但 CI 的部署延迟不可控；

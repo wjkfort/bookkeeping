@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "记账后端表结构（schema v2）",
+    "subtitle": "12 张表 = 10 张业务表 + 2 张 AI 相关表 · 外键与删除行为",
+    "output": "database-er.html"
+  },
+  "components": [
+    { "id": "users", "type": "security", "label": "users", "sublabel": "归属根 · ai_memory", "pos": [40, 800], "size": [170, 64] },
+
+    { "id": "categories", "type": "database", "label": "categories", "sublabel": "两级树 · parent_id", "pos": [340, 360], "size": [170, 64] },
+    { "id": "subscriptions", "type": "database", "label": "subscriptions", "sublabel": "cycle_days · 归档", "pos": [660, 360], "size": [170, 64] },
+    { "id": "transactions", "type": "database", "label": "transactions", "sublabel": "amount_cents · source", "pos": [340, 800], "size": [170, 64] },
+    { "id": "exchange_rates", "type": "cloud", "label": "exchange_rates", "sublabel": "汇率缓存 · 无 user_id", "pos": [340, 1020], "size": [170, 64] },
+
+    { "id": "items", "type": "database", "label": "items", "sublabel": "每用户唯一名", "pos": [660, 580], "size": [170, 64] },
+    { "id": "item_prices", "type": "database", "label": "item_prices", "sublabel": "价格观测 · R4 比价", "pos": [660, 800], "size": [170, 64] },
+    { "id": "merchants", "type": "database", "label": "merchants", "sublabel": "商家实体", "pos": [980, 800], "size": [170, 64] },
+    { "id": "units", "type": "cloud", "label": "units", "sublabel": "单位词表 · 无 user_id", "pos": [660, 1020], "size": [170, 64] },
+    { "id": "merchant_aliases", "type": "database", "label": "merchant_aliases", "sublabel": "别名 → 同一家店", "pos": [980, 1020], "size": [170, 64] },
+
+    { "id": "ai_messages", "type": "backend", "label": "ai_messages", "sublabel": "对话轮次 · tokens", "pos": [660, 40], "size": [170, 64] },
+    { "id": "ledger_days", "type": "backend", "label": "ledger_days", "sublabel": "no_spend | partial", "pos": [660, 180], "size": [170, 64] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "AI 相关表（2）· 均 user_id → users", "wraps": ["ai_messages", "ledger_days"] },
+    { "kind": "region", "label": "业务表（10）· 除 units / exchange_rates 外均 user_id → users", "wraps": ["users", "categories", "subscriptions", "transactions", "exchange_rates", "items", "item_prices", "merchants", "units", "merchant_aliases"] }
+  ],
+  "connections": [
+    { "from": "transactions", "to": "categories", "label": "category_id RESTRICT", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [425, 640] },
+    { "from": "subscriptions", "to": "categories", "label": "category_id SET NULL", "variant": "emphasis", "fromSide": "left", "toSide": "right", "labelAt": [585, 382] },
+    { "from": "item_prices", "to": "items", "label": "item_id CASCADE", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [745, 740] },
+    { "from": "transactions", "to": "item_prices", "label": "transaction_id SET NULL", "variant": "emphasis", "fromSide": "right", "toSide": "left", "labelAt": [585, 822] },
+    { "from": "item_prices", "to": "merchants", "label": "merchant_id SET NULL", "variant": "emphasis", "fromSide": "right", "toSide": "left", "labelAt": [905, 822] },
+    { "from": "item_prices", "to": "units", "label": "unit → units(code)", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [745, 950] },
+    { "from": "merchant_aliases", "to": "merchants", "label": "merchant_id CASCADE", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "labelAt": [1065, 950] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "业务表 10 张", "items": ["账号、分类树、交易、订阅、物品、价格观测", "商家 + 别名、单位词表、汇率缓存", "金额一律整数分；收支方向由 categories.type 决定"] },
+    { "dot": "rose", "title": "AI 相关表 2 张", "items": ["ai_messages：一次对话按 session_id 分组，token 数即成本账", "ledger_days：no_spend / partial 三态，决定要不要继续追问"] },
+    { "dot": "amber", "title": "删除时会发生什么", "items": ["transactions.category_id 是 RESTRICT：分类下有交易就删不掉", "item_prices.item_id CASCADE；transaction_id / merchant_id SET NULL", "其余 user_id 全 CASCADE；categories.parent_id CASCADE（删父连带删子）"] },
+    { "dot": "slate", "title": "未画的边（10 条）与结构约束", "items": ["9 张表各有一条 user_id → users ON DELETE CASCADE；units 与 exchange_rates 没有，users 是归属根", "categories.parent_id 自引用（自连接拉不出箭头）", "migrations/006 的触发器强制：深度 ≤ 2、子类型 = 父类型、子分类与父分类同一用户"] }
+  ]
+}

@@ -46,8 +46,8 @@ v2 相比 v1 的两处变化（文档此前描述的是旧结构）：
 迁移时 `002` 会按 renew 端点自己写入的描述（`Subscription renewal: <name>`）回填
 `subscription_id`，从而把历史续费找回来。
 
-`archived_at` 在 v1 时通过 `backend-ts/migrations/add_archived_at_to_subscriptions.sql` 加到已有库；
-新库直接从 `db/schema.sql` 获得。
+`archived_at` 在 v1 时通过 `backend-ts/migrations/000_add_archived_at_to_subscriptions.sql` 加到已有库
+（编号 000：它必须先于重建 `subscriptions` 的 `002` 执行）；新库直接从 `db/schema.sql` 获得。
 
 **删除订阅**会把相关交易的 `subscription_id` 置为 NULL（`SET NULL`），**交易本身保留**——它们只是
 不再关联这个订阅。旧文案曾说"续费记录会一并删除"，已不再成立。
@@ -173,7 +173,7 @@ POST /api/v1/subscriptions/:id/restore
 ## 相关文件
 
 - `backend-ts/db/schema.sql`（`subscriptions` 表定义）
-- `backend-ts/migrations/add_archived_at_to_subscriptions.sql`
+- `backend-ts/migrations/000_add_archived_at_to_subscriptions.sql`
 - `backend-ts/src/api/subscriptions.ts`
 - `client/src/components/features/Dashboard.tsx`、`SubscriptionModal.tsx`、`Dashboard.css`、`api.ts`、`types/index.ts`
 
