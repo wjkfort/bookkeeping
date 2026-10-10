@@ -49,3 +49,7 @@ CLAUDE.md
 .codegraph
 .reasonix
 .claude/
+
+# Impeccable design-review artifacts (local evidence, not source)
+.impeccable/
+.impeccable-eval/
