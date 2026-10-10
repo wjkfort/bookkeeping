@@ -79,7 +79,9 @@ MIGRATION = "migrations/002_schema_v2.sql"
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
                     "migrations/005_ai_message_sessions.sql",
-                    "migrations/006_category_structure_triggers.sql"]
+                    "migrations/006_category_structure_triggers.sql",
+                    "migrations/007_value_domain.sql",
+                    "migrations/008_category_tree.sql"]
 
 
 def main():

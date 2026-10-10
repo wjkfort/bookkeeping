@@ -2,6 +2,12 @@
 """
 Rebuild the local D1 database from a CURRENT production export.
 
+>>> The result is PRODUCTION PLUS EVERY PENDING MIGRATION, not a copy of
+>>> production. Step 2 below applies the migrations production has not taken
+>>> yet, so while any exist the local database deliberately differs from
+>>> production — that is what lets them be tried before they are applied for
+>>> real. `--as-in-production` places the export untouched instead.
+
     python3 -I scripts/rebuild_local_db.py [export.sql] [persist-root]
     npm run db:rebuild
 
@@ -56,6 +62,14 @@ PENDING_MIGRATIONS = [
     ("migrations/006_category_structure_triggers.sql",
      "SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' "
      "AND name='trg_categories_structure_update'"),
+    ("migrations/007_value_domain.sql",
+     "SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' "
+     "AND name='trg_transactions_value_domain_update'"),
+    # 008 is data, not schema, so the probe looks for its effect rather than an
+    # object. Re-running it is harmless (every statement is a no-op), which is
+    # what makes a probe this weak acceptable.
+    ("migrations/008_category_tree.sql",
+     "SELECT COUNT(*) FROM categories WHERE name = 'Tobacco & Alcohol'"),
 ]
 
 
@@ -116,7 +130,12 @@ def holders(path):
 
 
 def main():
-    args = [a for a in sys.argv[1:]]
+    argv = sys.argv[1:]
+    # A mirror of production is a different request from a preview of what
+    # production becomes, and the two differ exactly while migrations are
+    # pending. This flag asks for the first.
+    verbatim = "--as-in-production" in argv
+    args = [a for a in argv if a != "--as-in-production"]
     if len(args) > 2:
         print(__doc__)
         return 2
@@ -131,6 +150,7 @@ def main():
 
     print(f"export:       {export} ({os.path.getsize(export)} bytes)")
     print(f"persist root: {persist_root}")
+    print(f"mode:         {'mirror production exactly' if verbatim else 'production + pending migrations'}")
 
     target = find_db_object(persist_root)
     directory = d1_object_dir(persist_root)
@@ -180,28 +200,32 @@ def main():
 
         print("2. applying migrations production has not taken yet")
         applied = 0
-        for path, probe in PENDING_MIGRATIONS:
-            if not os.path.exists(path):
-                print(f"   skipped {path} (not present)")
-                continue
-            if db.execute(probe).fetchone()[0]:
-                print(f"   {path}: already applied")
-                continue
-            db.executescript(open(path, encoding="utf-8").read())
-            db.commit()
-            print(f"   {path}: applied")
-            applied += 1
-        if not applied:
-            print("   nothing to apply")
+        if verbatim:
+            print("   skipped: --as-in-production asks for production exactly as exported")
+        else:
+            for path, probe in PENDING_MIGRATIONS:
+                if not os.path.exists(path):
+                    print(f"   skipped {path} (not present)")
+                    continue
+                if db.execute(probe).fetchone()[0]:
+                    print(f"   {path}: already applied")
+                    continue
+                db.executescript(open(path, encoding="utf-8").read())
+                db.commit()
+                print(f"   {path}: applied")
+                applied += 1
+            if not applied:
+                print("   nothing to apply")
 
-        print(f"3. structure vs {SCHEMA_SQL}")
+        print(f"3. structure vs {SCHEMA_SQL}"
+              + (" (informational: a production mirror is expected to be behind)" if verbatim else ""))
         fresh = sqlite3.connect(":memory:")
         fresh.executescript(open(SCHEMA_SQL, encoding="utf-8").read())
         expected, observed = signature(fresh), signature(db)
         fresh.close()
         diffs = differences(expected, observed)
         for d in diffs:
-            print(f"   FAIL {d}")
+            print(f"   {'diff' if verbatim else 'FAIL'} {d}")
         if not diffs:
             print(f"   PASS: {len(expected[0])} tables, {len(expected[1])} triggers, "
                   f"columns/keys/indexes/CHECKs/views all match")
@@ -214,13 +238,13 @@ def main():
 
         after = {t: db.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in before}
         changed = {t: (before[t], after[t]) for t in before if before[t] != after[t]}
-        if changed:
+        if changed and not verbatim:
             print("   rows changed by the migrations applied above:")
             for t, (b, a) in sorted(changed.items()):
                 print(f"     {t}: {b} -> {a}")
 
         db.close()
-        if diffs or fk or integrity != "ok":
+        if (diffs and not verbatim) or fk or integrity != "ok":
             return die("the rebuilt database did not check out — the local database at\n"
                        f"       {target} was left untouched")
 
@@ -236,6 +260,14 @@ def main():
         shutil.rmtree(work, ignore_errors=True)
 
     print(f"\nlocal database replaced with {export}")
+    if verbatim:
+        print("NOTE: --as-in-production, so this is production exactly as exported and")
+        print(f"      {len(PENDING_MIGRATIONS)} known pending migration(s) were NOT applied.")
+    elif applied:
+        print(f"NOTE: {applied} pending migration(s) were applied on top, so this is")
+        print("      production PLUS those migrations, not a copy of production.")
+    else:
+        print("NOTE: no pending migrations, so this matches production as exported.")
     print("start `npm run dev` (or restart it) to serve the new data")
     return 0
 

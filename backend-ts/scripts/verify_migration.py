@@ -35,11 +35,22 @@ SCHEMA = "migrations/002_schema_v2.sql"
 # export predates it (see apply_pending_column_migrations).
 ARCHIVED_AT_MIGRATION = "migrations/000_add_archived_at_to_subscriptions.sql"
 # Applied after SCHEMA, in order. Each is a separate file because it targets a
-# database already on the previous version.
+# database already on the previous version. These are expected to PRESERVE the
+# data: the checks below assert exactly that, row counts and category tree
+# included.
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
                     "migrations/005_ai_message_sessions.sql",
-                    "migrations/006_category_structure_triggers.sql"]
+                    "migrations/006_category_structure_triggers.sql",
+                    "migrations/007_value_domain.sql"]
+# Migrations that deliberately RESHAPE the data rather than preserve it, so they
+# are applied after the preservation checks instead of before them. 008 is a
+# decision about one ledger's taxonomy — it merges two categories, creates
+# seven others, re-parents six and moves 19 transactions. Asserting "the category
+# tree is unchanged" against it would be asserting the opposite of its purpose.
+# They still run before the schema comparison, so a future migration that
+# happens to carry DDL in this file is not missed.
+DATA_MIGRATIONS = ["migrations/008_category_tree.sql"]
 # The full schema for new/empty databases; must match what the migration builds.
 SCHEMA_SQL = "db/schema.sql"
 
@@ -384,6 +395,30 @@ def main():
                       for r in db.execute("PRAGMA foreign_key_list(item_prices)"))
         check("item_prices.unit is constrained to units(code)", unit_fk,
               "" if unit_fk else "ALTER TABLE cannot add REFERENCES; the rebuild did not run")
+
+    # Now the migrations that intentionally change the data. Everything above
+    # asserted the opposite of what they do, so they run only once those checks
+    # are done — and before the schema comparison, so their DDL (there is none
+    # today) would still be compared.
+    for data_migration in DATA_MIGRATIONS:
+        if not os.path.exists(data_migration):
+            continue
+        db.executescript(open(data_migration, encoding="utf-8").read())
+        db.commit()
+        print(f"\n  applied {data_migration} (reshapes data, after the preservation checks)")
+
+    print("\n=== RESHAPED DATA ===")
+    # 008's own invariant: a category is either a leaf holding transactions or a
+    # group holding children, never both. The tree satisfied neither before it.
+    both = db.execute(
+        "SELECT COUNT(*) FROM transactions t JOIN categories c ON c.id = t.category_id "
+        "WHERE EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = c.id)"
+    ).fetchone()[0]
+    check("no category with children also holds transactions", both == 0, str(both))
+    orphans = db.execute(
+        "SELECT COUNT(*) FROM categories c WHERE c.parent_id IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM categories p WHERE p.id = c.parent_id)").fetchone()[0]
+    check("no category points at a missing parent", orphans == 0, str(orphans))
 
     print("\n=== SCHEMA ===")
     print(f"  tables ({len(remaining)}): {', '.join(sorted(remaining))}")

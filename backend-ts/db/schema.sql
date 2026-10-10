@@ -250,3 +250,143 @@ BEGIN
      WHERE EXISTS (SELECT 1 FROM categories
                     WHERE parent_id = NEW.id AND type <> NEW.type);
 END;
+
+-- ---------------------------------------------------------------------------
+-- Value-domain rules, enforced by triggers for the same reason as the category
+-- rules above, plus one more: SQLite cannot add a constraint to an existing
+-- table, and three of these tables are referenced by others, so a CHECK would
+-- be a park-and-rebuild of half the schema (migration 002 documents what that
+-- costs). Migration 007 installs these and repairs the rows that predate them.
+--
+-- Keep these statements byte-identical to migrations/007: the verifier compares
+-- this file against the migrated schema, triggers by stored SQL.
+-- ---------------------------------------------------------------------------
+CREATE TRIGGER IF NOT EXISTS trg_transactions_value_domain_insert
+BEFORE INSERT ON transactions
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: transactions.date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.date IS NULL OR date(NEW.date) IS NOT NEW.date;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_transactions_value_domain_update
+BEFORE UPDATE ON transactions
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: transactions.date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.date IS NULL OR date(NEW.date) IS NOT NEW.date;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_item_prices_value_domain_insert
+BEFORE INSERT ON item_prices
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: item_prices.observed_on must be a real date in YYYY-MM-DD form')
+     WHERE NEW.observed_on IS NULL OR date(NEW.observed_on) IS NOT NEW.observed_on;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_item_prices_value_domain_update
+BEFORE UPDATE ON item_prices
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: item_prices.observed_on must be a real date in YYYY-MM-DD form')
+     WHERE NEW.observed_on IS NULL OR date(NEW.observed_on) IS NOT NEW.observed_on;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_subscriptions_value_domain_insert
+BEFORE INSERT ON subscriptions
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: subscriptions.end_date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.end_date IS NULL OR date(NEW.end_date) IS NOT NEW.end_date;
+
+    SELECT RAISE(ABORT, 'NEGATIVE_AMOUNT: subscriptions.amount_cents must not be negative')
+     WHERE NEW.amount_cents IS NOT NULL AND NEW.amount_cents < 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_subscriptions_value_domain_update
+BEFORE UPDATE ON subscriptions
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: subscriptions.end_date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.end_date IS NULL OR date(NEW.end_date) IS NOT NEW.end_date;
+
+    SELECT RAISE(ABORT, 'NEGATIVE_AMOUNT: subscriptions.amount_cents must not be negative')
+     WHERE NEW.amount_cents IS NOT NULL AND NEW.amount_cents < 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_days_value_domain_insert
+BEFORE INSERT ON ledger_days
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: ledger_days.date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.date IS NULL OR date(NEW.date) IS NOT NEW.date;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_days_value_domain_update
+BEFORE UPDATE ON ledger_days
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_DATE: ledger_days.date must be a real date in YYYY-MM-DD form')
+     WHERE NEW.date IS NULL OR date(NEW.date) IS NOT NEW.date;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_categories_value_domain_insert
+BEFORE INSERT ON categories
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_JSON: categories.translations must be JSON or NULL')
+     WHERE NEW.translations IS NOT NULL AND NOT json_valid(NEW.translations);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_categories_value_domain_update
+BEFORE UPDATE ON categories
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_JSON: categories.translations must be JSON or NULL')
+     WHERE NEW.translations IS NOT NULL AND NOT json_valid(NEW.translations);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ai_messages_value_domain_insert
+BEFORE INSERT ON ai_messages
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_JSON: ai_messages.tool_calls must be JSON or NULL')
+     WHERE NEW.tool_calls IS NOT NULL AND NOT json_valid(NEW.tool_calls);
+
+    SELECT RAISE(ABORT, 'NEGATIVE_TOKENS: ai_messages.tokens_in must not be negative')
+     WHERE NEW.tokens_in IS NOT NULL AND NEW.tokens_in < 0;
+
+    SELECT RAISE(ABORT, 'NEGATIVE_TOKENS: ai_messages.tokens_out must not be negative')
+     WHERE NEW.tokens_out IS NOT NULL AND NEW.tokens_out < 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ai_messages_value_domain_update
+BEFORE UPDATE ON ai_messages
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'INVALID_JSON: ai_messages.tool_calls must be JSON or NULL')
+     WHERE NEW.tool_calls IS NOT NULL AND NOT json_valid(NEW.tool_calls);
+
+    SELECT RAISE(ABORT, 'NEGATIVE_TOKENS: ai_messages.tokens_in must not be negative')
+     WHERE NEW.tokens_in IS NOT NULL AND NEW.tokens_in < 0;
+
+    SELECT RAISE(ABORT, 'NEGATIVE_TOKENS: ai_messages.tokens_out must not be negative')
+     WHERE NEW.tokens_out IS NOT NULL AND NEW.tokens_out < 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_exchange_rates_value_domain_insert
+BEFORE INSERT ON exchange_rates
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'NON_POSITIVE_RATE: exchange_rates.rate must be greater than zero')
+     WHERE NEW.rate IS NULL OR NEW.rate <= 0;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_exchange_rates_value_domain_update
+BEFORE UPDATE ON exchange_rates
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'NON_POSITIVE_RATE: exchange_rates.rate must be greater than zero')
+     WHERE NEW.rate IS NULL OR NEW.rate <= 0;
+END;

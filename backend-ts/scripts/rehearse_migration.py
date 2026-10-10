@@ -10,7 +10,7 @@ Steps, exactly as they will be run in production:
     1. load the export into a fresh database          (the backup)
     2. migrations/000_add_archived_at_to_subscriptions.sql (no-op if already present)
     3. migrations/001_link_priced_rows_to_items.sql    (pre-flight repair)
-    4. verify_migration.py                             (must be 33/0)
+    4. verify_migration.py                             (must be 40/0)
     5. migrations/002_schema_v2.sql                    (the migration)
     5b. any later migrations (003 …), in order
     6. confirm a second run of 002 is refused and changes nothing
@@ -37,7 +37,9 @@ MIGRATION = "migrations/002_schema_v2.sql"
 LATER_MIGRATIONS = ["migrations/003_ai_layer_tables.sql",
                     "migrations/004_normalise_units_merchants.sql",
                     "migrations/005_ai_message_sessions.sql",
-                    "migrations/006_category_structure_triggers.sql"]
+                    "migrations/006_category_structure_triggers.sql",
+                    "migrations/007_value_domain.sql",
+                    "migrations/008_category_tree.sql"]
 VERIFIER = "scripts/verify_migration.py"
 
 failures = []
