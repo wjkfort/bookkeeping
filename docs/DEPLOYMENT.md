@@ -50,6 +50,20 @@ npx wrangler secret put DEEPSEEK_API_KEY
 
 若上线后登录或汇率异常，先 `secret list`，再查 Cloudflare Dashboard → Worker → Settings → Variables and Secrets。
 
+### 可选变量（`[vars]`，不是密钥）
+
+`EXCHANGE_RATE_CACHE_HOURS`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`DEEPSEEK_TEMPERATURE` 都是
+普通变量，**不设也能跑**（代码里有默认值）。只有 temperature 值得知道怎么调：
+
+| 值 | 效果 |
+|---|---|
+| `0` | 贪心解码。措辞最稳，但会**把助手的性格剪掉**——实测（2026-10-12）：`SOUL` 上线后模型只抄走了形状（一个 🐋、一次括号旁白），`本鱼`/`摸鱼` 在 119 条回复里出现 **0 次** |
+| `0.8`（默认） | 语气能出来；工具参数仍受 `src/services/` 校验与 DDL 触发器约束，写错会以 `{ok:false}` 当轮回灌 |
+| `1.3+` | DeepSeek 给创作场景的建议区间，**不要**用在这里：这是要写进真账本的数字 |
+
+要改就在 `wrangler.toml` 的 `[vars]` 里加 `DEEPSEEK_TEMPERATURE = "1.0"` 再部署（**不要**用
+`secret put`，它不是密钥）。越界值会被 clamp 到 `[0,2]`；写成 `0` 表示真的要 0，不会被当成"未设置"。
+
 ## 标准上线流程
 
 ### 1. 确认登录与密钥
@@ -230,6 +244,12 @@ npm run deploy
   - [ ] 说"那天没花钱"后，该日期不再出现在补记提醒里
   - [ ] 让它报一个总额，与 Dashboard 对得上
   - [ ] `DEEPSEEK_API_KEY` 缺失时 `/ai/*` 应为 503 而降级，其余页面照常
+- [ ] **AI 助手 · 人设与词表**（2026-10-12 上线后查）：
+  - [ ] 闲聊一句（"在忙啥呢"）应带出「本鱼」/ 心声 / 🐋；报一笔数字（"今天午饭 20"）应平实扼要、**不加戏**
+  - [ ] 打开对话坞**不再自动开场**，也不产生 `ai_messages` 行（提醒仍以卡片显示，来自 `/ai/gaps`）
+  - [ ] 说一个词表里没有的单位（"买了 3 扎啤酒，18 元"）应触发 `add_unit` 再写价格；
+        `SELECT code, name FROM units` 应多出该单位
+  - [ ] 回复里的 `**加粗**` 与 `*心声*` 应被渲染成粗体 / 灰色斜体，**不再出现字面星号**
 - [ ] **注意 `/summary` 约需 60 秒**（见"已知问题"），页面能出数就说明没坏，不要误判成超时故障
 
 接口抽查（先登录拿 token，可直接沿用前端 localStorage 里那个）：
@@ -353,6 +373,44 @@ SQL 挪到了 JS。`/summary/monthly` 因为结果按行数少得多而明显更
 
 ## 发布记录
 
+### 2026-10-12 — 触发器 006/007/008 上生产（已完成）+ 助手人设与词表可写（代码待推）
+
+**上半：migration 006/007/008 已应用到生产**（无 schema 破坏，只有触发器与数据重组）。
+
+```text
+[x] 生产导出（prod-backup-20261012-085121.sql）与 10-10 那份逐字节比对 → 生产 6h55m 内零写入
+[x] 本机 wrangler deploy 之前先 stash 了未提交的 src/api/ai.ts，部署后还原（sha256 逐字节一致）
+[x] wrangler deploy → 版本 35c2f471…（100% 流量）
+[x] 006：2 个触发器，数据未动
+[x] 007：第一次失败（LIKE or GLOB pattern too complex）→ 改成等价的 LIKE 形状测试后成功
+[x] 008：分类 52 → 58、交易 490 不变、订阅关联 3 → 8、组分类上无交易
+[x] 迁移后再导出比对：结构 12 表 / 10 索引 / 16 触发器一致，数据 +0 / −0 / ~0
+```
+
+**这次唯一的教训**：007 里的 `GLOB '[0-9][0-9]…'` 本机 SQLite 3.50.2 接受，**D1 拒绝**
+（`LIKE or GLOB pattern too complex: SQLITE_ERROR`）——本地测试与校验器 40/0 都对此无感。
+失败即整体回滚，所以生产当时精确停在 006。凡是给远端写的 SQL，形状要挑 D1 认的写法；
+`sqlite_version()` 在 D1 上也不可调用。
+
+**下半：助手人设与温度、词表可写、客户端 markdown —— 代码提交完毕，尚未 push。**
+无 migration（`units` 表结构没变，`add_unit` 只在运行时插行）。
+
+```text
+[ ] whoami / secret list 确认登录与三个密钥都在（OAuth token TTL 约 1 小时）
+[ ] git push origin main（7 笔提交：3 笔前端——桌宠 2 + 单位下拉 1；4 笔 AI——人设/温度、词表可写、客户端 markdown）
+[ ] Cloudflare Dashboard：Pages 构建成功 + Worker 出现新 Deployment
+[ ] 未带 token：GET / → 200、/api/v1/ai/status → 401
+[ ] 带 token：/ai/status 的 configured=true、provider=deepseek
+[ ] 聊天冒烟：语气（本鱼/心声）、报数字平实、markdown 渲染、无字面星号、开面板不自动开场
+[ ] add_unit：说"买了 3 扎啤酒，18 元"，再 SELECT code, name FROM units 确认多出该单位
+[ ] 回滚路径：Pages/Worker 都能回上一版；**数据库无需回滚**（只多了词表行，旧代码照读）
+```
+
+**这次要注意的三点**：temperature 从 0 提到 0.8，措辞更活但工具参数也更容易歪（护栏是服务层校验 +
+触发器 + `{ok:false}` 当轮回灌）；`add_unit` 写的是**共享**词表，一个用户加的单位对另一个用户也可见
+（设计如此，两个账号里有一个是空的）；`assistant.title` 已随前端改成「大肥鱼」，所以前后端要一起发，
+否则界面叫她大肥鱼、说话却还是旧语气。
+
 ### 2026-10-09 — schema v2 + AI 层（已完成）
 
 功能摘要：AI 记账助手（29 个工具、按会话隔离的对话、补记提醒）、服务层抽取、`/ai/*` 与 `/units` 端点。
@@ -393,6 +451,6 @@ SQL 挪到了 JS。`/summary/monthly` 因为结果按行数少得多而明显更
 - 功能需求文档：`docs/features/`
 - 后端配置：`backend-ts/wrangler.toml`
 - 全量 schema：`backend-ts/db/schema.sql`
-- 增量 migration：`backend-ts/migrations/`（已应用到 `005`，**当前无待执行脚本**）
+- 增量 migration：`backend-ts/migrations/`（已应用到 `008`，**当前无待执行脚本**）
 - 本地密钥：`backend-ts/.dev.vars`（勿提交）
 - 生产导出：`backend-ts/prod-backup-*.sql`（含真实用户数据，已在 `.gitignore` 中，勿提交）
