@@ -37,13 +37,23 @@
   border: 2px solid var(--app-coral);
 }
 
-.chat-dock {
+/* Positioning layer for the dock and its tail. The panel keeps `overflow:
+   hidden` for its rounded corners, so the tail lives out here. */
+.chat-dock-anchor {
   position: fixed;
   right: 28px;
   bottom: 96px;
   z-index: 41;
   width: min(420px, calc(100vw - 32px));
   max-height: min(620px, calc(100vh - 140px));
+  /* Follows her when she is dragged. */
+  transition: left .18s ease, bottom .18s ease;
+}
+.chat-dock {
+  /* Fills the anchor. The width cap lives on the anchor so the tail and the
+     panel stay the same width. */
+  width: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--app-paper);
@@ -51,6 +61,48 @@
   border-radius: 14px;
   box-shadow: 0 18px 44px rgba(62, 40, 26, .18);
   overflow: hidden;
+}
+
+/* The tail: a small rotated square on whichever edge faces her, positioned
+   part-way across so it points at her rather than at the dock's corner. */
+.chat-dock-tail {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--app-paper);
+  border: 1px solid var(--app-line);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.chat-dock-tail.is-right {
+  right: -8px;
+  top: calc(var(--tail, 50%) - 7px);
+  border-left: none;
+  border-bottom: none;
+}
+.chat-dock-tail.is-left {
+  left: -8px;
+  top: calc(var(--tail, 50%) - 7px);
+  border-right: none;
+  border-top: none;
+}
+.chat-dock-tail.is-bottom {
+  bottom: -8px;
+  left: calc(var(--tail, 50%) - 7px);
+  border-left: none;
+  border-top: none;
+}
+.chat-dock-tail.is-top {
+  top: -8px;
+  left: calc(var(--tail, 50%) - 7px);
+  border-right: none;
+  border-bottom: none;
+}
+/* The dock spans the full width on narrow screens, so a tail on a side edge
+   would point at nothing useful. */
+@media (max-width: 520px) {
+  .chat-dock-tail.is-right,
+  .chat-dock-tail.is-left { display: none; }
 }
 
 .chat-dock-header {
@@ -165,6 +217,8 @@
 .chat-dock-input:disabled { background: var(--app-paper-deep); }
 
 @media (max-width: 560px) {
-  .chat-dock { right: 16px; left: 16px; width: auto; bottom: 88px; }
+  /* Narrow screens: the dock spans the width, so anchoring it to her side is
+     meaningless — it is placed above her instead by the component. */
+  .chat-dock-anchor { right: 16px; left: 16px; width: auto; bottom: 88px; }
   .chat-dock-fab { right: 16px; bottom: 16px; }
 }

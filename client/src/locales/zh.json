@@ -235,10 +235,10 @@
     "error": "注册失败"
   },
   "assistant": {
-    "title": "助手",
-    "open": "打开助手",
-    "close": "关闭助手",
-    "placeholder": "说说你花了什么…",
+    "title": "大肥鱼",
+    "open": "打开大肥鱼",
+    "close": "关闭大肥鱼",
+    "inputLabel": "输入消息",
     "thinking": "思考中…",
     "empty": "可以问花销，也可以直接说买了什么。",
     "unavailableTitle": "助手不可用",

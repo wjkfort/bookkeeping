@@ -1,0 +1,145 @@
+/* The pet's clickable box.
+   Sized to the character, not to the 16:9 video: the art has empty space on
+   both sides, and a box that included it would put clickable area where nothing
+   is drawn. `CHAR_WIDTH_RATIO` is measured from the clips themselves — she
+   occupies the middle 35.6% of the frame — so the hit area matches her wingspan
+   closely enough that a click on any visible part lands. */
+.pet-frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The video is wider than the box and is allowed to overflow: it is centred on
+   the box, so the empty sides fall outside and only she is over the hit area.
+   `width` derives from the box height, which keeps the 16:9 art from being
+   squashed when the two disagree. */
+.pet-clip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  aspect-ratio: 16 / 9;
+  height: 100%;
+  width: auto;
+  transform: translateX(-50%);
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity .18s ease;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+.pet-clip.is-front { opacity: 1; }
+
+.pet-stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pet-stage-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-clip { transition: none; }
+}
+
+/* Development-only preview page (?petdemo=1). Never part of the app UI. */
+.pet-demo {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.pet-demo h1 { font-size: 22px; margin: 0 0 4px; }
+.pet-demo-note { color: #666; font-size: 13px; margin: 0 0 20px; }
+.pet-demo-note code { background: #eee; padding: 1px 5px; border-radius: 4px; }
+.pet-demo-stage {
+  display: grid;
+  place-items: center;
+  min-height: 440px;
+  margin-bottom: 24px;
+  /* A checkerboard makes the clip's transparency obvious. */
+  background:
+    linear-gradient(45deg, #e9e9e9 25%, transparent 25%) 0 0 / 20px 20px,
+    linear-gradient(-45deg, #e9e9e9 25%, transparent 25%) 0 10px / 20px 20px,
+    linear-gradient(45deg, transparent 75%, #e9e9e9 75%) 10px -10px / 20px 20px,
+    linear-gradient(-45deg, transparent 75%, #e9e9e9 75%) -10px 0 / 20px 20px,
+    #f6f6f6;
+  border-radius: 10px;
+}
+.pet-demo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.pet-demo-row > span { width: 72px; color: #444; }
+.pet-demo-row button {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+.pet-demo-row button.is-on { background: #2b5fb8; border-color: #2b5fb8; color: #fff; }
+
+/* The floating launcher. It is a button, but the only thing visible is her:
+   the art is 16:9 with empty sides, so the button's own background, border and
+   shadow are removed and it is sized to the character. */
+.pet-layer {
+  position: fixed;
+  /* Matches DEFAULT_RIGHT/DEFAULT_BOTTOM in PetLayer.tsx: far enough in that the
+     frame's empty side does not run off the right edge. */
+  right: 96px;
+  bottom: 96px;
+  z-index: 42;
+  /* An explicit box is required, not cosmetic: the only child is absolutely
+     positioned, so a button left to size itself collapses to zero width. Then
+     the video is centred on a zero-width box, which both pushes the art off the
+     right edge of the screen and leaves no clickable area over the character.
+     The width is the character's share of the 16:9 frame; the empty sides are
+     not part of the hit area. */
+  height: var(--pet-h, 168px);
+  /* Matches the character's share of the 16:9 frame (see .pet-frame). */
+  width: calc(var(--pet-h, 168px) * 16 / 9 * .356);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  transition: transform .16s ease;
+}
+.pet-layer:hover { transform: translateY(-3px); }
+.pet-layer.is-dragging { cursor: grabbing; transition: none; }
+/* The focus ring has to be visible against the video, which can be any colour,
+   so it is drawn twice: a dark ring hugging the outline and a light one outside
+   it. */
+.pet-layer:focus-visible {
+  outline: 2px solid var(--app-ink);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+.pet-layer.is-open { z-index: 43; }
+
+/* Reminder dot, above her head. The layer is 16:9 so her head is centred. */
+.pet-layer-badge {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(14px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--app-coral-dark);
+  box-shadow: 0 0 0 2px var(--app-paper);
+  pointer-events: none;
+}

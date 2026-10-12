@@ -235,10 +235,10 @@
     "error": "Registration failed"
   },
   "assistant": {
-    "title": "Assistant",
-    "open": "Open the assistant",
-    "close": "Close the assistant",
-    "placeholder": "Tell me what you spent…",
+    "title": "Big Fat Fish",
+    "open": "Open Big Fat Fish",
+    "close": "Close Big Fat Fish",
+    "inputLabel": "Message",
     "thinking": "Thinking…",
     "empty": "Ask about your spending, or just say what you bought.",
     "unavailableTitle": "Assistant unavailable",
