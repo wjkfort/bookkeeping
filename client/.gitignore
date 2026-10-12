@@ -25,3 +25,14 @@ dist-ssr
 
 # Wrangler
 .wrangler
+
+# Pet animation pipeline — only the scripts and their README are versioned.
+#
+# `source/` holds the raw generations, `alpha/` the transparent intermediate
+# (rebuildable from `source/`), `normalized/` the 2160x1215 masters. All three
+# are tens of megabytes and none of them is what the app serves, so they stay
+# on disk and out of git. The one thing that ships lives in `public/pet/`.
+pet-assets/source/
+pet-assets/alpha/
+pet-assets/normalized/
+pet-assets/playback/
