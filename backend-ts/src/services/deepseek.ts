@@ -69,7 +69,10 @@ export interface ChatResult {
 export interface ChatOptions {
   messages: ChatMessage[];
   tools?: ToolDefinition[];
-  /** 0 for bookkeeping extraction: wording consistency matters more than flair. */
+  /**
+   * Overrides the deployment's configured temperature for this one call. Omitted
+   * means `AiConfig.temperature`, which is what the assistant normally uses.
+   */
   temperature?: number;
   maxTokens?: number;
   /** Injectable for tests; defaults to the global fetch. */
@@ -81,6 +84,52 @@ export interface AiConfig {
   apiKey: string | undefined;
   baseUrl: string;
   model: string;
+  /** Resolved once from `DEEPSEEK_TEMPERATURE`; see `DEFAULT_DEEPSEEK_TEMPERATURE`. */
+  temperature: number;
+}
+
+/**
+ * Sampling temperature for every turn of the conversation.
+ *
+ * **0 is what this shipped with, and it is the wrong default for a persona.**
+ * Greedy decoding always takes the most probable continuation, and for "log my
+ * lunch" the most probable continuation is the driest possible sentence — the
+ * voice lives in the tail of the distribution and 0 cuts the tail off. This is
+ * measured rather than assumed: after the persona landed the model reproduced its
+ * *shape* (one 🐋, a parenthetical aside) and dropped every character trait, with
+ * 本鱼 and 摸鱼 appearing in none of the stored replies.
+ *
+ * 0.8 is a middle setting, deliberately not DeepSeek's creative-writing 1.3: this
+ * assistant writes to a real ledger, so the wording may wander but the arguments
+ * must not. The safety net is structural rather than prompt-level — the model
+ * cannot write SQL, every write goes through `src/services/` validation and the
+ * DDL triggers, and a refusal returns as `{ok:false}` for it to correct in the
+ * same turn.
+ *
+ * Override it with `DEEPSEEK_TEMPERATURE` (a plain var, like the base URL and the
+ * model — not a secret). An out-of-range value is clamped to [0, 2] rather than
+ * ignored, so a typo in a deployment shows up as an extreme value instead of
+ * silently doing nothing.
+ */
+export const DEFAULT_DEEPSEEK_TEMPERATURE = 0.8;
+
+/** The provider's accepted range. */
+export const MIN_TEMPERATURE = 0;
+export const MAX_TEMPERATURE = 2;
+
+/**
+ * Resolve the configured temperature.
+ *
+ * The explicit `isFinite` check is the point: writing `env.X || DEFAULT` would
+ * turn `"0"` into the default, so a deployment that deliberately asked for
+ * greedy decoding could not get it — and `0` is the one value somebody would
+ * reach for on purpose.
+ */
+function resolveTemperature(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return DEFAULT_DEEPSEEK_TEMPERATURE;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return DEFAULT_DEEPSEEK_TEMPERATURE;
+  return Math.min(MAX_TEMPERATURE, Math.max(MIN_TEMPERATURE, value));
 }
 
 /** Resolve configuration from the Worker environment. */
@@ -88,11 +137,13 @@ export function aiConfigFromEnv(env: {
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_BASE_URL?: string;
   DEEPSEEK_MODEL?: string;
+  DEEPSEEK_TEMPERATURE?: string;
 }): AiConfig {
   return {
     apiKey: env.DEEPSEEK_API_KEY,
     baseUrl: (env.DEEPSEEK_BASE_URL || DEFAULT_DEEPSEEK_BASE_URL).replace(/\/+$/, ''),
     model: env.DEEPSEEK_MODEL || DEFAULT_DEEPSEEK_MODEL,
+    temperature: resolveTemperature(env.DEEPSEEK_TEMPERATURE),
   };
 }
 
@@ -142,7 +193,7 @@ export async function chatCompletion(
   const body: Record<string, unknown> = {
     model: config.model,
     messages: options.messages,
-    temperature: options.temperature ?? 0,
+    temperature: options.temperature ?? config.temperature,
   };
 
   if (options.tools && options.tools.length > 0) {

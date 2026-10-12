@@ -20,6 +20,7 @@
  */
 
 import type { ChatMessage } from './deepseek';
+import { SOUL } from './soul';
 import { readMemory } from './memory';
 import { listCategories } from './categories';
 import { findGaps } from './gaps';
@@ -51,7 +52,12 @@ export interface PromptSnapshot {
 }
 
 /**
- * The system prompt.
+ * The rules: facts, formats, and what the ledger's data means.
+ *
+ * The manners are not here — they are `soul.ts`, sent as the message immediately
+ * before this one. Keeping them apart is what stops a tone change from having to
+ * be re-verified against the operational rules and vice versa: this is the spec,
+ * the soul is the voice.
  *
  * Written as constraints the model can act on, because these are the behaviours
  * the requirements single out: never invent a number, ask enough before writing,
@@ -250,11 +256,15 @@ export interface BuildPromptResult {
 /**
  * Assemble the full message list for one turn.
  *
- * Order is system → snapshot → transcript → new instruction, so the newest
+ * Order is soul → system → snapshot → transcript → new instruction, so the newest
  * instruction is last and the stable material is at the front. The transcript is
  * clamped first to its own budget, then the whole prompt is checked; if it is
- * still over, older transcript is dropped (never the snapshot or the system
- * prompt, which are what make the numbers trustworthy).
+ * still over, older transcript is dropped (never the soul, the system prompt or
+ * the snapshot, which are what make the voice and the numbers trustworthy).
+ *
+ * The soul leads because it is the most stable text in the request — it is a
+ * constant, while the snapshot is rebuilt every turn — and a byte-identical
+ * prefix is what the provider's context cache can reuse.
  */
 export async function buildPrompt(
   db: D1Database, userId: number, userMessage: string,
@@ -280,6 +290,8 @@ export async function buildPrompt(
   let kept = takeNewestGroups(groups, PROMPT_TRANSCRIPT_BUDGET);
 
   const head: ChatMessage[] = [
+    // The voice first, then the rules it shapes how to read.
+    { role: 'system', content: SOUL },
     { role: 'system', content: systemPrompt() },
     { role: 'system', content: `Current state:\n${renderSnapshot(snapshot)}` },
   ];
@@ -318,9 +330,9 @@ export async function buildPrompt(
     msgs.reduce((n, m) => n + (m.content?.length ?? 0) + (m.tool_calls ? JSON.stringify(m.tool_calls).length : 0), 0);
 
   // Final whole-prompt check: drop the oldest transcript, still in whole groups.
-  // The two system blocks, the language directive and the user's own message are
-  // never dropped — the snapshot is what makes the numbers trustworthy, and the
-  // user message is the question.
+  // The soul, the two system blocks, the language directive and the user's own
+  // message are never dropped — the snapshot is what makes the numbers
+  // trustworthy, and the user message is the question.
   //
   // This loop used to `splice(2, 1)`, one message at a time, with a
   // `length > 3` guard. That had the same pairing bug as the character clamp —

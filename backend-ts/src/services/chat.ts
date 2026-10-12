@@ -129,7 +129,15 @@ export async function runChatTurn(deps: ChatTurnDeps): Promise<ChatTurnResult> {
   const callProvider = async (msgs: ChatMessage[]): Promise<ChatResult> => {
     rounds += 1;
     if (deps.completion) return deps.completion(msgs);
-    return chatCompletion(config, { messages: msgs, tools, maxTokens: MAX_COMPLETION_TOKENS });
+    return chatCompletion(config, {
+      messages: msgs,
+      tools,
+      maxTokens: MAX_COMPLETION_TOKENS,
+      // The deployment's persona temperature (DEEPSEEK_TEMPERATURE), not the
+      // adapter's greedy fallback. See DEFAULT_DEEPSEEK_TEMPERATURE for why the
+      // assistant is not run at 0.
+      temperature: config.temperature,
+    });
   };
 
   let result = await callProvider(messages);

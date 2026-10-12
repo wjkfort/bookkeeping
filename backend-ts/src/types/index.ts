@@ -17,6 +17,12 @@ export interface Env {
   DEEPSEEK_BASE_URL?: string;
   /** Defaults to deepseek-chat. */
   DEEPSEEK_MODEL?: string;
+  /**
+   * Sampling temperature, a plain var rather than a secret. Defaults to 0.8 —
+   * 0 is the wrong setting for a persona, see `DEFAULT_DEEPSEEK_TEMPERATURE`.
+   * Clamped to [0, 2]; anything unparseable falls back to the default.
+   */
+  DEEPSEEK_TEMPERATURE?: string;
 }
 
 /** One turn of the stored conversation. `content` is null on a tool-call turn. */

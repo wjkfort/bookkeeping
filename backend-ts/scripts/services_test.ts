@@ -61,16 +61,20 @@ import { listUnits, addUnit, assertKnownUnit } from '../src/services/units';
 import { toolDefinitions, runTool, TOOLS } from '../src/services/tools';
 import { findTransactions } from '../src/services/queries';
 import { buildPrompt, PROMPT_CHAR_BUDGET, detectLanguage } from '../src/services/prompt';
+import { SOUL, MAX_SOUL_CHARS } from '../src/services/soul';
 import {
   groupMessages, takeNewestGroups, recordMessage, loadRecentMessages, toolCallIdPayload,
   pageMessages, listSessions, tokenUsage,
 } from '../src/services/conversation';
 import { runChatTurn, runOpeningTurn, MAX_TOOL_ROUNDS } from '../src/services/chat';
 import {
+  chatCompletion, aiConfigFromEnv, DEFAULT_DEEPSEEK_TEMPERATURE, MAX_TEMPERATURE,
+  type ChatResult,
+} from '../src/services/deepseek';
+import {
   localDateString, todayInZone, localGapWindow, requireTimezone,
   isValidTimezone, DEFAULT_TIMEZONE,
 } from '../src/utils/time';
-import type { ChatResult } from '../src/services/deepseek';
 import { ServiceError, toErrorResponse } from '../src/services/errors';
 
 const failures: string[] = [];
@@ -1028,9 +1032,10 @@ async function main() {
   check('a brand new conversation is given no earlier transcript',
         !freshBlob.includes('A-only-question') && !freshBlob.includes('B-only-question'),
         freshBlob.slice(0, 200));
-  check('the new conversation still gets the system prompt and snapshot',
-        freshPrompt.messages.length >= 3 &&
-        (freshPrompt.messages[0].content ?? '').includes('bookkeeping assistant'));
+  check('the new conversation still gets the soul, rules and snapshot',
+        freshPrompt.messages.length >= 4 &&
+        freshPrompt.messages[0].content === SOUL &&
+        (freshPrompt.messages[1].content ?? '').includes('bookkeeping assistant'));
 
   // Paging is scoped as well, so the UI cannot show another conversation's turns.
   const pageA = await pageMessages(db, uid, sessionA, { limit: 50 });
@@ -1261,7 +1266,7 @@ async function main() {
 
   // The prompt has to state the rule too: the model must know to report the
   // limitation rather than assume it succeeded.
-  const promptText = (await buildPrompt(db, uid, 'x', { today: '2030-06-15', sessionId: S })).messages[0].content ?? '';
+  const promptText = (await buildPrompt(db, uid, 'x', { today: '2030-06-15', sessionId: S })).messages[1].content ?? '';
   check('the system prompt forbids structural changes',
         /never change the database structure/i.test(promptText));
   check('the system prompt says to report the limitation instead of pretending',
@@ -1311,7 +1316,8 @@ async function main() {
   check('the row cap still holds when filtering', capped.length <= 50, `got ${capped.length}`);
 
   console.log('\n=== the assistant is told the baseline and its duty ===');
-  const baselinePrompt = (await buildPrompt(db, uid, 'x', { today: '2030-06-15', sessionId: S })).messages[0].content ?? '';
+  // messages[0] is the soul; the rules are the message after it.
+  const baselinePrompt = (await buildPrompt(db, uid, 'x', { today: '2030-06-15', sessionId: S })).messages[1].content ?? '';
   check('the prompt states what "detailed enough" means',
         /names the product AND gives a unit and a quantity/i.test(baselinePrompt));
   check('the prompt says an amount alone is not enough',
@@ -1371,12 +1377,101 @@ async function main() {
   const promptSize = built.messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   check('the prompt stays inside the hard budget', promptSize <= PROMPT_CHAR_BUDGET,
         `${promptSize} > ${PROMPT_CHAR_BUDGET}`);
-  check('the system prompt comes first', built.messages[0].role === 'system');
-  check('the snapshot follows it', built.messages[1].role === 'system' &&
-        (built.messages[1].content ?? '').includes('Today: 2030-06-15'));
+  check('the soul comes first', built.messages[0].role === 'system' &&
+        built.messages[0].content === SOUL);
+  check('the rules follow the soul', built.messages[1].role === 'system' &&
+        (built.messages[1].content ?? '').includes('bookkeeping assistant'));
+  check('the snapshot comes third', built.messages[2].role === 'system' &&
+        (built.messages[2].content ?? '').includes('Today: 2030-06-15'));
   check('the user message is last', built.messages[built.messages.length - 1].content === 'hello');
   check('the snapshot carries the month total from SQL',
-        (built.messages[1].content ?? '').includes('This month'));
+        (built.messages[2].content ?? '').includes('This month'));
+
+  console.log('\n=== soul: the voice is separate from the rules ===');
+  check('the soul fits its budget', SOUL.length > 0 && SOUL.length <= MAX_SOUL_CHARS,
+        `${SOUL.length} chars, cap ${MAX_SOUL_CHARS}`);
+  check('the assistant is named in both languages',
+        SOUL.includes('大肥鱼') && SOUL.includes('Big Fat Fish'));
+  // The character, vendored from docs/persona (MIT). These are the traits that
+  // make it a character rather than a list of adjectives; if a re-wording drops
+  // them, that is a decision worth failing a test over.
+  check('the soul keeps the self-reference and the snacks',
+        SOUL.includes('本鱼') && SOUL.includes('摸鱼'), SOUL.slice(0, 60));
+  check('the soul keeps the 心声 mechanism', SOUL.includes('心声'));
+  // The three places this persona was deliberately made different from the
+  // coding-assistant original it came from. They are pinned because each one is
+  // a way the voice could quietly become harmful in a ledger:
+  //   - handing verification back to the user,
+  //   - a joke landing on what they spent (praise and mockery are the same bug),
+  //   - cuteness surviving a bad number or a failed write.
+  check('the soul bans handing the verification back to the user',
+        SOUL.includes('我先去吃饭啦') && /is banned/i.test(SOUL));
+  check('the soul keeps the snark off their spending',
+        /never aim the snark at what they spent/i.test(SOUL));
+  check('the soul yields to the number',
+        /gag stops/i.test(SOUL) && /comes out plain/i.test(SOUL));
+  // The one line that keeps the layering honest. A soul that names tools (or
+  // fixes an amount convention) becomes a second rulebook, and the two then
+  // drift — which is exactly what happened when the unit rule lived in four
+  // files. Operational rules belong in prompt.ts.
+  //
+  // A plain substring scan, so it also fires when ordinary English collides with
+  // a tool name — "personality lives in the gaps" tripped it on the word `gaps`.
+  // That is a signal to reword the soul, not to weaken the check: the ledger's
+  // vocabulary has no business in the voice anyway.
+  const soulToolLeak = Object.keys(TOOLS).filter(name => SOUL.includes(name));
+  check('the soul names no tools', soulToolLeak.length === 0, soulToolLeak.join(', '));
+  // And the voice has to actually reach the provider, not just exist.
+  check('the soul is what the provider receives first',
+        built.messages[0].role === 'system' && built.messages[0].content === SOUL);
+
+  console.log('\n=== soul: the temperature is what makes a voice audible ===');
+  // Shipped at 0, and that is why the persona first looked like it had not landed:
+  // greedy decoding takes the driest continuation, so the model reproduced the
+  // persona's shape (one 🐋, a parenthetical aside) and none of its character —
+  // 本鱼 and 摸鱼 appeared in none of the stored replies. See
+  // DEFAULT_DEEPSEEK_TEMPERATURE for the measurement and the tradeoff.
+  const cfgEnv = { DEEPSEEK_API_KEY: 'k' };
+  check('the default temperature is the persona setting, not 0',
+        aiConfigFromEnv(cfgEnv).temperature === DEFAULT_DEEPSEEK_TEMPERATURE,
+        String(aiConfigFromEnv(cfgEnv).temperature));
+  check('an explicit temperature is honoured',
+        aiConfigFromEnv({ ...cfgEnv, DEEPSEEK_TEMPERATURE: '0.3' }).temperature === 0.3);
+  // `env.X || DEFAULT` would turn "0" into the default, and 0 is the one value
+  // somebody would set on purpose.
+  check('"0" means 0 rather than falling back to the default',
+        aiConfigFromEnv({ ...cfgEnv, DEEPSEEK_TEMPERATURE: '0' }).temperature === 0);
+  check('an unparseable temperature falls back to the default',
+        aiConfigFromEnv({ ...cfgEnv, DEEPSEEK_TEMPERATURE: 'hot' }).temperature
+          === DEFAULT_DEEPSEEK_TEMPERATURE);
+  check('out of range is clamped, not ignored',
+        aiConfigFromEnv({ ...cfgEnv, DEEPSEEK_TEMPERATURE: '9' }).temperature === MAX_TEMPERATURE &&
+        aiConfigFromEnv({ ...cfgEnv, DEEPSEEK_TEMPERATURE: '-1' }).temperature === 0);
+
+  // And the number has to reach the request, or all of the above is decoration.
+  let sentBody: any = null;
+  const captureFetch = (async (_url: string, init: any) => {
+    sentBody = JSON.parse(String(init.body));
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      model: 'fake',
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as unknown as typeof fetch;
+
+  await chatCompletion(aiConfigFromEnv(cfgEnv), {
+    messages: [{ role: 'user', content: 'hi' }], fetchImpl: captureFetch,
+  });
+  check('the configured temperature reaches the provider',
+        sentBody?.temperature === DEFAULT_DEEPSEEK_TEMPERATURE,
+        JSON.stringify(sentBody?.temperature));
+  // A per-call value still wins — that is the hook a future "be plain on
+  // recording turns" would use, without touching the deployment default.
+  await chatCompletion(aiConfigFromEnv(cfgEnv), {
+    messages: [{ role: 'user', content: 'hi' }], fetchImpl: captureFetch, temperature: 0.2,
+  });
+  check('a per-call temperature overrides the configured one', sentBody?.temperature === 0.2,
+        JSON.stringify(sentBody?.temperature));
 
   // The language rule lives in the system prompt AND as a per-turn directive
   // placed last. The directive is what actually fixed the reported bug: the
@@ -1404,7 +1499,7 @@ async function main() {
   check('an English turn gets an English directive',
         (enPrompt.messages[enPrompt.messages.length - 2].content ?? '').includes('English'));
 
-  const sysText = zhPrompt.messages[0].content ?? '';
+  const sysText = zhPrompt.messages[1].content ?? '';
   check('the system prompt also forbids mixing languages',
         /Never mix two languages/i.test(sysText));
   check('the system prompt applies the rule from the first word',
@@ -1751,6 +1846,10 @@ async function main() {
         replayable(clampedPrompt.messages, (m) => m.tool_call_id ?? null), roles);
   check('the oversized transcript was reported as clamped',
         clampedPrompt.transcriptClamped === true, `${clampedPrompt.transcriptClamped}`);
+  // The clamp drops transcript only. The soul is in the never-dropped head, so a
+  // long conversation cannot quietly turn the assistant back into a neutral bot.
+  check('the soul survives the clamp', clampedPrompt.messages[0].content === SOUL,
+        JSON.stringify(clampedPrompt.messages[0]));
 
   console.log('\n=== chat: the tool-calling loop ===');
   // Canned provider: round 1 asks for a write, round 2 answers in words.

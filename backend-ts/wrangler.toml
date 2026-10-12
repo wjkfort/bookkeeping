@@ -14,8 +14,11 @@ EXCHANGE_RATE_CACHE_HOURS = "24"
 # DEEPSEEK_API_KEY deliberately does NOT belong here (R2): `[vars]` is committed.
 # Use a secret instead —
 #   npx wrangler secret put DEEPSEEK_API_KEY
-# Optional DEEPSEEK_BASE_URL / DEEPSEEK_MODEL are plain vars if you ever need to
-# override the defaults (https://api.deepseek.com, deepseek-chat).
+# Optional DEEPSEEK_BASE_URL / DEEPSEEK_MODEL / DEEPSEEK_TEMPERATURE are plain
+# vars if you ever need to override the defaults (https://api.deepseek.com,
+# deepseek-chat, 0.8). The temperature default is a persona setting rather than a
+# neutrality setting — see DEFAULT_DEEPSEEK_TEMPERATURE in
+# src/services/deepseek.ts before lowering it.
 
 # Secrets (set via: wrangler secret put <NAME>)
 # OPEN_EXCHANGE_RATES_API_KEY
