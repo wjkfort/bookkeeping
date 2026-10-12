@@ -20,12 +20,14 @@ import {
   getCategories,
   getItems,
   getItemHistory,
+  getUnits,
 } from "../../api";
 import {
   Transaction,
   Category,
   Item,
   ItemHistory,
+  Unit,
 } from "../../types";
 import CategoryPicker from "../ui/CategoryPicker";
 import { currencySymbolFor, useCurrency } from "../../hooks/useCurrency";
@@ -39,24 +41,24 @@ export interface TransactionFormModalProps {
   onSuccess?: () => void;
 }
 
-// Must match the `units` table exactly (seeded in db/schema.sql and
-// migrations/004): `item_prices.unit` has a real foreign key to `units.code`, so
-// an option that is not in that table makes the save fail outright. The previous
-// list offered "gallon" and "lb", which the database does not have — picking
-// either one produced a FOREIGN KEY constraint failure — while "g", "ml" and
-// "bag" could not be chosen at all. scripts/check_unit_vocabulary.py keeps the
-// schema, this list and the locale files from drifting apart again.
-const UNIT_OPTIONS = [
-  "piece",
-  "pack",
-  "box",
-  "bottle",
-  "bag",
-  "kg",
-  "g",
-  "liter",
-  "ml",
-] as const;
+// The unit picker used to be this constant, and it drifted from the database
+// twice: it offered "gallon" and "lb" — which `item_prices.unit` has no row for,
+// so saving produced a raw FOREIGN KEY failure — while "g", "ml" and "bag" could
+// not be chosen at all.
+//
+// It is now read from GET /units, which is the only list that cannot be wrong:
+// `units` is the table the foreign key points at, and the assistant can add a row
+// to it mid-conversation (the `add_unit` tool) when the user names a unit it does
+// not have. A hardcoded list would go stale the first time that happened.
+//
+// Labels come from the locale files in the usual way. A unit the assistant added
+// has no translation yet, so `unitLabel` falls back to the name the row carries —
+// otherwise the picker would render the raw key, "units.斤".
+const unitLabel = (unit: Unit, t: (key: string) => string): string => {
+  const key = `units.${unit.code}`;
+  const translated = t(key);
+  return translated === key || translated.length === 0 ? unit.name : translated;
+};
 
 const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   open,
@@ -70,6 +72,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [amount, setAmount] = useState("");
@@ -124,9 +127,10 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
     if (!open) return;
     (async () => {
       try {
-        const [catRes, itemRes] = await Promise.all([
+        const [catRes, itemRes, unitRes] = await Promise.all([
           getCategories(true),
           getItems(false),
+          getUnits(),
         ]);
         const cats = catRes.data;
         // parent-then-children order for picker
@@ -142,6 +146,7 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
         });
         setCategories(sorted);
         setItems(itemRes.data as Item[]);
+        setUnits(unitRes.data);
       } catch (e) {
         console.error("Error loading form data:", e);
       }
@@ -675,9 +680,9 @@ const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                           placeholder={t("transactions.unitPlaceholder")}
                         />
                         <Select.Content>
-                          {UNIT_OPTIONS.map((u) => (
-                            <Select.Item key={u} value={u}>
-                              {t(`units.${u}`)}
+                          {units.map((u) => (
+                            <Select.Item key={u.code} value={u.code}>
+                              {unitLabel(u, t)}
                             </Select.Item>
                           ))}
                         </Select.Content>

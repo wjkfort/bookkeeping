@@ -6,6 +6,7 @@ import {
   Item,
   ItemWithStats,
   ItemHistory,
+  Unit,
   Subscription,
   MonthlySummary,
   CategorySummary,
@@ -124,6 +125,13 @@ export const convertCurrency = (amount: number, fromCurrency: string, toCurrency
 
 // Translate
 export const translateText = (text: string, fromLang: string, toLang: string): Promise<AxiosResponse<TranslateResponse>> => api.post("/translate", { text, from_lang: fromLang, to_lang: toLang });
+
+// Units
+//
+// The shared vocabulary, read rather than hardcoded: the assistant can add a
+// unit mid-conversation (the `add_unit` tool) when the user names one the table
+// does not have, and the picker has to be able to offer it afterwards.
+export const getUnits = (): Promise<AxiosResponse<Unit[]>> => api.get("/units");
 
 // Items
 export const getItems = (withStats: boolean = false): Promise<AxiosResponse<Item[] | ItemWithStats[]>> => api.get("/items", { params: { with_stats: withStats } });

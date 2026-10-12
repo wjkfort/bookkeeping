@@ -108,6 +108,19 @@ export interface Item {
   created_at: string;
 }
 
+/**
+ * A unit from the shared vocabulary (`units`).
+ *
+ * The list is no longer fixed: the assistant can add one mid-conversation with
+ * `add_unit` when the user names a unit the table does not have (斤, 两, 打), so
+ * the picker reads it from `GET /units` instead of a constant. `name` is the
+ * fallback label for a code the locale files do not know.
+ */
+export interface Unit {
+  code: string;
+  name: string;
+}
+
 export interface ItemWithStats {
   id: number;
   name: string;
