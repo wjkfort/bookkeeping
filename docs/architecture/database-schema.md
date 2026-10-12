@@ -186,7 +186,9 @@ cd <repo>/docs/architecture
 | `code` | TEXT PRIMARY KEY | 规范值，存进 `item_prices.unit` |
 | `name` | TEXT NOT NULL | 展示名 |
 
-> 这是**共享封闭词表，不是用户数据**：价格只在同一单位内比较才有意义，"12.8/个" 和 "12.8/pack" 不是同一个价。未知单位直接写入失败，而不是拆成两种拼写。
+> 这是**共享词表，不是用户数据**：价格只在同一单位内比较才有意义，"12.8/个" 和 "12.8/pack" 不是同一个价。未知单位写不进来（外键），而不是拆成两种拼写。
+>
+> 种子是 9 行（`db/schema.sql` 与 `migrations/004` 各一份，`scripts/check_unit_vocabulary.py` 保证两份一致）。此后词表不再只由迁移维护：模型的 `add_unit` 工具可以补一行（用户说"65 一斤"而词表没有"斤"时），`add` 幂等、不改名、不删除——`item_prices.unit` 指向这里，改名会让历史默不做声地变味。前端单位下拉因此读 `GET /units` 而不是硬编码常量，并对 locale 里没有的 code 回退显示 `name`。
 
 ## 8. `merchants` — 商家实体
 行数：1

@@ -57,7 +57,7 @@ import {
   findMissingDays,
 } from '../src/services/gaps';
 import { readMemory, writeMemory, appendMemory, AI_MEMORY_MAX_LENGTH } from '../src/services/memory';
-import { listUnits } from '../src/services/units';
+import { listUnits, addUnit, assertKnownUnit } from '../src/services/units';
 import { toolDefinitions, runTool, TOOLS } from '../src/services/tools';
 import { findTransactions } from '../src/services/queries';
 import { buildPrompt, PROMPT_CHAR_BUDGET, detectLanguage } from '../src/services/prompt';
@@ -103,12 +103,18 @@ function shimStatement(db: any, sql: string) {
           };
         }
         stmt.run(...args);
-        // node:sqlite does not expose changes/lastInsertRowid on StatementSync,
-        // so a plain write reports no metadata rather than re-running itself.
-        // auth.ts reads meta.last_row_id after an INSERT, so it is recovered
-        // from the connection instead of left at 0.
+        // node:sqlite does not expose changes/lastInsertRowid on StatementSync, so
+        // both are recovered from the connection instead of re-running the
+        // statement. `changes()` is what D1 reports as `meta.changes`, and the
+        // services read it: `addUnit` uses it to say whether the unit was new,
+        // and `pruneOldMessages` returns it as the number of turns deleted. The
+        // SELECT for it comes first because it describes the statement just run.
+        const changed = db.prepare('SELECT changes() AS n').get() as any;
         const lastRow = db.prepare('SELECT last_insert_rowid() AS id').get() as any;
-        return { success: true, meta: { changes: 0, last_row_id: Number(lastRow?.id ?? 0) } };
+        return {
+          success: true,
+          meta: { changes: Number(changed?.n ?? 0), last_row_id: Number(lastRow?.id ?? 0) },
+        };
       } catch (e: any) {
         throw new Error(`${e.message} [sql: ${sql.replace(/\s+/g, ' ').slice(0, 160)}]`);
       } finally { try { stmt.finalize?.(); } catch { /* ignore */ } }
@@ -1489,6 +1495,13 @@ async function main() {
   check('the prompt names the concrete trap', /5 斤 is not 5 kg/i.test(sysText));
   check('the prompt says to keep the number as given',
         /record their number and their wording exactly as given/i.test(sysText));
+  check('the prompt says a missing unit can be added, not guessed at',
+        /add it with add_unit/i.test(sysText));
+  // The reported wording was "the unit table is part of the database structure,
+  // I can only read and write data rows" — the right answer from the tool list
+  // the model had, and the wrong reason. This sentence is the correction.
+  check('the prompt separates a vocabulary row from a schema change',
+        /A vocabulary table is not structure/i.test(sysText));
   check('the prompt asks for a size only where one exists',
         /has a size, so record it when the user gives it/i.test(sysText));
   check('the prompt names services as the exception',
@@ -1518,6 +1531,86 @@ async function main() {
         JSON.stringify(jinAsKg.comparable?.unit));
   check('it lands among the un-normalisable rows instead',
         jinAsKg.without_unit?.count === 1, JSON.stringify(jinAsKg.without_unit?.count));
+
+  // ------------------------------------------------------------------ add_unit
+  //
+  // The reported case, in order. The crab was "65 元一斤", 斤 was not in the
+  // vocabulary, and the assistant's only honest answer was that it could not add
+  // one — so the price stayed incomparable forever. It can now add it and use it,
+  // which is what the nine checks below pin down.
+  console.log('\n=== units: a unit the vocabulary is missing can be added ===');
+
+  // listUnits() has already run (well above), so the per-isolate cache is warm. A
+  // write that failed to clear it would leave 斤 invisible on the very next read
+  // and make the price write below fail with UNKNOWN_UNIT — the trap this test
+  // exists to catch, and the one that would look like "adding did nothing".
+  const addedJin = await addUnit(db, '斤');
+  check('the missing unit is added', addedJin.created === true && addedJin.code === '斤',
+        JSON.stringify(addedJin));
+  check('the new row is its own display name', addedJin.name === '斤', addedJin.name);
+  check('the vocabulary sees it immediately, despite the warm cache',
+        (await listUnits(db)).some(u => u.code === '斤'));
+  check('a price may now be recorded in it', (await assertKnownUnit(db, '斤')) === '斤');
+
+  const crab = await logPrice(db, uid, {
+    item_name: 'svc-jin-crab', unit_price: 65, unit: '斤', unit_raw: '斤', observed_on: '2026-10-11',
+  });
+  check('the price keeps the new code instead of dropping it', crab.unit === '斤',
+        `unit=${crab.unit}`);
+
+  // Idempotent: the vocabulary is shared and price rows point at it, so a second
+  // add must not rewrite the row or leave a neighbour behind. "Already there" is
+  // success, and it hands back the code the caller actually wanted.
+  const againJin = await addUnit(db, ' 斤 ');
+  check('adding it again reports that it was already there',
+        againJin.created === false && againJin.code === '斤', JSON.stringify(againJin));
+  check('and there is still exactly one such row',
+        (await listUnits(db)).filter(u => u.code === '斤').length === 1);
+
+  // A full-width spelling is the same unit, not a second invisible one. NFKC is
+  // what stops a Chinese IME's ｋｇ from splitting a price history in two.
+  const wideKg = await addUnit(db, 'ｋｇ');
+  check('a full-width spelling folds onto the existing code',
+        wideKg.code === 'kg' && wideKg.created === false, JSON.stringify(wideKg));
+
+  const emptyUnit = await expectServiceErrorInfo(() => addUnit(db, '   '));
+  check('an empty unit is refused', emptyUnit.status === 400 && emptyUnit.code === 'INVALID_UNIT',
+        `${emptyUnit.status} ${emptyUnit.code}`);
+  const longUnit = await expectServiceErrorInfo(() => addUnit(db, 'kilogrammes'));
+  check('an over-long unit is refused', longUnit.status === 400 && longUnit.code === 'INVALID_UNIT',
+        `${longUnit.status} ${longUnit.code}`);
+  const newlineUnit = await expectServiceErrorInfo(() => addUnit(db, '斤\n斤'));
+  check('a unit carrying a control character is refused',
+        newlineUnit.status === 400 && newlineUnit.code === 'INVALID_UNIT',
+        `${newlineUnit.status} ${newlineUnit.code}`);
+  const numberUnit = await expectServiceErrorInfo(() => addUnit(db, 42));
+  check('a non-text unit is refused',
+        numberUnit.status === 400 && numberUnit.code === 'INVALID_UNIT',
+        `${numberUnit.status} ${numberUnit.code}`);
+
+  // A unit nobody added keeps the old, safe behaviour: the wording is stored and
+  // no code is invented. add_unit is the fix for a missing unit — it deliberately
+  // does not change what log_price does when the model skips it.
+  const stillUnknown = await logPrice(db, uid, {
+    item_name: 'svc-da-apples', unit_price: 8, quantity: 1, unit: '打', unit_raw: '打',
+  });
+  check('a unit nobody added is still stored with no code', stillUnknown.unit === null,
+        `unit=${stillUnknown.unit}`);
+
+  // The model reaches this through the tool, not the service, so the wiring has
+  // to be tested too: a service that works is invisible to the assistant if the
+  // tool is missing from the registry the provider is handed.
+  check('add_unit is offered to the provider',
+        defs.some(d => d.function.name === 'add_unit'));
+  const viaUnitTool = await runTool(ctx, 'add_unit', JSON.stringify({ code: '两' }));
+  check('the tool adds a unit', viaUnitTool.ok === true, JSON.stringify(viaUnitTool));
+  const viaUnitToolAgain = await runTool(ctx, 'add_unit', JSON.stringify({ code: '两' }));
+  check('the tool reports an existing unit as already there',
+        viaUnitToolAgain.ok === true && (viaUnitToolAgain.data as any)?.created === false,
+        JSON.stringify(viaUnitToolAgain));
+  const toolBadUnit = await runTool(ctx, 'add_unit', JSON.stringify({ code: '' }));
+  check('the tool relays a bad unit as a fixable error rather than a crash',
+        toolBadUnit.ok === false && toolBadUnit.code === 'INVALID_UNIT', JSON.stringify(toolBadUnit));
 
 
   // A pathological transcript must not blow the budget: the group clamp is what
@@ -1727,6 +1820,65 @@ async function main() {
         stored.some(m => m.role === 'assistant' && m.tool_calls && m.content === null));
   check('the tool result stored its call id',
         stored.some(m => m.role === 'tool' && JSON.parse(m.tool_calls ?? '{}').tool_call_id === 'call_1'));
+
+  console.log('\n=== chat: the assistant adds the unit it is missing, then uses it ===');
+  // The reported conversation, replayed end to end: "晚上买65一斤的螃蟹花了89" → the
+  // model looked for the unit, found none, and answered that adding one was a
+  // schema change it could not make. Four provider rounds here on purpose — a
+  // model cannot know the code before add_unit returns it, so list_units →
+  // add_unit → log_price is the shape the tool has to support.
+  let unitRound = 0;
+  const unitTurn = await runChatTurn({
+    env: { DB: db } as any, userId: uid, sessionId: S,
+    message: '买了 3 扎啤酒，一共 18 元', today: '2030-06-16',
+    completion: async (): Promise<ChatResult> => {
+      unitRound += 1;
+      const toolCall = (name: string, args: unknown): ChatResult => ({
+        content: null,
+        tool_calls: [{
+          id: `call_u${unitRound}`, type: 'function',
+          function: { name, arguments: JSON.stringify(args) },
+        }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        finish_reason: 'tool_calls',
+        model: 'fake',
+      });
+
+      if (unitRound === 1) return toolCall('list_units', {});
+      if (unitRound === 2) return toolCall('add_unit', { code: '扎' });
+      if (unitRound === 3) {
+        return toolCall('log_price', {
+          item: 'svc-zha-beer', unit_price: 6, quantity: 3, unit: '扎', unit_raw: '扎',
+          observed_on: '2030-06-16',
+        });
+      }
+      return {
+        content: '记好了：3 扎啤酒 18 元，6 元一扎。',
+        tool_calls: [],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        finish_reason: 'stop',
+        model: 'fake',
+      };
+    },
+  });
+
+  check('the model can look, add and then write in one turn',
+        unitTurn.writes.map(w => w.tool).join(',') === 'list_units,add_unit,log_price',
+        JSON.stringify(unitTurn.writes));
+  check('every step of that turn succeeded', unitTurn.writes.every(w => w.ok),
+        JSON.stringify(unitTurn.writes));
+  check('the reply is in words, not a tool call', unitTurn.reply === '记好了：3 扎啤酒 18 元，6 元一扎。',
+        JSON.stringify(unitTurn.reply));
+
+  const zhaPrice = raw.prepare(
+    'SELECT ip.unit, ip.unit_raw, ip.quantity FROM item_prices ip '
+    + 'JOIN items i ON i.id = ip.item_id WHERE i.name = ?',
+  ).get('svc-zha-beer') as any;
+  check('the price is stored under the unit the model added',
+        zhaPrice?.unit === '扎' && zhaPrice?.unit_raw === '扎' && zhaPrice?.quantity === 3,
+        JSON.stringify(zhaPrice));
+  check('and the vocabulary still carries it afterwards',
+        (await listUnits(db)).some(u => u.code === '扎'));
 
   console.log('\n=== chat: a failing tool is reported, not thrown ===');
   let badRound = 0;

@@ -97,6 +97,9 @@ AI 回答趋势问题时，**算术由 SQL 做，AI 只负责措辞**。
 - 单位受 `units` 词表约束（`REFERENCES units(code)`），原话保留在 `unit_raw`；商家解析为
   `merchants` 实体，原话保留在 `merchant`。理由：单位不同的价格比较本身是错的；"永辉"与
   "永辉超市"必须是同一家才能比价。
+- 词表**不是只由迁移维护的封闭列表**：模型缺哪个单位就自己补（`add_unit`，见下），所以用户说
+  "65 一斤"时不必再让价格永远停留在"没有 code、无法比较"的状态。补进去不等于能换算——按斤
+  的价格仍然只和按斤的价格比。
 - AI 应当：
   - 把新价格与该物品自身的历史（最近、平均、最低）比较，直说贵了还是便宜了、差多少。
   - 明显高于近期均价时提示（默认高出 10% 以上；可配置）。
@@ -180,6 +183,8 @@ item_prices      id, user_id → users CASCADE, item_id → items CASCADE,
 
 units            code PRIMARY KEY, name
                  -- 共享词表，不是用户数据：价格只在同一单位内比较才有意义
+                 -- 种子 9 个（schema.sql / migrations/004 各一份，必须一致）；
+                 -- 之后由模型的 add_unit 追加，前端下拉读 GET /units 而不是常量。
 
 merchants        id, user_id → users CASCADE, name, created_at, UNIQUE(user_id, name)
 
@@ -235,7 +240,7 @@ ledger_days      user_id → users CASCADE, date,
 | `subscriptions.last_renewed_at` | 派生 | 该订阅最新续费交易的 `created_at` |
 | 续费交易 | `transactions.subscription_id` | 按 renew 端点自己写入的描述 `Subscription renewal: <name>` 回填 |
 | `exchange_rates`（194 行） | 每币种对一行（2） | `ROW_NUMBER() OVER (PARTITION BY pair ORDER BY fetched_at DESC, id DESC)`；必须有 tiebreak，因 97 行共享同一时间戳 |
-| `unit` 自由文本 | `units.code` + `unit_raw` | 只接受词表中的 code；不认识的值留在 `unit_raw` 并把 code 置空，**不猜** |
+| `unit` 自由文本 | `units.code` + `unit_raw` | 只接受词表中的 code；不认识的值留在 `unit_raw` 并把 code 置空，**不猜**。词表本身可由 `add_unit` 追加 |
 
 **由测试在真实数据上发现并修复的缺陷**（不是事先假设的）：
 
@@ -399,6 +404,7 @@ AI 层**未写代码**。本节是唯一的实现依据。
 | `delete_item` | 会**级联删掉该物品的全部价格记录**（`ON DELETE CASCADE`），删除前必须明确告知用户 |
 | `log_price` | `item`(名或id), `unit_price`, `currency?`, `observed_on?`, `quantity?`, `unit?`, `merchant?`, `transaction_id?`。**可不带交易**——这是 R4 的主场景 |
 | `list_units` | 返回单位词表，供模型把"个/袋/斤"映射到 code |
+| `add_unit` | `code`。词表里**没有**用户说的那个单位时补一行（斤、两、打），返回 `{code, name, created}`。幂等：已存在则 `created:false` 并把 code 还给它，**不改名**（词表共享、价格行指向它，改名会让所有人的历史变味）。校验：NFKC 归一 + 去空白、非空、≤8 字符、拒绝控制字符；`INVALID_UNIT` 是模型可自我纠正的 400 |
 | `resolve_merchant` | `name` → `merchant_id`（不存在则新建），可选 `alias` 记录为同一家的另一种写法。**实测**：显式要求合并时可用（`aliases` 落库、后续用别名写的价格解析到同一 `merchant_id`）；但模型**不会主动**把"永辉"与"永辉超市"认作一家，需用户提出或经后续沉淀 |
 | `update_price` / `delete_price` | 修正 / 撤销单条价格观测 |
 | `price_stats` | 复用 `/prices/stats`（last/average/min/max），供"比上次贵了吗""是否超过均价 10%" |
@@ -413,6 +419,23 @@ AI 层**未写代码**。本节是唯一的实现依据。
     （5 斤 = 2.5 kg，它记成 5 kg），污染了后续要用来比价的单价历史。现在：能被词表识别的才当
     code，识别不了的**当作用户原话存进 `unit_raw`、code 留空**。既没有编造代码，也没有丢信息，
     模型也不必为了绕过报错而换算。见 §8.6f。
+  - **补充（2026-10-12，用户反馈驱动）**：上一条只解决了"不写错数字"，没解决"这个单位以后永远
+    用不上"。真实对话（`4f3cb36c`，2026-10-11）里用户说"晚上买65一斤的螃蟹花了89"，随后问
+    "你不能在单位表中加一个斤吗？"，模型答"单位表是数据库结构的一部分，我只能读写数据行，不能
+    新建、修改或删除表"——**结论对（确实没有这个工具），理由错（`units` 就是普通数据行）**。
+    因此：
+    - 新增工具 `add_unit`，并修掉造成那句话的 prompt：原文那条"要改数据库结构，得由能改结构的
+      人来做"被模型套用到了词表上。现在 prompt 明说"词表不是结构，单位/分类/物品/订阅都是行，
+      写它们的工具就是普通写入，不要告诉用户这需要改 schema 的人"。
+    - `listUnits` 的 isolate 缓存必须由写入侧清掉：否则"刚加的单位下一次读还不在"，模型会看到
+      `add_unit` 成功、紧接着写价格却收到 `UNKNOWN_UNIT`，症状像"加了没用"。
+    - `add_unit` 只**加**，不改名、不删除。词表共享且 `item_prices.unit` 指向它，改名会让所有人
+      的历史默不做声地变味；删除要么被外键挡住，要么留下悬空引用。
+    - 前端单位下拉原本是硬编码常量（`.tsx` 里第二份词表），现在读 `GET /units`，并对 locale 里
+      没有的 code 回退显示 `units.name`；`scripts/check_unit_vocabulary.py` 相应改为"种子 =
+      文案，表单和服务都不许再复述词表"。
+    - `add_unit` 只给 code，`name` 直接取 code：九个种子单位有英文 name、由 locale 负责本地化，
+      而对话里加的"斤"没有译文可给，code 就是诚实的显示值。
 - **`merchant` 原文与 `merchant_id` 都要写**：`merchant_id` 用于比价，原文保证解析失败时不丢信息。
 
 #### `subscriptions`
@@ -438,12 +461,12 @@ AI 层**未写代码**。本节是唯一的实现依据。
 | `mark_partial` | `date`。写/改为 `status='partial'`：这天只记了一部分，仍应继续问 |
 | `gaps` | 只读：返回待补日期与逾期订阅（见 §5.4）。同一份数据每轮已在快照里，此工具用于**取最新**（例如用户刚回答完某天） |
 
-#### 完整索引（29 个，按注册表顺序）
+#### 完整索引（30 个，按注册表顺序）
 
 `add_transaction` `update_transaction` `delete_transaction` `find_transactions` `summarize`
 `list_categories` `add_category` `rename_category` `delete_category`
 `list_items` `add_item` `rename_item` `delete_item`
-`log_price` `price_stats` `update_price` `delete_price` `list_units`
+`log_price` `price_stats` `update_price` `delete_price` `list_units` `add_unit`
 `list_subscriptions` `add_subscription` `update_subscription` `renew_subscription` `archive_subscription`
 `mark_no_spend` `mark_partial` `gaps`
 `resolve_merchant` `remember` `recall`

@@ -37,7 +37,7 @@ import {
   listSubscriptions, createSubscription, updateSubscription,
   archiveSubscription, renewSubscription,
 } from './subscriptions';
-import { listUnits } from './units';
+import { listUnits, addUnit } from './units';
 import { markLedgerDay, findGaps } from './gaps';
 import { resolveMerchant, addMerchantAlias } from './merchants';
 import { readMemory, writeMemory } from './memory';
@@ -153,7 +153,7 @@ export const TOOLS: Record<string, ToolSpec> = {
                 name: str('Item name, e.g. "eggs".'),
                 unit_price: num('Price per unit. Omit to use the amount paid.'),
                 quantity: num('How many units.'),
-                unit: str('A unit code from list_units, e.g. piece. Omit if the wording maps to nothing.'),
+                unit: str('A unit code from list_units, or from add_unit when the vocabulary has no code for what the user said. Omit only when they named no unit at all.'),
                 unit_raw: str('The unit exactly as the user said it, e.g. "个" or "斤". Always set this when the user named a unit, and never convert it to another unit.'),
                 merchant: str('Shop name as said, e.g. "永辉超市".'),
               },
@@ -489,7 +489,7 @@ export const TOOLS: Record<string, ToolSpec> = {
       function: {
         name: 'log_price',
         description:
-          'Record a price that was seen, with or without a purchase — this is the main way shelf prices get tracked ("eggs are 15 at the corner shop"). Call list_units first and map the wording onto one of those codes, and always pass `unit_raw` with the user\'s own wording. NEVER convert a unit: 斤 and 打 are not kg or piece, so record the number exactly as said and leave `unit` empty rather than translating it. A converted number is a wrong number.',
+          'Record a price that was seen, with or without a purchase — this is the main way shelf prices get tracked ("eggs are 15 at the corner shop"). Call list_units first and map the wording onto one of those codes; when none of them fits what the user said, call add_unit with their own wording and use the code it returns. Always pass `unit_raw` with the user\'s own wording. NEVER convert a unit: 斤 and 打 are not kg or piece, so 斤 is added as a unit of its own rather than translated into kg — a converted number is a wrong number.',
         parameters: {
           type: 'object',
           properties: {
@@ -497,7 +497,7 @@ export const TOOLS: Record<string, ToolSpec> = {
             unit_price: num('Price per unit, decimal.'),
             currency: str('Three-letter code. Defaults to CNY.'),
             quantity: num('How many units at that price.'),
-            unit: str('A unit code from list_units, e.g. piece.'),
+            unit: str('A unit code from list_units, or from add_unit when the vocabulary has no code for the wording.'),
             unit_raw: str('The unit exactly as the user said it, e.g. "个" or "斤". Never converted.'),
             merchant: str('Shop name as said.'),
             observed_on: str(`The date the price was seen. Defaults to today. ${DATE_DESC}`),
@@ -624,11 +624,30 @@ export const TOOLS: Record<string, ToolSpec> = {
       function: {
         name: 'list_units',
         description:
-          'The unit vocabulary. Call this before writing any price with a unit, and map what the user said onto one of these codes. If nothing fits, do not invent one: leave the code out and pass the wording as unit_raw.',
+          'The unit vocabulary. Call this before writing any price with a unit, and map what the user said onto one of these codes. If nothing fits, call add_unit once with the user\'s own wording and use the code it returns — do not invent a code, and never convert.',
         parameters: { type: 'object', properties: {} },
       },
     },
     run: async (ctx) => listUnits(ctx.db),
+  },
+
+  add_unit: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'add_unit',
+        description:
+          'Add a unit the vocabulary is missing (斤, 两, 打). Call list_units first: when an existing code already means the same thing — 颗 is piece, 袋 is bag — use that one instead, because a second name for one unit splits its price history in two. This is for a unit that genuinely has no code. The vocabulary is shared, so the unit stays available to every later price. Adding it does NOT make it convertible: 斤 prices still compare only with 斤 prices.',
+        parameters: {
+          type: 'object',
+          properties: {
+            code: str('The unit, written the shortest way the user would keep saying it, e.g. 斤.'),
+          },
+          required: ['code'],
+        },
+      },
+    },
+    run: async (ctx, args) => addUnit(ctx.db, args.code),
   },
 
   // ----------------------------------------------------------- subscriptions

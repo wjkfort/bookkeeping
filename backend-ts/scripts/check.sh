@@ -203,12 +203,15 @@ fi
 
 # --------------------------------------------------- 3d. one unit vocabulary
 #
-# The unit vocabulary is written down in four files, and they had drifted apart
-# in both directions: the form offered "gallon" and "lb" (not in `units`, so
+# The unit vocabulary used to be written down in four files, and they had drifted
+# apart in both directions: the form offered "gallon" and "lb" (not in `units`, so
 # saving hit the FOREIGN KEY and surfaced as a 500) while neither locale file
 # labelled "g", "ml" or "bag". `item_prices.unit` cannot hold anything outside
-# the table, so the lists have to agree. Needs no fixtures.
-run_layer "unit vocabulary (schema = form = locales)" \
+# the table, so the lists had to agree — and the answer was to stop keeping lists:
+# the picker reads GET /units and the assistant can add a row with `add_unit`.
+# What is left to check is the seed (schema.sql = 004), the labels, and that the
+# form and the service read the table rather than restating it. Needs no fixtures.
+run_layer "unit vocabulary (seed = labels; the form reads the table)" \
   python3 -I scripts/check_unit_vocabulary.py
 
 # ------------------------------------------------------------ 4. money arithmetic

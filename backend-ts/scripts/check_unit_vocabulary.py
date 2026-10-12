@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-One unit vocabulary, told in four places.
+One unit vocabulary, and the table is the only copy of it.
 
     python3 -I scripts/check_unit_vocabulary.py
 
 Why this exists:
 
 `item_prices.unit` has a real foreign key to `units.code`, so a unit that is not
-in that table cannot be stored at all. The vocabulary is nevertheless written
-down in four files, and they had drifted apart in both directions:
+in that table cannot be stored at all. The vocabulary used to be written down in
+four files, and they had drifted apart in both directions:
 
   * `TransactionFormModal.tsx` offered "gallon" and "lb", which the database does
     not have — choosing either one and saving produced
@@ -22,6 +22,25 @@ down in four files, and they had drifted apart in both directions:
   * `zh.json` / `en.json` had no label for `g`, `ml` or `bag` (so the Items page
     would have rendered the raw key, e.g. "units.ml"), and labelled two units
     that no row can ever hold.
+
+That is the bug this check was written for, and the answer to it is not a longer
+list: the picker now reads `GET /units` and the assistant can add a row itself
+with `add_unit` when the user names a unit the table does not have (斤, 两, 打).
+A list in the client would go stale the first time that happened, which is why
+the checks on the form are structural — that it reads the API, keeps no list of
+its own, and can label a code the locale files have never seen.
+
+What is left to keep in step:
+
+  1. `db/schema.sql` and `migrations/004` seed the same codes. Both exist and
+     both must: one is a fresh install, the other upgrades a database that is
+     already running.
+  2. Both locale files label every seeded code and nothing else. Labels are the
+     one thing the database cannot supply, and an unlabelled seeded code is the
+     "units.ml" bug.
+  3. The form reads the vocabulary instead of restating it, and falls back to the
+     row's own name for a code no locale knows.
+  4. The service does not restate it either.
 
 Sets are compared, not counts, and a missing list is a failure rather than a
 silent pass — otherwise renaming a constant would quietly disable this check.
@@ -39,6 +58,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 SCHEMA = "backend-ts/db/schema.sql"
 MIGRATION = "backend-ts/migrations/004_normalise_units_merchants.sql"
+SERVICE = "backend-ts/src/services/units.ts"
 FORM = "client/src/components/features/TransactionFormModal.tsx"
 LOCALES = ["client/src/locales/zh.json", "client/src/locales/en.json"]
 
@@ -46,7 +66,9 @@ SEED_RE = re.compile(
     r"INSERT\s+OR\s+IGNORE\s+INTO\s+units\s*\(code,\s*name\)\s*VALUES(.*?);",
     re.DOTALL | re.IGNORECASE,
 )
-OPTIONS_RE = re.compile(r"const\s+UNIT_OPTIONS\s*=\s*\[(.*?)\]\s*as\s+const", re.DOTALL)
+# The code is the first string of each tuple; `[^']+` rather than `[A-Za-z]+` so
+# a unit seeded in Chinese (which is the whole point of add_unit) still counts.
+SEED_CODE_RE = re.compile(r"\(\s*'([^']+)'")
 
 passed = 0
 failed = 0
@@ -76,7 +98,7 @@ def seed_codes(path):
     if not match:
         print(f"  [FAIL] no `INSERT OR IGNORE INTO units` block found in {path}")
         sys.exit(1)
-    return set(re.findall(r"\(\s*'([A-Za-z]+)'", match.group(1)))
+    return set(SEED_CODE_RE.findall(match.group(1)))
 
 
 def describe(a, b, a_name, b_name):
@@ -90,6 +112,50 @@ def describe(a, b, a_name, b_name):
     return "; ".join(bits)
 
 
+def check_form():
+    """The picker must not own a copy of the vocabulary. Three ways to tell."""
+    form = read(FORM)
+
+    report(
+        "getUnits(" in form,
+        "the transaction form reads the vocabulary from the API",
+        "it calls getUnits()"
+        if "getUnits(" in form
+        else "it never calls getUnits(), so its options come from somewhere else",
+    )
+    report(
+        "UNIT_OPTIONS" not in form,
+        "the transaction form keeps no list of its own",
+        "no hardcoded list"
+        if "UNIT_OPTIONS" not in form
+        else "UNIT_OPTIONS is back: a constant in the form is what drifted from the table twice",
+    )
+    # A code the assistant added has no translation yet. Rendering t("units.<code>")
+    # for it prints the key itself, which is the shape of the original bug.
+    report(
+        "unit.name" in form,
+        "a unit the locales do not label falls back to its own name",
+        "falls back to unit.name"
+        if "unit.name" in form
+        else f"{FORM} never reads .name, so a newly added unit renders as \"units.<code>\"",
+    )
+
+
+def check_service(schema):
+    """`units` is the list; a second copy in the service would drift too."""
+    service = read(SERVICE)
+    restated = sorted(c for c in schema if f"'{c}'" in service or f'"{c}"' in service)
+
+    report(
+        not restated,
+        "the server reads the vocabulary from the table",
+        "no codes restated in units.ts"
+        if not restated
+        else f"{SERVICE} hardcodes {', '.join(restated)} — the codes belong in the "
+             f"table, which add_unit extends at runtime",
+    )
+
+
 def main():
     schema = seed_codes(SCHEMA)
     migration = seed_codes(MIGRATION)
@@ -100,20 +166,8 @@ def main():
         else describe(schema, migration, "schema.sql", "004"),
     )
 
-    match = OPTIONS_RE.search(read(FORM))
-    if not match:
-        print(f"  [FAIL] no `const UNIT_OPTIONS = [...] as const` found in {FORM}")
-        sys.exit(1)
-    form = set(re.findall(r'"([A-Za-z]+)"', match.group(1)))
-    if not form:
-        print(f"  [FAIL] `UNIT_OPTIONS` in {FORM} is empty — the parsing or the list is wrong")
-        sys.exit(1)
-    report(
-        form == schema,
-        "the transaction form offers exactly the vocabulary",
-        f"{len(form)} options" if form == schema
-        else describe(form, schema, "the form", "the database"),
-    )
+    check_form()
+    check_service(schema)
 
     for path in LOCALES:
         labels = set(json.loads(read(path)).get("units", {}))
@@ -122,9 +176,9 @@ def main():
             sys.exit(1)
         report(
             labels == schema,
-            f"{path} labels every unit and nothing else",
+            f"{path} labels every seeded unit and nothing else",
             f"{len(labels)} labels" if labels == schema
-            else describe(labels, schema, path, "the database"),
+            else describe(labels, schema, path, "the seed"),
         )
 
     print(f"\nRESULT: {passed} passed, {failed} failed")
