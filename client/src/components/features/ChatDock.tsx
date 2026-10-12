@@ -7,12 +7,12 @@ import {
   getAiMessages,
   currentSessionId,
   sendAiMessage,
-  openAiConversation,
   getAiGaps,
   markAiNoSpend,
 } from "../../api";
 import type { AiGaps, AiMessage } from "../../types";
 import { useToast } from "../ui/toastContext";
+import MiniMarkdown from "../ui/MiniMarkdown";
 import PetLayer, { type PetBounds } from "./pet/PetLayer";
 import type { PetReaction } from "./pet/scheduler";
 import "./ChatDock.css";
@@ -147,9 +147,6 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged, onManualEntry }) => {
   const [error, setError] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
 
-  // Guards the one-time opening turn so it does not fire on every render or
-  // re-open: it must happen once per session, not once per click.
-  const openedRef = useRef(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -188,26 +185,12 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged, onManualEntry }) => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages, isSending, isOpen]);
 
-  /**
-   * R3 delivery: when the panel is first opened, ask the server to open the
-   * conversation with the outstanding gaps. Skipped when a conversation already
-   * exists, so it does not repeat on every visit.
-   */
-  const maybeOpenConversation = useCallback(async () => {
-    if (openedRef.current) return;
-    openedRef.current = true;
-    if (messages.length > 0) return;
-
-    try {
-      const res = await openAiConversation();
-      if (res.data.reply) {
-        setMessages(chronological((await getAiMessages({ limit: 50 })).data));
-      }
-      if (res.data.writes.length > 0) onChanged?.();
-    } catch {
-      // Nothing to greet with is not an error worth showing.
-    }
-  }, [messages.length, onChanged]);
+  // R3's reminder delivery does NOT go through the model. The dock renders the
+  // gaps straight from `GET /ai/gaps` (the cards above the log), so opening the
+  // panel costs nothing. It used to also ask the server to phrase them — one
+  // provider call per open, every open — which bought nothing the cards did not
+  // already say. The `{ opening: true }` route is still there for a deliberate
+  // future trigger; the client no longer calls it on its own.
 
   /**
    * The dock calls itself a dialog, so it has to behave like one: focus moves
@@ -389,9 +372,7 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged, onManualEntry }) => {
   }, [isOpen]);
 
   const handleToggle = () => {
-    const next = !isOpen;
-    setIsOpen(next);
-    if (next && configured !== false) void maybeOpenConversation();
+    setIsOpen(!isOpen);
   };
 
   const handleSend = async () => {
@@ -568,7 +549,12 @@ const ChatDock: React.FC<ChatDockProps> = ({ onChanged, onManualEntry }) => {
 
                 {dated.map((m) => (
                   <div key={m.id} className={`chat-dock-bubble is-${m.role}`}>
-                    {m.content}
+                    {/* Only the assistant's turns are markdown: the model emits it
+                        unbidden, while the user's own text is literal — "* 2" in a
+                        note should not become italics. */}
+                    {m.role === "assistant"
+                      ? <MiniMarkdown text={m.content ?? ""} />
+                      : m.content}
                   </div>
                 ))}
 

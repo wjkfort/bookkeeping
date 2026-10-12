@@ -260,14 +260,6 @@ export const getAiSessions = (): Promise<AxiosResponse<{ session_id: string; mes
 export const sendAiMessage = (message: string): Promise<AxiosResponse<AiChatResponse>> =>
   api.post("/ai/chat", { message, timezone: clientTimezone(), session: sessionId });
 
-/**
- * Ask the assistant to open with the outstanding reminders (R3). The gaps are
- * computed server-side; this only produces the wording, and the server does not
- * store a synthetic user turn for it.
- */
-export const openAiConversation = (): Promise<AxiosResponse<AiChatResponse>> =>
-  api.post("/ai/chat", { opening: true, timezone: clientTimezone(), session: sessionId });
-
 /** The raw reminder data, independent of the model. */
 export const getAiGaps = (params?: { today?: string }): Promise<AxiosResponse<AiGaps>> =>
   api.get("/ai/gaps", { params: { ...params, timezone: clientTimezone() } });
