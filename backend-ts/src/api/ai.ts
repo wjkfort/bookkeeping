@@ -189,6 +189,11 @@ app.get("/status", async (c) => {
 
     return c.json({
       configured: isAiConfigured(c.env),
+      // Which provider the deployment is wired to. Only DeepSeek is implemented
+      // (R2), so this is constant today; the client uses it to decide how the
+      // assistant presents itself, and it stays honest when a second provider
+      // lands instead of the client guessing from `tools`.
+      provider: "deepseek",
       tools: toolNames(),
       usage: { today, total },
       daily_token_limit: null,
