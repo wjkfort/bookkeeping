@@ -373,14 +373,15 @@ SQL 挪到了 JS。`/summary/monthly` 因为结果按行数少得多而明显更
 
 ## 发布记录
 
-### 2026-10-12 — 触发器 006/007/008 上生产（已完成）+ 助手人设与词表可写（代码待推）
+### 2026-10-12 — 触发器 006/007/008 上生产 + 助手人设与词表可写（均已上线）
 
 **上半：migration 006/007/008 已应用到生产**（无 schema 破坏，只有触发器与数据重组）。
+migration 只动 D1；按 `wrangler deployments list`，当时线上运行的 Worker 版本是 `fa63ea75`
+（2026-10-10T15:02Z）——这一段没有为新代码单独部署。
 
 ```text
 [x] 生产导出（prod-backup-20261012-085121.sql）与 10-10 那份逐字节比对 → 生产 6h55m 内零写入
-[x] 本机 wrangler deploy 之前先 stash 了未提交的 src/api/ai.ts，部署后还原（sha256 逐字节一致）
-[x] wrangler deploy → 版本 35c2f471…（100% 流量）
+[x] 部署前 stash 了未提交的 src/api/ai.ts、之后还原（sha256 逐字节一致）——为保护工作区，非 migration 必需
 [x] 006：2 个触发器，数据未动
 [x] 007：第一次失败（LIKE or GLOB pattern too complex）→ 改成等价的 LIKE 形状测试后成功
 [x] 008：分类 52 → 58、交易 490 不变、订阅关联 3 → 8、组分类上无交易
@@ -392,24 +393,36 @@ SQL 挪到了 JS。`/summary/monthly` 因为结果按行数少得多而明显更
 失败即整体回滚，所以生产当时精确停在 006。凡是给远端写的 SQL，形状要挑 D1 认的写法；
 `sqlite_version()` 在 D1 上也不可调用。
 
-**下半：助手人设与温度、词表可写、客户端 markdown —— 代码提交完毕，尚未 push。**
-无 migration（`units` 表结构没变，`add_unit` 只在运行时插行）。
+**下半：助手人设与温度、词表可写、客户端 markdown —— 已 push，CI 已上线。** 无 migration
+（`units` 表结构没变，`add_unit` 只在运行时插行）。Worker 版本 `32bcc419`
+（2026-10-12T08:24:33Z，本机 16:24）；Pages 产物 `assets/index-CwFdm8jp.js`
+（替换 `assets/index-CksGFxSL.js`）。
 
 ```text
-[ ] whoami / secret list 确认登录与三个密钥都在（OAuth token TTL 约 1 小时）
-[ ] git push origin main（7 笔提交：3 笔前端——桌宠 2 + 单位下拉 1；4 笔 AI——人设/温度、词表可写、客户端 markdown）
-[ ] Cloudflare Dashboard：Pages 构建成功 + Worker 出现新 Deployment
-[ ] 未带 token：GET / → 200、/api/v1/ai/status → 401
-[ ] 带 token：/ai/status 的 configured=true、provider=deepseek
-[ ] 聊天冒烟：语气（本鱼/心声）、报数字平实、markdown 渲染、无字面星号、开面板不自动开场
-[ ] add_unit：说"买了 3 扎啤酒，18 元"，再 SELECT code, name FROM units 确认多出该单位
-[ ] 回滚路径：Pages/Worker 都能回上一版；**数据库无需回滚**（只多了词表行，旧代码照读）
+[x] whoami = stringwjk@gmail.com；secret list：三个密钥都在
+[x] git push origin main（8 笔：3 笔前端 + 4 笔 AI + 1 笔文档）
+[x] CI 约 3 分钟完成：Worker 出新 Deployment、Pages 换新产物（哈希 CksGFxSL → CwFdm8jp）
+[x] 未带 token：GET / → 200、/api/v1/ai/status → 401、/api/v1/units → 401
+[x] 带 token：configured=true、provider="deepseek"、tools=30（含 add_unit；旧版 29）
+[x] 闲聊「在忙啥呢」→「（其实在摸鱼……）忙着数钱呢，别打扰本鱼。🐋」（1 轮，7330/19 token，无写入）
+[x] 报数字「这个月总共花了多少？」→ 调 summarize(ok)、平实作答 2601.5 元（2 轮，15051/129 token）
+[x] 数字交叉核对：本地库 10 月支出 2621.5 − 本地测试写入的那笔 20 = 2601.5，与生产回复一致
+[x] 前端静态核对：新包里 `opening:!0` 消失（旧包 1 处）、`打开大肥鱼`、`.chat-dock-bubble code`、
+      `.is-assistant em` 都只出现在新包里
+[x] 回滚路径已确认可走（Pages / Worker 都有上一成功版本）；数据库无需回滚
+[ ] add_unit 的生产写入**刻意没做**：会往真实账本写一笔交易、并往共享词表加一个永久单位。
+      留给使用者自己说一句"买了 3 扎啤酒，18 元"，再 SELECT code,name FROM units 核对
 ```
 
+冒烟对话落在 session `smoke-20261012-1626`（4 行 `ai_messages`）；不想要就按 session 删掉。
+
 **这次要注意的三点**：temperature 从 0 提到 0.8，措辞更活但工具参数也更容易歪（护栏是服务层校验 +
-触发器 + `{ok:false}` 当轮回灌）；`add_unit` 写的是**共享**词表，一个用户加的单位对另一个用户也可见
-（设计如此，两个账号里有一个是空的）；`assistant.title` 已随前端改成「大肥鱼」，所以前后端要一起发，
-否则界面叫她大肥鱼、说话却还是旧语气。
+触发器 + `{ok:false}` 当轮回灌；本次 `summarize` 一轮通过，但一轮不是保证）；`add_unit` 写的是
+**共享**词表，一个用户加的单位对另一个用户也可见（设计如此，两个账号里有一个是空的）；
+`assistant.title` 已随前端改成「大肥鱼」，所以前后端要一起发，否则界面叫她大肥鱼、说话却还是旧语气。
+
+**另一件值得记的事**：闲聊那条回复与 `SOUL` 里的示范**逐字相同**。这是"形状传递"的另一面——
+示范越像台词就越容易被照搬。要它更活，别再加形容词，再多加两三条不同场景的示范。
 
 ### 2026-10-09 — schema v2 + AI 层（已完成）
 
