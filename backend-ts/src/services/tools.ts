@@ -31,7 +31,8 @@ import {
   listItems, createItem, renameItem, deleteItem,
 } from './items';
 import {
-  logPrice, listPrices, getPriceStats, updatePrice, deletePrice, compareMerchants, priceBreakdown,
+  logPrice, listPrices, getPriceStats, updatePrice, deletePrice, compareMerchants,
+  priceBreakdown, findPriceForTransaction,
 } from './prices';
 import {
   listSubscriptions, createSubscription, updateSubscription,
@@ -41,7 +42,7 @@ import { listUnits, addUnit } from './units';
 import { markLedgerDay, findGaps } from './gaps';
 import { resolveMerchant, addMerchantAlias } from './merchants';
 import { readMemory, writeMemory } from './memory';
-import { findTransactions, summarize } from './queries';
+import { findTransactions, summarize, deriveQuantityForTransaction } from './queries';
 import { asServiceError } from './errors';
 
 export interface ToolResult {
@@ -489,7 +490,7 @@ export const TOOLS: Record<string, ToolSpec> = {
       function: {
         name: 'log_price',
         description:
-          'Record a price that was seen, with or without a purchase — this is the main way shelf prices get tracked ("eggs are 15 at the corner shop"). Call list_units first and map the wording onto one of those codes; when none of them fits what the user said, call add_unit with their own wording and use the code it returns. Always pass `unit_raw` with the user\'s own wording. NEVER convert a unit: 斤 and 打 are not kg or piece, so 斤 is added as a unit of its own rather than translated into kg — a converted number is a wrong number.',
+          'Record a price that was seen, with or without a purchase — this is the main way shelf prices get tracked ("eggs are 15 at the corner shop"). Call list_units first and map the wording onto one of those codes; when none of them fits what the user said, call add_unit with their own wording and use the code it returns. Always pass `unit_raw` with the user\'s own wording. NEVER convert a unit: 斤 and 打 are not kg or piece, so 斤 is added as a unit of its own rather than translated into kg — a converted number is a wrong number. With `transaction_id`, a purchase that already has a price for that item is CORRECTED rather than recorded again; to fill in a size you were not given, prefer `update_price` with the `price_id` from find_transactions.',
         parameters: {
           type: 'object',
           properties: {
@@ -509,7 +510,14 @@ export const TOOLS: Record<string, ToolSpec> = {
     },
     run: async (ctx, args) => {
       const itemId = await resolveItemId(ctx.db, ctx.userId, args.item);
-      return logPrice(ctx.db, ctx.userId, {
+
+      // Checked before the write so the reply can say which of the two happened.
+      // The service applies the same rule, so this is a report, not the guard.
+      const replacing = itemId !== undefined && args.transaction_id != null
+        ? await findPriceForTransaction(ctx.db, ctx.userId, args.transaction_id, itemId)
+        : null;
+
+      const price = await logPrice(ctx.db, ctx.userId, {
         // An unresolved name is handed over as a name so the service creates it.
         item_id: itemId ?? null,
         item_name: itemId === undefined && typeof args.item === 'string' ? args.item : null,
@@ -523,6 +531,8 @@ export const TOOLS: Record<string, ToolSpec> = {
         transaction_id: args.transaction_id,
         timezone: ctx.timezone,
       });
+
+      return { ...price, corrected_existing: replacing !== null };
     },
   },
 
@@ -573,13 +583,19 @@ export const TOOLS: Record<string, ToolSpec> = {
       type: 'function',
       function: {
         name: 'update_price',
-        description: 'Correct a recorded price observation.',
+        description:
+          'Correct a recorded price observation — including the size of a purchase that was recorded without one. Pass the `price_id` from find_transactions. When the user asks you to work out the size from what they paid, do not supply `quantity` yourself: pass `derive_quantity` and the division is done here, and refused unless it comes out even. That refusal is the honest answer when a discount or a rounded price has broken the sum, and then you have to ask.',
         parameters: {
           type: 'object',
           properties: {
             id: num('The price observation id.'),
             unit_price: num('Corrected price per unit.'),
-            quantity: num('Corrected quantity.'),
+            quantity: num('Corrected quantity, as the user gave it.'),
+            derive_quantity: {
+              type: 'boolean',
+              description:
+                'true works the quantity out from the purchase amount divided by the unit price. Use it only when the user has asked you to calculate the size; the result is an inference, so say where it came from. Refused when the division leaves a remainder.',
+            },
             unit: str('Corrected unit code.'),
             unit_raw: str('Corrected unit wording.'),
             merchant: str('Corrected shop name.'),
@@ -592,11 +608,33 @@ export const TOOLS: Record<string, ToolSpec> = {
     run: async (ctx, args) => updatePrice(ctx.db, ctx.userId, args.id, {
       unit_price: args.unit_price,
       quantity: args.quantity,
+      derive_quantity: args.derive_quantity === true,
       unit: args.unit,
       unit_raw: args.unit_raw,
       merchant: args.merchant,
       observed_on: args.observed_on,
     }),
+  },
+
+  derive_quantity: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'derive_quantity',
+        description:
+          'Work out how many units were bought, from the amount paid and the recorded price per unit. The division happens here, never in your head. This only reads: use it to answer "how many would that be?" or to offer the user a number to confirm, and then record what they say. `exact: false` means the amount does not divide evenly, which usually means a discount, a rounded price, or one payment covering more than one thing — so the number is a guess at what they bought, not a fact, and it must be presented that way. Recording a derived size is `update_price` with `derive_quantity`, and only works when the division is exact.',
+        parameters: {
+          type: 'object',
+          properties: {
+            transaction_id: num('The purchase to work from, as returned by find_transactions.'),
+          },
+          required: ['transaction_id'],
+        },
+      },
+    },
+    run: async (ctx, args) => deriveQuantityForTransaction(
+      ctx.db, ctx.userId, args.transaction_id,
+    ),
   },
 
   delete_price: {

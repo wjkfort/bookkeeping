@@ -35,17 +35,47 @@ import { normaliseMerchantName } from './merchants';
 // Item and price columns come from item_prices rather than from transactions
 // (v2 moved them). The API contract is unchanged, so they are folded back into
 // the transaction object on the way out.
+
+/**
+ * The single price row a purchase is reported through.
+ *
+ * A transaction can carry several `item_prices` rows, and joining them all made
+ * one purchase come back as several transactions. That is not hypothetical: the
+ * crab had two rows, so `find_transactions` returned the purchase twice, the
+ * transactions page listed it twice, and — the part that never healed — the
+ * completeness filter kept reporting it as missing a quantity, because one of
+ * the two rows still had `quantity IS NULL`. Correcting the row the user meant
+ * therefore never cleared the flag.
+ *
+ * So a transaction is summarised by one row: the most complete observation of it
+ * (a row with a quantity beats one without, then a row with a unit), newest as
+ * the tiebreak. Those columns exist only to answer "is this entry detailed
+ * enough?", and that question is about the best observation available, not about
+ * an arbitrary one. A purchase that really did buy two different things shows
+ * the row that carries the size; nothing in the ledger does that today.
+ */
+export const PRIMARY_PRICE_JOIN = `
+  LEFT JOIN item_prices ip ON ip.id = (
+      SELECT ip2.id FROM item_prices ip2
+       WHERE ip2.transaction_id = t.id AND ip2.user_id = t.user_id
+       ORDER BY (ip2.quantity IS NULL), (ip2.unit IS NULL), ip2.id DESC
+       LIMIT 1
+  )`;
+
 export const TX_SELECT = `
   SELECT t.*, i.name as item_name,
+         ip.id as price_id,
          ip.item_id as item_id, ip.unit_price_cents as unit_price_cents,
          ip.quantity as quantity, ip.unit as unit
   FROM transactions t
-  LEFT JOIN item_prices ip ON ip.transaction_id = t.id
+  ${PRIMARY_PRICE_JOIN}
   LEFT JOIN items i ON i.id = ip.item_id AND i.user_id = t.user_id
 `;
 
 export interface TxRow extends TransactionRow {
   item_name: string | null;
+  /** The row the item/unit/quantity columns came from, or null when none exists. */
+  price_id: number | null;
   item_id: number | null;
   unit_price_cents: number | null;
   quantity: number | null;
@@ -233,7 +263,7 @@ export async function createTransaction(
 
   const full = await fetchTransaction(db, userId, result.id);
   return full ?? toTransaction({
-    ...result, item_name: null, item_id: null, unit_price_cents: null,
+    ...result, item_name: null, price_id: null, item_id: null, unit_price_cents: null,
     quantity: null, unit: null,
   });
 }
@@ -392,7 +422,7 @@ export async function updateTransaction(
 
   const full = await fetchTransaction(db, userId, id);
   return full ?? toTransaction({
-    ...result, item_name: null, item_id: null, unit_price_cents: null,
+    ...result, item_name: null, price_id: null, item_id: null, unit_price_cents: null,
     quantity: null, unit: null,
   });
 }

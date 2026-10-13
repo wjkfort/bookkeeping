@@ -59,7 +59,7 @@ import {
 import { readMemory, writeMemory, appendMemory, AI_MEMORY_MAX_LENGTH } from '../src/services/memory';
 import { listUnits, addUnit, assertKnownUnit } from '../src/services/units';
 import { toolDefinitions, runTool, TOOLS } from '../src/services/tools';
-import { findTransactions } from '../src/services/queries';
+import { findTransactions, deriveQuantityForTransaction } from '../src/services/queries';
 import { buildPrompt, PROMPT_CHAR_BUDGET, detectLanguage } from '../src/services/prompt';
 import { SOUL, MAX_SOUL_CHARS } from '../src/services/soul';
 import {
@@ -856,6 +856,145 @@ async function main() {
   check('retracting it twice is a 404', missingPrice === 404, `status ${missingPrice}`);
 
   // -------------------------------------------------------------------------
+  // A purchase's size, and where a calculated one may come from.
+  //
+  // Modelled on the crab (2026-10-13): 89 paid at 65 a 斤, recorded with no
+  // quantity, and filled in later. Three things went wrong there and each is
+  // asserted below — the correction wrote a SECOND price row rather than fixing
+  // the first, the missing-size flag then never cleared because the stale row was
+  // still in the join, and the assistant had no way to answer "you work it out"
+  // except by doing the division itself.
+  // -------------------------------------------------------------------------
+  console.log('\n=== quantity: one price row per purchase, and the repair path ===');
+
+  const crabTx = await createTransaction(db, uid, {
+    amount: 89, currency: 'CNY', date: '2026-10-11', category_id: catId,
+    description: 'svc-crab 晚上买螃蟹，65元一斤', source: 'ai',
+    item: { item_name: 'svc-crab', unit_price: 65 },
+  });
+  const crabRows = raw.prepare('SELECT * FROM item_prices WHERE transaction_id = ?')
+    .all(crabTx.id) as any[];
+  check('the purchase recorded one price observation', crabRows.length === 1,
+        `got ${crabRows.length}`);
+  check('with no quantity, because the user gave none',
+        crabRows[0].quantity === null, `got ${crabRows[0].quantity}`);
+  const crabPriceId = crabRows[0].id as number;
+
+  // The size has to be reachable from the transaction, or the only tool that
+  // looks applicable is log_price — which records instead of correcting.
+  const foundCrab = await findTransactions(db, uid, { keyword: 'svc-crab' });
+  check('find_transactions hands back the price row id',
+        foundCrab[0]?.price_id === crabPriceId, `got ${foundCrab[0]?.price_id}`);
+
+  const derived = await deriveQuantityForTransaction(db, uid, crabTx.id);
+  check('the division is done for the caller', derived.quantity === 1.3692,
+        `got ${derived.quantity}`);
+  check('and reported as inexact', derived.exact === false, `exact=${derived.exact}`);
+  check('the working is handed over with it',
+        derived.amount === 89 && derived.unit_price === 65,
+        `${derived.amount} / ${derived.unit_price}`);
+
+  // Nothing may be written from an inexact division: the rounded number would be
+  // stored as though the user had said it.
+  const refusedDerive = await expectServiceErrorInfo(() =>
+    updatePrice(db, uid, crabPriceId, { derive_quantity: true }));
+  check('recording a size that does not divide evenly is refused',
+        refusedDerive.status === 400 && refusedDerive.code === 'QUANTITY_NOT_EXACT',
+        `status ${refusedDerive.status} code ${refusedDerive.code}`);
+  check('the refusal carries the approximate figure, so it can be offered back',
+        /1\.3692/.test(refusedDerive.message), refusedDerive.message.slice(0, 70));
+  check('and the row is left exactly as it was',
+        (raw.prepare('SELECT quantity FROM item_prices WHERE id = ?')
+          .get(crabPriceId) as any).quantity === null);
+
+  // What the user does say is written — to the row that already exists.
+  await updatePrice(db, uid, crabPriceId, { quantity: 1.4, unit: '斤' });
+  await logPrice(db, uid, {
+    item_name: 'svc-crab', unit_price: 65, quantity: 1.4, transaction_id: crabTx.id,
+  });
+  const afterLog = raw.prepare('SELECT id FROM item_prices WHERE transaction_id = ?')
+    .all(crabTx.id) as any[];
+  check('log_price against a purchase corrects its row instead of adding one',
+        afterLog.length === 1, `got ${afterLog.length}`);
+  check('and it is the same row', afterLog[0].id === crabPriceId,
+        `${afterLog[0].id} vs ${crabPriceId}`);
+
+  const foundAfter = await findTransactions(db, uid, { keyword: 'svc-crab' });
+  check('the purchase is still one row', foundAfter.length === 1,
+        `got ${foundAfter.length}`);
+  check('and now carries the size', foundAfter[0]?.quantity === 1.4,
+        `got ${foundAfter[0]?.quantity}`);
+
+  const cleaned = await findTransactions(db, uid,
+    { missing_field: 'quantity', keyword: 'svc-crab' });
+  check('the repaired purchase stops being reported as missing a size',
+        cleaned.length === 0, `got ${cleaned.length}`);
+
+  // The exact shape of the production data: the stale row left behind next to the
+  // corrected one. That row is what made the flag impossible to clear, so it is
+  // reproduced directly rather than assumed.
+  raw.prepare(
+    `INSERT INTO item_prices
+       (user_id, item_id, transaction_id, unit_price_cents, currency, observed_on, created_at)
+     VALUES (?, ?, ?, 6500, 'CNY', '2026-10-11', ?)`,
+  ).run(uid, crabRows[0].item_id, crabTx.id, new Date().toISOString());
+
+  const withStale = await findTransactions(db, uid,
+    { missing_field: 'quantity', keyword: 'svc-crab' });
+  check('a stale row with no quantity does not resurrect the flag',
+        withStale.length === 0, `got ${withStale.length}`);
+  const rowsNow = await findTransactions(db, uid, { keyword: 'svc-crab' });
+  check('and the purchase is still listed once', rowsNow.length === 1,
+        `got ${rowsNow.length}`);
+  check('summarised by the row that carries the size', rowsNow[0]?.quantity === 1.4,
+        `got ${rowsNow[0]?.quantity}`);
+
+  // The case where dividing IS the answer: 130 at 65 a 斤 is 2, with nothing left
+  // to choose between.
+  const exactTx = await createTransaction(db, uid, {
+    amount: 130, currency: 'CNY', date: '2026-10-12', category_id: catId,
+    description: 'svc-crab-exact', source: 'ai',
+    item: { item_name: 'svc-crab-exact', unit_price: 65 },
+  });
+  const exactPriceId = (raw.prepare('SELECT id FROM item_prices WHERE transaction_id = ?')
+    .get(exactTx.id) as any).id as number;
+  const exactDerived = await deriveQuantityForTransaction(db, uid, exactTx.id);
+  check('an even division is reported as exact',
+        exactDerived.exact === true && exactDerived.quantity === 2,
+        `${exactDerived.quantity} exact=${exactDerived.exact}`);
+
+  const derivedWrite = await updatePrice(db, uid, exactPriceId, { derive_quantity: true });
+  check('and can be recorded', derivedWrite.quantity === 2, `got ${derivedWrite.quantity}`);
+
+  const bothWays = await expectServiceErrorInfo(() =>
+    updatePrice(db, uid, exactPriceId, { quantity: 3, derive_quantity: true }));
+  check('stating a size and deriving one in the same call is refused',
+        bothWays.status === 400 && bothWays.code === 'INVALID_ARGUMENTS',
+        `status ${bothWays.status} code ${bothWays.code}`);
+
+  // A shelf price has no purchase behind it, and a zero price cannot be divided
+  // by: both are refusals with a code, not a silent zero.
+  const shelfPrice = await logPrice(db, uid, { item_name: 'svc-crab-shelf', unit_price: 8 });
+  const noPurchase = await expectServiceErrorInfo(() =>
+    updatePrice(db, uid, shelfPrice.id, { derive_quantity: true }));
+  check('a price with no purchase behind it cannot be divided',
+        noPurchase.status === 400 && noPurchase.code === 'NO_TRANSACTION',
+        `status ${noPurchase.status} code ${noPurchase.code}`);
+
+  const zeroPriced = await createTransaction(db, uid, {
+    amount: 12, currency: 'CNY', date: '2026-10-12', category_id: catId,
+    description: 'svc-freebie', source: 'ai',
+    item: { item_name: 'svc-freebie', unit_price: 0 },
+  });
+  const zeroPriceId = (raw.prepare('SELECT id FROM item_prices WHERE transaction_id = ?')
+    .get(zeroPriced.id) as any).id as number;
+  const zeroDerive = await expectServiceErrorInfo(() =>
+    updatePrice(db, uid, zeroPriceId, { derive_quantity: true }));
+  check('a zero unit price has no answer rather than a zero quantity',
+        zeroDerive.status === 400 && zeroDerive.code === 'NO_UNIT_PRICE',
+        `status ${zeroDerive.status} code ${zeroDerive.code}`);
+
+  // -------------------------------------------------------------------------
   // Subscriptions: renewal is the mechanism R3 depends on. A renewal is a
   // transaction carrying subscription_id, and once it exists the period is no
   // longer overdue — so the assertions here are about that link, not just dates.
@@ -1626,6 +1765,93 @@ async function main() {
         JSON.stringify(jinAsKg.comparable?.unit));
   check('it lands among the un-normalisable rows instead',
         jinAsKg.without_unit?.count === 1, JSON.stringify(jinAsKg.without_unit?.count));
+
+  // ------------------------------------------------- where a size may come from
+  //
+  // The other half of the crab: the assistant was asked "你自己算一下不就知道了吗"
+  // and answered that any figure it produced would be one it made up. That was
+  // the rule working (`systemPrompt`: no figure from the model's own arithmetic),
+  // and it left the user with nothing. The rule is kept and the arithmetic is
+  // moved: the service divides, the tool says whether it came out even, and a
+  // remainder is a refusal rather than a rounding.
+  console.log('\n=== quantity: the assistant may calculate, and may not invent ===');
+
+  const deriveDef = defs.find(d => d.function.name === 'derive_quantity');
+  check('derive_quantity is offered to the model', deriveDef !== undefined);
+  check('and is described as read-only',
+        /only reads/i.test(deriveDef?.function.description ?? ''),
+        (deriveDef?.function.description ?? '').slice(0, 60));
+  check('its description warns that an inexact answer is a guess',
+        /not a fact/i.test(deriveDef?.function.description ?? ''));
+
+  const updatePriceDef = defs.find(d => d.function.name === 'update_price')!;
+  check('update_price can be asked to work a size out',
+        'derive_quantity' in (updatePriceDef.function.parameters as any).properties);
+  check('and says the inference has to be disclosed',
+        /say where it came from/i.test(
+          ((updatePriceDef.function.parameters as any).properties.derive_quantity.description as string)));
+  check('log_price points at update_price for filling in a size',
+        /prefer `update_price`/.test(logPriceDef.function.description));
+
+  const sysText2 = (await buildPrompt(db, uid, 'x',
+    { today: '2030-06-15', sessionId: S })).messages[1].content ?? '';
+  check('the prompt forbids dividing the amount by the unit price',
+        /Never divide the amount by the unit price yourself/i.test(sysText2));
+  check('the prompt says to use the price row id to correct a size',
+        /price_id/.test(sysText2) && /call update_price with that id/i.test(sysText2));
+  check('the prompt refuses log_price as the way to add a size',
+        /Do not call log_price to fill in a size/i.test(sysText2));
+  check('the prompt requires an inferred size to be disclosed',
+        /your inference, not something the user said/i.test(sysText2));
+  check('the prompt allows recording it only when the division is exact',
+        /only when the division was exact AND they have agreed/i.test(sysText2));
+
+  // Read-only means read-only: asking for a number must not write one.
+  const probeTx = await runTool(ctx, 'add_transaction', JSON.stringify({
+    amount: 89, currency: 'CNY', date: '2026-10-11', category: catId,
+    description: 'svc-tool-crab', item: { name: 'svc-tool-crab', unit_price: 65 },
+  }));
+  check('the tool call recorded the purchase', probeTx.ok === true, JSON.stringify(probeTx).slice(0, 120));
+  const probeTxId = (probeTx.data as any).id as number;
+
+  // The id has to be reachable the way the prompt says it is. add_transaction
+  // returns the purchase, not its price row, so the model's route to the row is
+  // find_transactions — the same call it makes days later when the size is
+  // finally supplied.
+  const foundViaTool = await runTool(ctx, 'find_transactions',
+    JSON.stringify({ keyword: 'svc-tool-crab' }));
+  const foundRow = (foundViaTool.data as any[])[0];
+  check('find_transactions hands the model the price row it must correct',
+        typeof foundRow?.price_id === 'number', JSON.stringify(foundRow?.price_id));
+  const probePriceId = foundRow.price_id as number;
+
+  const derivedViaTool = await runTool(ctx, 'derive_quantity', JSON.stringify({ transaction_id: probeTxId }));
+  check('the tool does the division', derivedViaTool.ok === true && (derivedViaTool.data as any).quantity === 1.3692,
+        JSON.stringify(derivedViaTool).slice(0, 140));
+  check('and reports it as inexact', (derivedViaTool.data as any).exact === false);
+  check('and hands back the price row so the size can be corrected there',
+        (derivedViaTool.data as any).price_id === probePriceId,
+        `${(derivedViaTool.data as any).price_id} vs ${probePriceId}`);
+  check('asking for a number wrote nothing',
+        (raw.prepare('SELECT quantity FROM item_prices WHERE transaction_id = ?')
+          .get(probeTxId) as any).quantity === null);
+
+  // Through the tool the refusal has to arrive as data the model can act on, not
+  // as a thrown error: that is the difference between "ask the user" and "fail".
+  const toolRefusal = await runTool(ctx, 'update_price',
+    JSON.stringify({ id: probePriceId, derive_quantity: true }));
+  check('the tool relays the refusal instead of writing something',
+        toolRefusal.ok === false && toolRefusal.code === 'QUANTITY_NOT_EXACT',
+        JSON.stringify(toolRefusal).slice(0, 160));
+  check('with the approximate figure, so it can be offered to the user',
+        /1\.3692/.test(toolRefusal.error ?? ''));
+
+  const toolCorrect = await runTool(ctx, 'log_price', JSON.stringify({
+    item: 'svc-tool-crab', unit_price: 65, quantity: 1.4, transaction_id: probeTxId,
+  }));
+  check('the tool reports that it corrected rather than recorded',
+        toolCorrect.ok === true && (toolCorrect.data as any).corrected_existing === true,
+        JSON.stringify(toolCorrect).slice(0, 140));
 
   // ------------------------------------------------------------------ add_unit
   //

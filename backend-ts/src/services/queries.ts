@@ -14,8 +14,11 @@
 
 import type { TransactionWithItemName } from '../types';
 import { centsToAmount, roundMoney } from '../utils/money';
-import { badRequest } from './errors';
-import { TX_SELECT, toTransaction, type TxRow } from './transactions';
+import { deriveQuantity } from '../utils/quantity';
+import { badRequest, notFound } from './errors';
+import {
+  PRIMARY_PRICE_JOIN, TX_SELECT, toTransaction, type TxRow,
+} from './transactions';
 import { getAllSubcategoryIds } from '../utils/categories';
 
 /** Hard ceiling on rows returned to the model in one query. */
@@ -63,9 +66,22 @@ const MISSING_FIELD_SQL: Record<NonNullable<FindTransactionsInput['missing_field
   description: "(t.description IS NULL OR TRIM(t.description) = '')",
 };
 
+/**
+ * What the assistant sees for one transaction.
+ *
+ * The wire shape plus `price_id`: the row that carries this purchase's unit and
+ * quantity. Without it the only way to add a missing size was `log_price`, which
+ * *records* rather than corrects — that is what put a second price row on the
+ * crab, after which the item counted twice and the missing-quantity flag never
+ * cleared. With it, `update_price` is a single obvious call.
+ */
+export interface AiTransaction extends TransactionWithItemName {
+  price_id: number | null;
+}
+
 export async function findTransactions(
   db: D1Database, userId: number, input: FindTransactionsInput,
-): Promise<TransactionWithItemName[]> {
+): Promise<AiTransaction[]> {
   const where: string[] = ['t.user_id = ?'];
   const params: any[] = [userId];
 
@@ -113,7 +129,94 @@ export async function findTransactions(
     .bind(...params, limit)
     .all<TxRow>();
 
-  return results.map(toTransaction);
+  // `price_id` is added here rather than in `toTransaction`, which is the API's
+  // wire shape as well: the id of the price row is something the assistant needs
+  // in order to correct that row, and the HTTP contract has no use for it.
+  return results.map((row) => ({ ...toTransaction(row), price_id: row.price_id }));
+}
+
+/**
+ * The amount a purchase is reported through, for dividing by the unit price.
+ *
+ * Separate from `findTransactions` so the arithmetic has one home, and read-only
+ * on purpose: this answers "how many would that be?", and answering is not
+ * recording. The write path is `update_price`'s `derive_quantity`.
+ */
+export interface DerivedQuantityView {
+  transaction_id: number;
+  date: string;
+  description: string | null;
+  currency: string;
+  item_id: number | null;
+  item_name: string | null;
+  /** The price row the unit price came from, so it can be corrected in place. */
+  price_id: number | null;
+  unit: string | null;
+  unit_raw: string | null;
+  amount: number;
+  unit_price: number;
+  /** What the division gives, rounded when it did not come out even. */
+  quantity: number;
+  /** False when the amount does not divide evenly — see utils/quantity.ts. */
+  exact: boolean;
+}
+
+export async function deriveQuantityForTransaction(
+  db: D1Database, userId: number, transactionId: number,
+): Promise<DerivedQuantityView> {
+  const row = await db
+    .prepare(
+      `SELECT t.id, t.date, t.description, t.amount_cents, t.currency,
+              ip.id as price_id, ip.unit_price_cents, ip.unit, ip.unit_raw,
+              i.id as item_id, i.name as item_name
+         FROM transactions t
+         ${PRIMARY_PRICE_JOIN}
+         LEFT JOIN items i ON i.id = ip.item_id AND i.user_id = t.user_id
+        WHERE t.id = ? AND t.user_id = ?`,
+    )
+    .bind(transactionId, userId)
+    .first<{
+      id: number; date: string; description: string | null;
+      amount_cents: number; currency: string;
+      price_id: number | null; unit_price_cents: number | null;
+      unit: string | null; unit_raw: string | null;
+      item_id: number | null; item_name: string | null;
+    }>();
+
+  if (!row) throw notFound('Transaction not found');
+
+  // Both refusals are "there is nothing to divide", and both have to reach the
+  // model as a reason it can act on rather than as a generic 400.
+  if (row.unit_price_cents === null) {
+    throw badRequest(
+      'This purchase has no price per unit recorded, so there is nothing to divide the amount by.',
+      { code: 'NO_UNIT_PRICE' }, 'NO_UNIT_PRICE',
+    );
+  }
+
+  const derived = deriveQuantity(row.amount_cents, row.unit_price_cents);
+  if (!derived) {
+    throw badRequest(
+      'The recorded unit price is zero, so the amount cannot be divided by it.',
+      { code: 'NO_UNIT_PRICE' }, 'NO_UNIT_PRICE',
+    );
+  }
+
+  return {
+    transaction_id: row.id,
+    date: row.date,
+    description: row.description,
+    currency: row.currency,
+    item_id: row.item_id,
+    item_name: row.item_name,
+    price_id: row.price_id,
+    unit: row.unit,
+    unit_raw: row.unit_raw,
+    amount: centsToAmount(row.amount_cents),
+    unit_price: centsToAmount(row.unit_price_cents),
+    quantity: derived.quantity,
+    exact: derived.exact,
+  };
 }
 
 export type SummaryGroupBy = 'category' | 'month' | 'day';

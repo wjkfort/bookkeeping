@@ -18,6 +18,7 @@
  */
 
 import { toCents, toAmount } from '../utils/money';
+import { deriveQuantity } from '../utils/quantity';
 import { isDateOnly, todayInZone } from '../utils/time';
 import { badRequest, notFound, serverError } from './errors';
 import { listUnits } from './units';
@@ -317,11 +318,42 @@ export async function resolveUnitPair(
 }
 
 /**
+ * The observation a purchase already carries for one item, if any.
+ *
+ * A purchase has one price per item in practice, so this is what makes
+ * `log_price` idempotent per (transaction, item) and what lets the tool report
+ * whether it recorded a new observation or corrected the existing one.
+ */
+export async function findPriceForTransaction(
+  db: D1Database, userId: number, transactionId: number, itemId: number,
+): Promise<{ id: number } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id FROM item_prices
+        WHERE user_id = ? AND transaction_id = ? AND item_id = ?
+        ORDER BY id DESC LIMIT 1`,
+    )
+    .bind(userId, transactionId, itemId)
+    .first<{ id: number }>();
+  return row ?? null;
+}
+
+/**
  * Record one observed price, with or without a transaction.
  *
  * `item_id` is verified to belong to the user (the model cannot pick a user or
  * reach another user's item), and `unit` is validated against the vocabulary
  * before touching the table so failures are actionable.
+ *
+ * Called with a transaction and an item that already has an observation, this
+ * corrects that row instead of adding a second one. It used to always insert,
+ * and that is what put two rows on the crab: one written when the purchase was
+ * recorded ("65 元一斤"), one written when the size was filled in later. Each
+ * row was right on its own, and together they made the item report two purchases
+ * and double the spending, because the stats count purchases through the price
+ * rows. The `UNIQUE (transaction_id, item_id)` index that would make this
+ * structural cannot be created while that duplicate is still in the table, so
+ * the rule lives here until the data is cleaned up.
  */
 export async function logPrice(
   db: D1Database, userId: number, input: LogPriceInput,
@@ -374,6 +406,23 @@ export async function logPrice(
       .bind(transaction_id, userId)
       .first<{ id: number; date: string }>();
     if (!ownedTx) throw notFound('Transaction not found');
+
+    // One observation per (purchase, item): correct the existing row rather than
+    // recording the same purchase twice. `observed_on` is forwarded only when the
+    // caller gave one — an upsert that defaulted it to today would move yesterday's
+    // observation to the day the correction was made.
+    const existing = await findPriceForTransaction(db, userId, transaction_id, itemId);
+    if (existing) {
+      return updatePrice(db, userId, existing.id, {
+        unit_price,
+        quantity,
+        unit,
+        unit_raw: input.unit_raw,
+        currency: input.currency,
+        merchant: input.merchant,
+        observed_on: input.observed_on,
+      });
+    }
   }
 
   // Validated here rather than left to the foreign key, so the model receives
@@ -423,6 +472,18 @@ export async function logPrice(
 export interface UpdatePriceInput {
   unit_price?: number;
   quantity?: number | null;
+  /**
+   * Set the quantity by dividing the purchase's amount by the unit price
+   * instead of being told it. Refused unless the division is exact.
+   *
+   * This is the one way a quantity can reach the ledger without the user having
+   * said it, so it is deliberately narrow. The division is done here, not by the
+   * model (`systemPrompt`: no figure may come from the model's own arithmetic),
+   * and a remainder is a refusal rather than a rounding, because the rounded
+   * number would be stored as though someone had stated it. Read
+   * `utils/quantity.ts` for why even an exact division is only a proposal.
+   */
+  derive_quantity?: boolean;
   /** A `units.code`; the wording goes in `unit_raw`. */
   unit?: string | null;
   unit_raw?: string | null;
@@ -437,6 +498,61 @@ export async function updatePrice(
 ): Promise<Price> {
   const existing = await fetchPrice(db, userId, id);
   if (!existing) throw notFound('Price not found');
+
+  if (body.derive_quantity && body.quantity !== undefined) {
+    throw badRequest(
+      'Pass either quantity or derive_quantity, not both — one states the size, the other works it out.',
+      { code: 'INVALID_ARGUMENTS' }, 'INVALID_ARGUMENTS',
+    );
+  }
+
+  // Resolved before the update is assembled, so a refusal leaves the row exactly
+  // as it was.
+  let derivedQuantity: number | null = null;
+  if (body.derive_quantity) {
+    if (existing.transaction_id === null) {
+      throw badRequest(
+        'This price is not linked to a purchase, so there is no amount to divide.',
+        { code: 'NO_TRANSACTION' }, 'NO_TRANSACTION',
+      );
+    }
+
+    const tx = await db
+      .prepare('SELECT amount_cents FROM transactions WHERE id = ? AND user_id = ?')
+      .bind(existing.transaction_id, userId)
+      .first<{ amount_cents: number }>();
+    if (!tx) {
+      throw badRequest(
+        'This price points at a purchase that no longer exists, so there is no amount to divide.',
+        { code: 'NO_TRANSACTION' }, 'NO_TRANSACTION',
+      );
+    }
+
+    // Against the unit price this call will leave in place, not necessarily the
+    // stored one: correcting the price and the size together is one intent.
+    const unitPriceCents = body.unit_price !== undefined
+      ? toCents(body.unit_price)
+      : toCents(existing.unit_price);
+
+    const derived = deriveQuantity(tx.amount_cents, unitPriceCents);
+    if (!derived) {
+      throw badRequest(
+        'The unit price is zero, so the amount cannot be divided by it, and there is no '
+        + 'quantity that can be worked out from it.',
+        { code: 'NO_UNIT_PRICE' }, 'NO_UNIT_PRICE',
+      );
+    }
+    if (!derived.exact) {
+      throw badRequest(
+        `The amount does not divide evenly by the unit price — it comes to about ${derived.quantity}. `
+        + 'A discount, a rounded price or one payment covering several things all break the sum, '
+        + 'so the quantity has to come from the user.',
+        { code: 'QUANTITY_NOT_EXACT', quantity: derived.quantity },
+        'QUANTITY_NOT_EXACT',
+      );
+    }
+    derivedQuantity = derived.quantity;
+  }
 
   const updates: string[] = [];
   const values: any[] = [];
@@ -460,6 +576,11 @@ export async function updatePrice(
   if (body.quantity !== undefined) {
     updates.push('quantity = ?');
     values.push(body.quantity);
+  } else if (derivedQuantity !== null) {
+    // Written like any other quantity; what differs is where it came from, and
+    // that is what the reply has to say out loud.
+    updates.push('quantity = ?');
+    values.push(derivedQuantity);
   }
 
   if (body.unit !== undefined) {
