@@ -126,7 +126,23 @@ async function main() {
   const env = {
     DB: new D1Shim(dbPath),
     JWT_SECRET: secret,
-    EXCHANGE_RATE_CACHE_HOURS: '24',
+    // Pinned so that a capture does not depend on WHEN it is run.
+    //
+    // `fetchAndCacheRates` re-fetches only when the stored `fetched_at` is older
+    // than this window, and the fetch below is stubbed to a fixed payload. So the
+    // rates — and therefore every converted figure in /summary — used to depend
+    // on the age of the fixture's rate row: inside the window the stored rate was
+    // used, outside it the stubbed one was. On 2026-10-09 that flipped
+    // 6.7047 -> 7.25 exactly 24h after the row was written, moving all 76 money
+    // fields by 7.25/6.7047 and failing the stored contract baseline from then
+    // on, with no change to the code or the data.
+    //
+    // A window this wide (100 years) makes every stored row count as fresh, so
+    // the numbers are a function of the database alone. A fixture with no stored
+    // rates falls through to the stub, which is fixed too, so both paths are
+    // deterministic. The staleness logic itself is covered elsewhere; this layer
+    // snapshots a contract, not the refresh policy.
+    EXCHANGE_RATE_CACHE_HOURS: '876000',
     OPEN_EXCHANGE_RATES_API_KEY: 'unused-in-capture',
   };
 
