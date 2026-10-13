@@ -53,7 +53,15 @@
   /* Fills the anchor. The width cap lives on the anchor so the tail and the
      panel stay the same width. */
   width: 100%;
-  max-height: 100%;
+  /* `inherit`, not `100%`. The anchor's height is `auto` (it is capped by
+     `max-height`, not sized by `height`), and a percentage max-height against an
+     indefinite containing block computes to `none`. So `100%` left the panel
+     unbounded: with enough turns it grew past the anchor, ran off the bottom of
+     the fixed box, and took the composer and the newest replies with it.
+     `.chat-dock-log` could never scroll either, because nothing above it was
+     height-constrained — `flex: 1` only distributes space that exists. Taking
+     the parent's used cap keeps the two in sync by construction. */
+  max-height: inherit;
   display: flex;
   flex-direction: column;
   background: var(--app-paper);
